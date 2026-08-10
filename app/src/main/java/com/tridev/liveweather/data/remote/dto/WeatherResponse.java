@@ -30,6 +30,9 @@ public class WeatherResponse {
     @SerializedName("current")
     private CurrentWeather current;
 
+    @SerializedName("minutely_15")
+    private Minutely15Weather minutely15;
+
     @SerializedName("hourly")
     private HourlyWeather hourly;
 
@@ -66,6 +69,10 @@ public class WeatherResponse {
 
     public CurrentWeather getCurrent() {
         return current;
+    }
+
+    public Minutely15Weather getMinutely15() {
+        return minutely15;
     }
 
     public HourlyWeather getHourly() {
@@ -209,6 +216,65 @@ public class WeatherResponse {
 
         public Double getWindGusts10m() {
             return windGusts10m;
+        }
+    }
+
+    public static class Minutely15Weather {
+
+        @SerializedName("time")
+        private List<String> time;
+
+        @SerializedName("precipitation")
+        private List<Double> precipitation;
+
+        @SerializedName("rain")
+        private List<Double> rain;
+
+        @SerializedName("showers")
+        private List<Double> showers;
+
+        @SerializedName("snowfall")
+        private List<Double> snowfall;
+
+        @SerializedName("weather_code")
+        private List<Integer> weatherCode;
+
+        @SerializedName("cloud_cover")
+        private List<Double> cloudCover;
+
+        @SerializedName("visibility")
+        private List<Double> visibility;
+
+        public List<String> getTime() {
+            return time;
+        }
+
+        public List<Double> getPrecipitation() {
+            return precipitation;
+        }
+
+        public List<Double> getRain() {
+            return rain;
+        }
+
+        public List<Double> getShowers() {
+            return showers;
+        }
+
+        public List<Double> getSnowfall() {
+            return snowfall;
+        }
+
+        public List<Integer> getWeatherCode() {
+            return weatherCode;
+        }
+
+        public List<Double> getCloudCover() {
+            return cloudCover;
+        }
+
+        public List<Double> getVisibility() {
+            return visibility;
         }
     }
 
