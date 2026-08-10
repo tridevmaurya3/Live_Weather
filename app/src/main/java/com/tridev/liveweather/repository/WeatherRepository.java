@@ -20,6 +20,9 @@ public class WeatherRepository {
                     "pressure_msl,surface_pressure,wind_speed_10m,wind_direction_10m," +
                     "wind_gusts_10m";
 
+    private static final String MINUTELY_15_VARIABLES =
+            "precipitation,rain,showers,snowfall,weather_code,cloud_cover,visibility";
+
     private static final String HOURLY_VARIABLES =
             "temperature_2m,relative_humidity_2m,apparent_temperature,dew_point_2m,is_day," +
                     "precipitation_probability,precipitation,rain,showers,snowfall," +
@@ -36,6 +39,8 @@ public class WeatherRepository {
 
     private static final String TIMEZONE_AUTO = "auto";
     private static final int FORECAST_DAYS = 10;
+    private static final int FORECAST_MINUTELY_15 = 8;
+    private static final int PAST_MINUTELY_15 = 4;
 
     private final OpenMeteoApiService apiService;
 
@@ -56,10 +61,13 @@ public class WeatherRepository {
                 latitude,
                 longitude,
                 CURRENT_VARIABLES,
+                MINUTELY_15_VARIABLES,
                 HOURLY_VARIABLES,
                 DAILY_VARIABLES,
                 TIMEZONE_AUTO,
-                FORECAST_DAYS
+                FORECAST_DAYS,
+                FORECAST_MINUTELY_15,
+                PAST_MINUTELY_15
         );
 
         call.enqueue(new Callback<WeatherResponse>() {
