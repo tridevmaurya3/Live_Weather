@@ -67,15 +67,30 @@
     <string name="detail_daylight">Daylight</string>
     <string name="dashboard_quick_actions">Explore weather</string>
 
-    <!-- Forecast -->
+    <!-- Phase 5 advanced forecast -->
     <string name="forecast_title">Forecast</string>
-    <string name="forecast_subtitle">Hourly and multi-day weather intelligence.</string>
+    <string name="forecast_subtitle">Advanced hourly trends, rain timing, expandable daily intelligence and sky reality.</string>
+    <string name="forecast_smart_title">Smart outlook</string>
+    <string name="forecast_smart_waiting">Analysing the next 24 hours…</string>
+    <string name="forecast_temperature_chart_title">Temperature trend</string>
+    <string name="forecast_temperature_chart_sub">Next 24 hours · live forecast curve</string>
+    <string name="forecast_rain_chart_title">Rain probability</string>
+    <string name="forecast_rain_chart_sub">Next 24 hours · precipitation chance</string>
     <string name="forecast_hourly_title">Next 24 hours</string>
     <string name="forecast_chart_waiting">Waiting for live hourly weather…</string>
     <string name="forecast_daily_title">10-day outlook</string>
     <string name="forecast_daily_waiting">Waiting for live daily forecast…</string>
+    <string name="forecast_daily_hint">Tap any day to expand feels-like, wet hours, sunshine, daylight, UV and wind details.</string>
     <string name="forecast_wind_title">Wind &amp; precipitation</string>
     <string name="forecast_wind_waiting">Wind and precipitation details will appear after sync.</string>
+    <string name="forecast_sky_title">Sky Reality</string>
+    <string name="forecast_sky_subtitle">Astronomical position + live weather obstruction. This same state is reserved for the app, widgets and Live Wallpaper.</string>
+    <string name="forecast_sky_stage">Sky stage</string>
+    <string name="forecast_sun_position">Sun</string>
+    <string name="forecast_moon_position">Moon</string>
+    <string name="forecast_star_visibility">Stars</string>
+    <string name="forecast_scene_light">Scene light</string>
+    <string name="forecast_sky_waiting">Waiting for location, weather and astronomy state.</string>
 
     <!-- Radar -->
     <string name="radar_title">Radar</string>
@@ -101,7 +116,7 @@
     <string name="wallpaper_effect_daynight">Day / night sync</string>
     <string name="wallpaper_effect_battery">Battery adaptive</string>
     <string name="wallpaper_apply">Apply Live Wallpaper</string>
-    <string name="wallpaper_note">The real rendering engine will be connected to these controls in the wallpaper phase.</string>
+    <string name="wallpaper_note">The real rendering engine will consume the shared weather + Sky Reality state in the wallpaper phase.</string>
 
     <!-- More / City Engine -->
     <string name="more_title">More</string>
@@ -143,4 +158,5 @@
     <string name="status_phase_two">PHASE 2 · REAL WEATHER ENGINE</string>
     <string name="status_phase_three">PHASE 3 · LOCATION &amp; CITY ENGINE</string>
     <string name="status_phase_four">PHASE 4 · DASHBOARD INTELLIGENCE</string>
+    <string name="status_phase_five">PHASE 5 · ADVANCED FORECAST &amp; SKY REALITY</string>
 </resources>
