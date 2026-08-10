@@ -23,8 +23,7 @@ import com.tridev.liveweather.ui.scene.NatureSceneRenderer;
  */
 public final class LiveSkyView extends View {
 
-    private static final long NORMAL_FRAME_MILLIS = 33L;
-    private static final long POWER_FRAME_MILLIS = 50L;
+    private static final long FRAME_MILLIS = 33L;
 
     private final Handler handler = new Handler(Looper.getMainLooper());
     private final NatureSceneRenderer renderer = new NatureSceneRenderer();
@@ -38,12 +37,7 @@ public final class LiveSkyView extends View {
                 return;
             }
             postInvalidateOnAnimation();
-            handler.postDelayed(
-                    this,
-                    options != null && options.isBatteryAdaptive()
-                            ? POWER_FRAME_MILLIS
-                            : NORMAL_FRAME_MILLIS
-            );
+            handler.postDelayed(this, FRAME_MILLIS);
         }
     };
 
