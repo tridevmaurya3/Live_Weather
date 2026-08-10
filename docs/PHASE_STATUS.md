@@ -28,7 +28,25 @@ Status: COMPLETE
 - Responsive reusable glass cards, chips, buttons, typography and spacing
 - No fake live weather values: data-dependent values remain placeholders until Phase 2
 
-## Next
-Phase 2 — Real Weather Data Engine
+## Phase 2 — Real Weather Data Engine
+Status: IN PROGRESS
 
-The next phase will connect the UI to real current-weather and forecast data, shared cached state and resilient network/error handling.
+### Step 2.1 — Real Weather API Core
+Status: COMPLETE
+
+- INTERNET permission added
+- Open-Meteo Retrofit API service added
+- Reusable Retrofit weather client added
+- Current, hourly and daily weather DTO model added
+- Weather repository added with latitude/longitude input
+- Current weather variables include temperature, humidity, feels-like, precipitation, rain, snow, weather code, cloud cover, pressure and wind
+- Hourly forecast includes precipitation probability, visibility, pressure and wind
+- Daily forecast includes max/min temperature, feels-like, sunrise/sunset, UV, precipitation and wind
+- 10-day forecast request configured
+- Automatic timezone selection configured
+- No hard-coded user location
+
+### Next — Step 2.2
+Device Location Engine
+
+The next step will add runtime location permissions, current-device location retrieval, graceful permission handling and feed real latitude/longitude into the weather repository.
