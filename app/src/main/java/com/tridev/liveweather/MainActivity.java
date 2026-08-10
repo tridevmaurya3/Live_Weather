@@ -100,7 +100,7 @@ public class MainActivity extends AppCompatActivity {
         );
 
         if (fineGranted || coarseGranted) {
-            requestCurrentLocation();
+            requestCurrentLocation(false);
         } else {
             showLocationPermissionNeeded();
         }
@@ -285,7 +285,7 @@ public class MainActivity extends AppCompatActivity {
         }
 
         if (deviceLocationManager.hasLocationPermission()) {
-            requestCurrentLocation();
+            requestCurrentLocation(false);
             return;
         }
 
@@ -327,7 +327,7 @@ public class MainActivity extends AppCompatActivity {
 
     private void requestLocationAccess() {
         if (deviceLocationManager.hasLocationPermission()) {
-            requestCurrentLocation();
+            requestCurrentLocation(false);
         } else {
             requestLocationPermission();
         }
@@ -340,7 +340,7 @@ public class MainActivity extends AppCompatActivity {
         });
     }
 
-    private void requestCurrentLocation() {
+    private void requestCurrentLocation(boolean forceWeatherRefresh) {
         if (cityViewModel.getSelectedCity() != null) {
             return;
         }
@@ -377,7 +377,7 @@ public class MainActivity extends AppCompatActivity {
                             weatherViewModel.refreshWeather(
                                     resolvedLatitude,
                                     resolvedLongitude,
-                                    false
+                                    forceWeatherRefresh
                             );
                         });
 
@@ -421,25 +421,14 @@ public class MainActivity extends AppCompatActivity {
             return;
         }
 
-        if (!Double.isNaN(latestLatitude) && !Double.isNaN(latestLongitude)) {
-            weatherViewModel.refreshWeather(latestLatitude, latestLongitude, true);
+        // Current-location mode intentionally obtains a new GPS fix before a
+        // forced network refresh so manual Refresh cannot silently reuse an old position.
+        if (deviceLocationManager.hasLocationPermission()) {
+            requestCurrentLocation(true);
             return;
         }
 
-        WeatherUiState state = weatherViewModel.getWeatherState().getValue();
-        if (state != null
-                && state.hasWeather()
-                && !Double.isNaN(state.getLatitude())
-                && !Double.isNaN(state.getLongitude())) {
-            weatherViewModel.refreshWeather(
-                    state.getLatitude(),
-                    state.getLongitude(),
-                    true
-            );
-            return;
-        }
-
-        requestLocationAccess();
+        requestLocationPermission();
     }
 
     private void renderLocationError(DeviceLocationManager.LocationError error) {
