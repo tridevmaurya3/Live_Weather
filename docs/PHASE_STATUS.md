@@ -45,80 +45,87 @@ Status: COMPLETE
 ## Phase 3 — Location & City Engine
 Status: COMPLETE
 
-### Step 3.1 — Friendly Current Place Name
+- Friendly current-place name resolution with coordinate fallback
+- Global city / postal-code search
+- Multiple saved cities
+- Persistent active city selection
+- Current-location and searched-city switching
+- Per-location weather cache
+- Professional Locations & Cities manager on More page
+- Home, Forecast and Wallpaper preview stay synchronized with the active location
+
+## Phase 4 — Main Weather Dashboard Intelligence & Interaction
 Status: COMPLETE
 
-- Android Geocoder reverse-geocoding layer added
-- API 33+ asynchronous GeocodeListener path added
-- Android 8–12 background-thread compatibility path added
-- Current coordinates are replaced by a friendly locality/admin/country label when available
-- Coordinates remain the fallback when geocoding is unavailable or fails
-- Weather loading never depends on reverse-geocoding success
-
-### Step 3.2 — Global City Search
+### Step 4.1 — Rich Current Conditions
 Status: COMPLETE
 
-- Open-Meteo Geocoding API client added
-- City or postal-code search added
-- Local device language is sent to the geocoding service when possible
-- Up to eight ranked results are shown
-- Search results include friendly place name, coordinates and timezone
-- Empty, loading and error search states are handled
-- Active search calls are cancelled before replacement searches
+- Current API request expanded with dew point and visibility
+- Daily request expanded with daylight and sunshine duration
+- Existing temperature, feels-like, humidity, precipitation, cloud cover, pressure, wind and gust values retained
+- Dashboard values still come from the shared WeatherViewModel response
 
-### Step 3.3 — Saved / Favourite Cities
+### Step 4.2 — Weather Intelligence Layer
 Status: COMPLETE
 
-- Multiple cities can be saved locally
-- Saved cities survive app restart
-- Duplicate saved locations are prevented by stable identity/coordinates
-- Up to 20 saved cities are retained
-- Saved cities can be removed
-- Active-city removal safely returns the app to current-location mode
+- DashboardIntelligence helper added
+- Current conditions are converted into concise user-facing weather insight
+- Thunderstorm, rain, strong-gust, low-visibility, high-UV, clear-sky and heavy-cloud states are interpreted
+- UV value is classified as Low, Moderate, High, Very high or Extreme
+- Visibility is converted to kilometres and interpreted
+- Dew point is interpreted into dry / comfortable / humid states
+- Wind gust strength is interpreted
+- Rain probability is interpreted
+- Pressure trend compares current pressure with the near-term hourly forecast
 
-### Step 3.4 — Active Weather Location Switching
+### Step 4.3 — Sun & Atmospheric Details
 Status: COMPLETE
 
-- Search result can be used directly without saving
-- Saved city can be activated with one tap
-- Active selected city is persisted across app restarts
-- Selecting a city switches Home, Forecast and Wallpaper preview together
-- Current-location mode can be restored from the city manager
-- Startup restores the selected city without requesting GPS permission unnecessarily
-- Restoring a city does not override the currently restored bottom-navigation tab
+- Sunrise and sunset are shown in local API time
+- Daylight duration is shown
+- UV index is shown with interpretation
+- Pressure and trend are shown
+- Visibility and quality are shown
+- Cloud cover and sky interpretation are shown
+- Dew point is shown
+- Wind gusts are shown
+- Today rain chance is shown
 
-### Step 3.5 — Multi-City Weather Cache
+### Step 4.4 — Weather-Reactive Hero Card
 Status: COMPLETE
 
-- WeatherCache upgraded from one global snapshot to per-location snapshots
-- Phase 2 legacy cache is migrated automatically
-- Each location stores its own WeatherResponse, coordinates and update time
-- Switching to a previously visited city can show its saved weather immediately
-- Live network refresh replaces the saved snapshot when successful
-- Network failure keeps the selected city’s saved weather instead of another city’s data
+- Hero card changes visual theme from current WMO condition and day/night state
+- Separate visual modes added for clear day, clear night, cloudy, rain, thunderstorm, snow and fog
+- Live temperature, condition, feels-like and high/low remain readable over every hero state
+- Wallpaper preview summary now includes cloud, gust and day/night context
 
-### Step 3.6 — Professional City Manager UI
+### Step 4.5 — Interactive Dashboard Actions
 Status: COMPLETE
 
-- More page now contains a dedicated Locations & Cities manager
-- Active weather location is shown clearly
-- Use current device location action added
-- City/postal-code search box added
-- Search results render dynamically
-- Use, Save, Active and Remove actions added
-- Saved cities render dynamically
-- Existing Widgets, Alerts, Air Quality, Units and Performance controls remain available below the city manager
+- Explicit Refresh action added to Home hero card
+- Existing sync status remains tap-to-refresh
+- 10-day forecast card navigates to Forecast
+- Live radar card navigates to Radar
+- Air quality card navigates to the More control center until the dedicated AQI phase is implemented
+- Live Wallpaper action navigates to Wallpaper controls
+- Location label keeps its Phase 3 current-location / city-manager behavior
+- Dashboard actions use light platform haptic feedback while respecting device haptic settings
 
-## Phase 3 Result
+### Step 4.6 — Compact Professional Dashboard Layout
+Status: COMPLETE
 
-The app now supports two complete weather-location modes:
+- Home spacing tightened while preserving scroll safety
+- Smart weather insight card added
+- Advanced details are presented in compact two-column cards
+- Hourly forecast remains horizontally scrollable
+- Explore Weather quick actions grouped below current details
+- Phase 4 status shown at the bottom of Home
 
-1. Current device location with best-effort friendly place naming.
-2. Any searched/saved city with persistent selection and its own cached weather.
+## Phase 4 Result
 
-Weather location switching updates the shared weather pipeline, so Home, Forecast and Wallpaper preview remain synchronized.
+The Home dashboard is no longer only a raw weather readout. It now combines live weather values, interpretation, weather-reactive visual state and direct navigation actions while continuing to use the shared cached multi-city weather pipeline.
 
 ## Next
-Phase 4 — Main Weather Dashboard Intelligence & Interaction
+Phase 5 — Advanced Forecast System & Charts
 
-Planned scope: richer current-condition details, sunrise/sunset, pressure, visibility, cloud cover, UV interpretation, weather-aware visual state, interaction polish and dashboard actions.
+Planned scope: richer hourly presentation, temperature/rain charts, daily expansion, precipitation timing, forecast summaries and interaction polish.
