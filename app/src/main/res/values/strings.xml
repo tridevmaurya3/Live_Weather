@@ -7,38 +7,90 @@
     <string name="nav_wallpaper">Wallpaper</string>
     <string name="nav_more">More</string>
 
-    <string name="foundation_eyebrow">REAL ATMOSPHERE ENGINE</string>
-    <string name="foundation_title">Live Weather</string>
-    <string name="foundation_subtitle">Weather that feels alive on your screen.</string>
-    <string name="foundation_card_title">Visual foundation ready</string>
-    <string name="foundation_card_body">Atmospheric colors, glass surfaces, responsive spacing and Material 3 styling are connected. Real weather data comes in the next phases.</string>
-    <string name="foundation_status">PHASE 0 · HOME SHELL</string>
+    <!-- Home -->
+    <string name="home_brand">LIVE WEATHER</string>
+    <string name="home_location_label">CURRENT LOCATION</string>
+    <string name="home_location_waiting">Location not connected</string>
+    <string name="home_temperature_placeholder">—°</string>
+    <string name="home_condition_waiting">Waiting for live weather</string>
+    <string name="home_feels_like">Feels like —°</string>
+    <string name="home_high_low">H: —°  ·  L: —°</string>
+    <string name="home_sync_status">Connect weather data to activate the live atmosphere.</string>
+    <string name="metric_humidity">Humidity</string>
+    <string name="metric_wind">Wind</string>
+    <string name="metric_rain">Rain</string>
+    <string name="metric_placeholder">—</string>
+    <string name="section_hourly">Hourly forecast</string>
+    <string name="section_today_details">Today at a glance</string>
+    <string name="hour_now">Now</string>
+    <string name="hour_plus_1">+1h</string>
+    <string name="hour_plus_2">+2h</string>
+    <string name="hour_plus_3">+3h</string>
+    <string name="hour_plus_4">+4h</string>
+    <string name="hour_plus_5">+5h</string>
+    <string name="quick_ten_day">10-day forecast</string>
+    <string name="quick_ten_day_sub">Daily highs, lows &amp; rain</string>
+    <string name="quick_radar">Live radar</string>
+    <string name="quick_radar_sub">Rain movement &amp; layers</string>
+    <string name="quick_air">Air quality</string>
+    <string name="quick_air_sub">AQI &amp; pollutants</string>
+    <string name="home_wallpaper_title">Live Wallpaper Engine</string>
+    <string name="home_wallpaper_body">Weather-reactive scenes will mirror rain, clouds, lightning, fog, snow and day-night changes.</string>
+    <string name="home_wallpaper_action">Open wallpaper controls</string>
 
-    <string name="forecast_eyebrow">SMART FORECAST</string>
+    <!-- Forecast -->
     <string name="forecast_title">Forecast</string>
     <string name="forecast_subtitle">Hourly and multi-day weather intelligence.</string>
-    <string name="forecast_card_title">Forecast destination ready</string>
-    <string name="forecast_card_body">Hourly timeline, precipitation probability, temperature, wind and daily forecast components will plug into this section.</string>
-    <string name="forecast_status">PHASE 0 · FORECAST SHELL</string>
+    <string name="forecast_hourly_title">Next 24 hours</string>
+    <string name="forecast_chart_waiting">Temperature &amp; rain chart will appear after live data sync.</string>
+    <string name="forecast_daily_title">10-day outlook</string>
+    <string name="forecast_daily_waiting">Daily forecast is ready for real API data.</string>
+    <string name="forecast_wind_title">Wind &amp; precipitation</string>
+    <string name="forecast_wind_waiting">Wind direction, speed and precipitation probability will populate here.</string>
 
-    <string name="radar_eyebrow">LIVE WEATHER MAP</string>
+    <!-- Radar -->
     <string name="radar_title">Radar</string>
-    <string name="radar_subtitle">Rain, cloud, wind and temperature layers.</string>
-    <string name="radar_card_title">Radar destination ready</string>
-    <string name="radar_card_body">Interactive weather-map layers, location tracking and precipitation movement will be connected here in the radar phase.</string>
-    <string name="radar_status">PHASE 0 · RADAR SHELL</string>
+    <string name="radar_subtitle">A focused map surface for rain, clouds, temperature and wind.</string>
+    <string name="radar_map_label">LIVE WEATHER MAP</string>
+    <string name="radar_map_waiting">Map layer waiting for location and radar provider.</string>
+    <string name="radar_layer_rain">Rain</string>
+    <string name="radar_layer_clouds">Clouds</string>
+    <string name="radar_layer_temp">Temperature</string>
+    <string name="radar_layer_wind">Wind</string>
+    <string name="radar_timeline_title">Storm timeline</string>
+    <string name="radar_timeline_waiting">Past and future precipitation animation controls are ready.</string>
 
-    <string name="wallpaper_eyebrow">REAL ATMOSPHERE WALLPAPER</string>
-    <string name="wallpaper_title">Wallpaper</string>
-    <string name="wallpaper_subtitle">Your current weather, alive on the home screen.</string>
-    <string name="wallpaper_card_title">Hero destination ready</string>
-    <string name="wallpaper_card_body">Rain, clouds, lightning, snow, fog, wind and day-night transitions will be controlled from this section.</string>
-    <string name="wallpaper_status">PHASE 0 · WALLPAPER SHELL</string>
+    <!-- Wallpaper -->
+    <string name="wallpaper_title">Live Wallpaper</string>
+    <string name="wallpaper_subtitle">A weather-aware atmosphere designed for your home screen.</string>
+    <string name="wallpaper_preview_label">LIVE PREVIEW</string>
+    <string name="wallpaper_preview_waiting">Scene waiting for current weather</string>
+    <string name="wallpaper_effects_title">Atmosphere controls</string>
+    <string name="wallpaper_effect_rain">Rain particles</string>
+    <string name="wallpaper_effect_clouds">Cloud movement</string>
+    <string name="wallpaper_effect_lightning">Dynamic lightning</string>
+    <string name="wallpaper_effect_daynight">Day / night sync</string>
+    <string name="wallpaper_effect_battery">Battery adaptive</string>
+    <string name="wallpaper_apply">Apply Live Wallpaper</string>
+    <string name="wallpaper_note">The real rendering engine will be connected to these controls in the wallpaper phase.</string>
 
-    <string name="more_eyebrow">APP CONTROL CENTER</string>
+    <!-- More -->
     <string name="more_title">More</string>
-    <string name="more_subtitle">Cities, widgets, alerts and app preferences.</string>
-    <string name="more_card_title">Control center ready</string>
-    <string name="more_card_body">Saved locations, widget setup, weather alerts, units, refresh options and performance controls will live here.</string>
-    <string name="more_status">PHASE 0 · MORE SHELL</string>
+    <string name="more_subtitle">Your weather control center.</string>
+    <string name="more_cities">Cities</string>
+    <string name="more_cities_sub">Saved locations</string>
+    <string name="more_widgets">Widgets</string>
+    <string name="more_widgets_sub">Home screen layouts</string>
+    <string name="more_alerts">Alerts</string>
+    <string name="more_alerts_sub">Severe weather</string>
+    <string name="more_air_quality">Air quality</string>
+    <string name="more_air_quality_sub">AQI details</string>
+    <string name="more_units">Units</string>
+    <string name="more_units_sub">°C, km/h, mm</string>
+    <string name="more_performance">Performance</string>
+    <string name="more_performance_sub">Battery &amp; refresh</string>
+    <string name="more_about">About Live Weather</string>
+    <string name="more_about_sub">Phase 1 professional UI foundation complete</string>
+
+    <string name="status_phase_one">PHASE 1 · UI SYSTEM READY</string>
 </resources>
