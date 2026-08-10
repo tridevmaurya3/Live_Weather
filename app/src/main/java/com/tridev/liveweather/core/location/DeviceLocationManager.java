@@ -17,16 +17,15 @@ import com.google.android.gms.location.Priority;
 import com.google.android.gms.tasks.CancellationTokenSource;
 
 /**
- * Provides a single foreground location fix for weather lookup.
- *
- * This class deliberately does not request background location and does not
- * subscribe to continuous updates. It is designed for a battery-friendly
- * weather refresh flow where the UI asks for a fresh location when needed.
+ * Provides one foreground location fix for weather lookup.
+ * Fine-location permission prefers a fresh high-accuracy fix; approximate
+ * permission remains supported with balanced power accuracy.
  */
 public final class DeviceLocationManager {
 
-    private static final long MAX_UPDATE_AGE_MILLIS = 5 * 60 * 1000L;
-    private static final long REQUEST_DURATION_MILLIS = 12_000L;
+    private static final long FINE_MAX_UPDATE_AGE_MILLIS = 60_000L;
+    private static final long COARSE_MAX_UPDATE_AGE_MILLIS = 2 * 60 * 1000L;
+    private static final long REQUEST_DURATION_MILLIS = 15_000L;
 
     private final Context appContext;
     private final FusedLocationProviderClient fusedLocationClient;
@@ -37,10 +36,18 @@ public final class DeviceLocationManager {
     }
 
     public boolean hasLocationPermission() {
+        return hasFineLocationPermission() || hasCoarseLocationPermission();
+    }
+
+    public boolean hasFineLocationPermission() {
         return ContextCompat.checkSelfPermission(
                 appContext,
                 Manifest.permission.ACCESS_FINE_LOCATION
-        ) == PackageManager.PERMISSION_GRANTED || ContextCompat.checkSelfPermission(
+        ) == PackageManager.PERMISSION_GRANTED;
+    }
+
+    private boolean hasCoarseLocationPermission() {
+        return ContextCompat.checkSelfPermission(
                 appContext,
                 Manifest.permission.ACCESS_COARSE_LOCATION
         ) == PackageManager.PERMISSION_GRANTED;
@@ -67,9 +74,14 @@ public final class DeviceLocationManager {
             return;
         }
 
+        boolean fine = hasFineLocationPermission();
         CurrentLocationRequest request = new CurrentLocationRequest.Builder()
-                .setPriority(Priority.PRIORITY_BALANCED_POWER_ACCURACY)
-                .setMaxUpdateAgeMillis(MAX_UPDATE_AGE_MILLIS)
+                .setPriority(fine
+                        ? Priority.PRIORITY_HIGH_ACCURACY
+                        : Priority.PRIORITY_BALANCED_POWER_ACCURACY)
+                .setMaxUpdateAgeMillis(fine
+                        ? FINE_MAX_UPDATE_AGE_MILLIS
+                        : COARSE_MAX_UPDATE_AGE_MILLIS)
                 .setDurationMillis(REQUEST_DURATION_MILLIS)
                 .build();
 
