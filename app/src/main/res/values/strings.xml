@@ -11,11 +11,21 @@
     <string name="home_brand">LIVE WEATHER</string>
     <string name="home_location_label">CURRENT LOCATION</string>
     <string name="home_location_waiting">Location not connected</string>
+    <string name="home_location_requesting">Detecting current location…</string>
+    <string name="home_location_ready">Current location ready</string>
+    <string name="home_location_permission_needed">Tap to allow location</string>
+    <string name="home_location_unavailable">Location unavailable</string>
+    <string name="home_location_play_services_unavailable">Location service unavailable</string>
     <string name="home_temperature_placeholder">—°</string>
     <string name="home_condition_waiting">Waiting for live weather</string>
     <string name="home_feels_like">Feels like —°</string>
     <string name="home_high_low">H: —°  ·  L: —°</string>
     <string name="home_sync_status">Connect weather data to activate the live atmosphere.</string>
+    <string name="home_sync_location_requesting">Getting a fresh location for local weather…</string>
+    <string name="home_sync_location_ready">Location detected · ready for real weather sync.</string>
+    <string name="home_sync_location_permission_denied">Location permission is needed for local weather. Tap the location text to retry.</string>
+    <string name="home_sync_location_unavailable">Turn on device Location and tap the location text to retry.</string>
+    <string name="home_sync_location_service_unavailable">Google Play location service is not available on this device.</string>
     <string name="metric_humidity">Humidity</string>
     <string name="metric_wind">Wind</string>
     <string name="metric_rain">Rain</string>
@@ -93,4 +103,5 @@
     <string name="more_about_sub">Phase 1 professional UI foundation complete</string>
 
     <string name="status_phase_one">PHASE 1 · UI SYSTEM READY</string>
+    <string name="status_phase_two_location">PHASE 2 · LOCATION ENGINE READY</string>
 </resources>
