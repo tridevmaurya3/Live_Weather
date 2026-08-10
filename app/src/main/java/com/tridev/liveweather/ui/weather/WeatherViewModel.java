@@ -15,10 +15,7 @@ import com.tridev.liveweather.repository.WeatherRepository;
 import retrofit2.Call;
 
 /**
- * Shared Phase 2 weather state holder.
- *
- * It survives Activity recreation, exposes cached data immediately and keeps
- * the app on one weather request/state source instead of separate requests per screen.
+ * Shared weather state holder for current location and saved cities.
  */
 public final class WeatherViewModel extends AndroidViewModel {
 
@@ -38,15 +35,7 @@ public final class WeatherViewModel extends AndroidViewModel {
 
         WeatherCache.CachedWeather cachedWeather = weatherCache.load();
         if (cachedWeather != null) {
-            weatherState.setValue(new WeatherUiState(
-                    false,
-                    cachedWeather.getWeather(),
-                    true,
-                    "Showing last saved weather while live data refreshes.",
-                    cachedWeather.getSavedAt(),
-                    cachedWeather.getLatitude(),
-                    cachedWeather.getLongitude()
-            ));
+            weatherState.setValue(fromCache(cachedWeather, false, "Showing last saved weather."));
         } else {
             weatherState.setValue(new WeatherUiState(
                     false,
@@ -77,19 +66,30 @@ public final class WeatherViewModel extends AndroidViewModel {
             activeCall = null;
         }
 
-        WeatherResponse existingWeather = currentState != null
-                ? currentState.getWeather()
-                : null;
-        long existingUpdatedAt = currentState != null
-                ? currentState.getUpdatedAt()
-                : 0L;
-        boolean existingFromCache = currentState != null && currentState.isFromCache();
+        WeatherResponse existingWeather = null;
+        long existingUpdatedAt = 0L;
+        boolean existingFromCache = false;
+
+        if (isSameArea(currentState, latitude, longitude) && currentState != null) {
+            existingWeather = currentState.getWeather();
+            existingUpdatedAt = currentState.getUpdatedAt();
+            existingFromCache = currentState.isFromCache();
+        } else {
+            WeatherCache.CachedWeather targetCache = weatherCache.load(latitude, longitude);
+            if (targetCache != null) {
+                existingWeather = targetCache.getWeather();
+                existingUpdatedAt = targetCache.getSavedAt();
+                existingFromCache = true;
+            }
+        }
 
         weatherState.setValue(new WeatherUiState(
                 true,
                 existingWeather,
                 existingFromCache,
-                "Updating live weather…",
+                existingWeather == null
+                        ? "Loading live weather…"
+                        : "Showing saved weather while live data refreshes…",
                 existingUpdatedAt,
                 latitude,
                 longitude
@@ -116,10 +116,7 @@ public final class WeatherViewModel extends AndroidViewModel {
                     }
 
                     @Override
-                    public void onError(
-                            @NonNull String message,
-                            Throwable throwable
-                    ) {
+                    public void onError(@NonNull String message, Throwable throwable) {
                         activeCall = null;
                         WeatherUiState latestState = weatherState.getValue();
                         WeatherResponse fallbackWeather = latestState != null
@@ -143,6 +140,22 @@ public final class WeatherViewModel extends AndroidViewModel {
         );
     }
 
+    private WeatherUiState fromCache(
+            @NonNull WeatherCache.CachedWeather cachedWeather,
+            boolean loading,
+            String message
+    ) {
+        return new WeatherUiState(
+                loading,
+                cachedWeather.getWeather(),
+                true,
+                message,
+                cachedWeather.getSavedAt(),
+                cachedWeather.getLatitude(),
+                cachedWeather.getLongitude()
+        );
+    }
+
     private boolean canReuseLiveState(
             WeatherUiState state,
             double latitude,
@@ -152,16 +165,24 @@ public final class WeatherViewModel extends AndroidViewModel {
             return false;
         }
 
-        if (Double.isNaN(state.getLatitude()) || Double.isNaN(state.getLongitude())) {
-            return false;
-        }
-
-        boolean sameArea = Math.abs(state.getLatitude() - latitude) <= COORDINATE_REUSE_DELTA
-                && Math.abs(state.getLongitude() - longitude) <= COORDINATE_REUSE_DELTA;
+        boolean sameArea = isSameArea(state, latitude, longitude);
         boolean recent = System.currentTimeMillis() - state.getUpdatedAt()
                 <= LIVE_REUSE_WINDOW_MILLIS;
-
         return sameArea && recent;
+    }
+
+    private boolean isSameArea(
+            WeatherUiState state,
+            double latitude,
+            double longitude
+    ) {
+        if (state == null
+                || Double.isNaN(state.getLatitude())
+                || Double.isNaN(state.getLongitude())) {
+            return false;
+        }
+        return Math.abs(state.getLatitude() - latitude) <= COORDINATE_REUSE_DELTA
+                && Math.abs(state.getLongitude() - longitude) <= COORDINATE_REUSE_DELTA;
     }
 
     @Override
