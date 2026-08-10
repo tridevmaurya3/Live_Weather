@@ -8,12 +8,23 @@
     android:background="@drawable/bg_weather_foundation"
     tools:context=".MainActivity">
 
+    <com.tridev.liveweather.ui.sky.LiveSkyView
+        android:id="@+id/appLiveNatureBackground"
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        android:alpha="0.62"
+        android:importantForAccessibility="no"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent" />
+
     <View
         android:id="@+id/skyAtmosphereOverlay"
         android:layout_width="0dp"
         android:layout_height="0dp"
-        android:alpha="0.05"
-        android:background="@color/weather_sky_blue"
+        android:alpha="0.18"
+        android:background="@color/weather_night_deep"
         android:importantForAccessibility="no"
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
