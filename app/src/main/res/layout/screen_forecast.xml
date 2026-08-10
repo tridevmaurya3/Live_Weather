@@ -11,7 +11,7 @@
         android:layout_height="wrap_content"
         android:orientation="vertical"
         android:paddingStart="@dimen/space_16"
-        android:paddingTop="@dimen/space_16"
+        android:paddingTop="@dimen/space_14"
         android:paddingEnd="@dimen/space_16"
         android:paddingBottom="@dimen/space_24">
 
@@ -31,7 +31,86 @@
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="@dimen/space_16"
+            android:layout_marginTop="@dimen/space_14"
+            android:background="@drawable/bg_weather_card_accent"
+            android:orientation="vertical"
+            android:padding="@dimen/space_16">
+
+            <TextView
+                style="@style/TextAppearance.LiveWeather.Section"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="@string/forecast_smart_title" />
+
+            <TextView
+                android:id="@+id/forecastSmartSummary"
+                style="@style/TextAppearance.LiveWeather.Body"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="@dimen/space_8"
+                android:text="@string/forecast_smart_waiting" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="@dimen/space_10"
+            android:background="@drawable/bg_weather_card_compact"
+            android:orientation="vertical"
+            android:padding="@dimen/space_14">
+
+            <TextView
+                style="@style/TextAppearance.LiveWeather.Section"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="@string/forecast_temperature_chart_title" />
+
+            <TextView
+                style="@style/TextAppearance.LiveWeather.Caption"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="@dimen/space_4"
+                android:text="@string/forecast_temperature_chart_sub" />
+
+            <com.tridev.liveweather.ui.forecast.ForecastChartView
+                android:id="@+id/forecastTemperatureChart"
+                android:layout_width="match_parent"
+                android:layout_height="190dp"
+                android:layout_marginTop="@dimen/space_8" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="@dimen/space_10"
+            android:background="@drawable/bg_weather_card_compact"
+            android:orientation="vertical"
+            android:padding="@dimen/space_14">
+
+            <TextView
+                style="@style/TextAppearance.LiveWeather.Section"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="@string/forecast_rain_chart_title" />
+
+            <TextView
+                style="@style/TextAppearance.LiveWeather.Caption"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="@dimen/space_4"
+                android:text="@string/forecast_rain_chart_sub" />
+
+            <com.tridev.liveweather.ui.forecast.ForecastChartView
+                android:id="@+id/forecastRainChart"
+                android:layout_width="match_parent"
+                android:layout_height="190dp"
+                android:layout_marginTop="@dimen/space_8" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="@dimen/space_10"
             android:background="@drawable/bg_weather_card_accent"
             android:orientation="vertical"
             android:padding="@dimen/space_16">
@@ -69,7 +148,7 @@
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="@dimen/space_12"
+            android:layout_marginTop="@dimen/space_10"
             android:background="@drawable/bg_weather_card_compact"
             android:orientation="vertical"
             android:padding="@dimen/space_16">
@@ -88,6 +167,13 @@
                 android:layout_marginTop="@dimen/space_8"
                 android:text="@string/forecast_daily_waiting" />
 
+            <TextView
+                style="@style/TextAppearance.LiveWeather.Caption"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="@dimen/space_6"
+                android:text="@string/forecast_daily_hint" />
+
             <LinearLayout
                 android:id="@+id/forecastDailyContainer"
                 android:layout_width="match_parent"
@@ -99,7 +185,7 @@
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="@dimen/space_12"
+            android:layout_marginTop="@dimen/space_10"
             android:background="@drawable/bg_weather_card_compact"
             android:orientation="vertical"
             android:padding="@dimen/space_16">
@@ -119,6 +205,146 @@
                 android:text="@string/forecast_wind_waiting" />
         </LinearLayout>
 
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="@dimen/space_10"
+            android:background="@drawable/bg_weather_card_accent"
+            android:orientation="vertical"
+            android:padding="@dimen/space_16">
+
+            <TextView
+                style="@style/TextAppearance.LiveWeather.Section"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="@string/forecast_sky_title" />
+
+            <TextView
+                style="@style/TextAppearance.LiveWeather.Caption"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="@dimen/space_4"
+                android:text="@string/forecast_sky_subtitle" />
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="@dimen/space_12"
+                android:orientation="horizontal">
+
+                <TextView
+                    style="@style/TextAppearance.LiveWeather.Caption"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="@string/forecast_sky_stage" />
+
+                <TextView
+                    android:id="@+id/forecastSkyStageValue"
+                    style="@style/TextAppearance.LiveWeather.BodyLarge"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1.35"
+                    android:gravity="end"
+                    android:text="@string/metric_placeholder"
+                    android:textColor="@color/weather_text_primary" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="@dimen/space_10"
+                android:orientation="horizontal">
+
+                <TextView
+                    style="@style/TextAppearance.LiveWeather.Caption"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="@string/forecast_sun_position" />
+
+                <TextView
+                    android:id="@+id/forecastSunPositionValue"
+                    style="@style/TextAppearance.LiveWeather.Body"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1.35"
+                    android:gravity="end"
+                    android:text="@string/metric_placeholder" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="@dimen/space_10"
+                android:orientation="horizontal">
+
+                <TextView
+                    style="@style/TextAppearance.LiveWeather.Caption"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="@string/forecast_moon_position" />
+
+                <TextView
+                    android:id="@+id/forecastMoonPositionValue"
+                    style="@style/TextAppearance.LiveWeather.Body"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1.35"
+                    android:gravity="end"
+                    android:text="@string/metric_placeholder" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="@dimen/space_10"
+                android:orientation="horizontal">
+
+                <TextView
+                    style="@style/TextAppearance.LiveWeather.Caption"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="@string/forecast_star_visibility" />
+
+                <TextView
+                    android:id="@+id/forecastStarVisibilityValue"
+                    style="@style/TextAppearance.LiveWeather.BodyLarge"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1.35"
+                    android:gravity="end"
+                    android:text="@string/metric_placeholder"
+                    android:textColor="@color/weather_snow" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="@dimen/space_10"
+                android:orientation="horizontal">
+
+                <TextView
+                    style="@style/TextAppearance.LiveWeather.Caption"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="@string/forecast_scene_light" />
+
+                <TextView
+                    android:id="@+id/forecastSceneLightValue"
+                    style="@style/TextAppearance.LiveWeather.BodyLarge"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1.35"
+                    android:gravity="end"
+                    android:text="@string/metric_placeholder"
+                    android:textColor="@color/weather_sun_warm" />
+            </LinearLayout>
+        </LinearLayout>
+
         <TextView
             android:id="@+id/forecastStatus"
             style="@style/TextAppearance.LiveWeather.Caption"
@@ -128,7 +354,7 @@
             android:layout_marginTop="@dimen/space_16"
             android:clickable="true"
             android:focusable="true"
-            android:text="@string/status_phase_two"
+            android:text="@string/status_phase_five"
             android:textColor="@color/weather_sky_blue" />
 
     </LinearLayout>
