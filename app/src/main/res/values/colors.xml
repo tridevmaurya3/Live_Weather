@@ -1,5 +1,35 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <!-- Core atmospheric backgrounds -->
+    <color name="weather_background">#08111F</color>
+    <color name="weather_background_mid">#0C1B2E</color>
+    <color name="weather_background_soft">#10243A</color>
+
+    <!-- Glass surfaces -->
+    <color name="weather_surface">#15263A</color>
+    <color name="weather_surface_glass">#CC182B42</color>
+    <color name="weather_surface_glass_soft">#99182B42</color>
+    <color name="weather_border">#33DCEBFF</color>
+    <color name="weather_border_strong">#55DCEBFF</color>
+
+    <!-- Weather accents -->
+    <color name="weather_sky_blue">#79C7FF</color>
+    <color name="weather_rain_blue">#58AEFF</color>
+    <color name="weather_aqua">#7CE8E1</color>
+    <color name="weather_violet">#B8A7FF</color>
+    <color name="weather_sun_warm">#FFD39A</color>
+    <color name="weather_lightning">#FFEAA7</color>
+    <color name="weather_snow">#E8F7FF</color>
+    <color name="weather_success">#7DE2A8</color>
+    <color name="weather_warning">#FFD27A</color>
+    <color name="weather_danger">#FF8E9E</color>
+
+    <!-- Text -->
+    <color name="weather_text_primary">#F6FAFF</color>
+    <color name="weather_text_secondary">#B8C7D9</color>
+    <color name="weather_text_tertiary">#7F91A6</color>
+
+    <!-- Compatibility aliases -->
     <color name="black">#FF000000</color>
     <color name="white">#FFFFFFFF</color>
 </resources>
