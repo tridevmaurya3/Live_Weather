@@ -19,7 +19,8 @@ import retrofit2.Call;
  */
 public final class WeatherViewModel extends AndroidViewModel {
 
-    private static final long LIVE_REUSE_WINDOW_MILLIS = 5 * 60 * 1000L;
+    // Shorter foreground reuse window helps local shower changes appear sooner.
+    private static final long LIVE_REUSE_WINDOW_MILLIS = 2 * 60 * 1000L;
     private static final double COORDINATE_REUSE_DELTA = 0.01d;
 
     private final MutableLiveData<WeatherUiState> weatherState = new MutableLiveData<>();
