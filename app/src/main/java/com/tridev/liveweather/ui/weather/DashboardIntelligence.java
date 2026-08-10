@@ -4,6 +4,7 @@ import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
 import com.tridev.liveweather.data.remote.dto.WeatherResponse;
+import com.tridev.liveweather.domain.LiveConditionResolver;
 
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
@@ -30,7 +31,8 @@ public final class DashboardIntelligence {
 
         WeatherResponse.CurrentWeather current = response.getCurrent();
         WeatherResponse.DailyWeather daily = response.getDaily();
-        Integer code = current.getWeatherCode();
+        LiveConditionResolver.ResolvedCondition resolved = LiveConditionResolver.resolve(response);
+        Integer code = resolved.getWeatherCode();
         Double rainChance = daily == null
                 ? null
                 : WeatherFormatter.valueAt(daily.getPrecipitationProbabilityMax(), 0);
@@ -41,9 +43,11 @@ public final class DashboardIntelligence {
         if (code != null && code >= 95) {
             return "Thunderstorm conditions are active or nearby. Radar and short-term forecast are the most useful views right now.";
         }
-        if ((current.getPrecipitation() != null && current.getPrecipitation() > 0.1d)
-                || (rainChance != null && rainChance >= 70d)) {
-            return "Rain is active or likely today. The hourly strip shows when the risk changes through the next several hours.";
+        if (isRainCode(code) || resolved.getPrecipitationSignalMm() > 0.02d) {
+            return "Live precipitation signals indicate rain or showers now. The dashboard is prioritising the short-term precipitation signal over a conflicting clear-sky model code.";
+        }
+        if (rainChance != null && rainChance >= 70d) {
+            return "Rain is likely today. The hourly strip shows when the risk changes through the next several hours.";
         }
         if (gusts != null && gusts >= 45d) {
             return "Wind gusts are elevated. Check the wind details before outdoor plans and watch for forecast changes.";
@@ -63,6 +67,10 @@ public final class DashboardIntelligence {
             return "Cloud cover is extensive. Watch the hourly rain probability to see whether the cloud layer becomes active weather.";
         }
         return "Conditions are fairly balanced right now. Use the hourly forecast for the next change and the 10-day view for the larger trend.";
+    }
+
+    private static boolean isRainCode(@Nullable Integer code) {
+        return code != null && ((code >= 51 && code <= 67) || (code >= 80 && code <= 82));
     }
 
     @NonNull
@@ -268,11 +276,27 @@ public final class DashboardIntelligence {
     }
 
     @NonNull
-    public static HeroMode heroMode(@Nullable WeatherResponse.CurrentWeather current) {
-        if (current == null || current.getWeatherCode() == null) {
+    public static HeroMode heroMode(@Nullable WeatherResponse response) {
+        if (response == null || response.getCurrent() == null) {
             return HeroMode.CLOUDY;
         }
-        int code = current.getWeatherCode();
+        LiveConditionResolver.ResolvedCondition resolved = LiveConditionResolver.resolve(response);
+        return heroMode(resolved.getWeatherCode(), resolved.getIsDay());
+    }
+
+    @NonNull
+    public static HeroMode heroMode(@Nullable WeatherResponse.CurrentWeather current) {
+        if (current == null) {
+            return HeroMode.CLOUDY;
+        }
+        return heroMode(current.getWeatherCode(), current.getIsDay());
+    }
+
+    @NonNull
+    public static HeroMode heroMode(@Nullable Integer code, @Nullable Integer isDay) {
+        if (code == null) {
+            return HeroMode.CLOUDY;
+        }
         if (code >= 95) {
             return HeroMode.STORM;
         }
@@ -286,7 +310,7 @@ public final class DashboardIntelligence {
             return HeroMode.FOG;
         }
         if (code == 0 || code == 1) {
-            return current.getIsDay() != null && current.getIsDay() == 0
+            return isDay != null && isDay == 0
                     ? HeroMode.CLEAR_NIGHT
                     : HeroMode.CLEAR_DAY;
         }
