@@ -30,7 +30,7 @@
 
         <FrameLayout
             android:layout_width="match_parent"
-            android:layout_height="320dp"
+            android:layout_height="360dp"
             android:layout_marginTop="@dimen/space_16"
             android:background="@drawable/bg_weather_wallpaper_preview">
 
@@ -90,6 +90,28 @@
             android:text="@string/phase6_celestial_waiting"
             android:textColor="@color/weather_text_secondary" />
 
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="@dimen/space_14"
+            android:background="@drawable/bg_weather_card_accent"
+            android:orientation="vertical"
+            android:padding="@dimen/space_16">
+
+            <TextView
+                style="@style/TextAppearance.LiveWeather.Section"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="@string/wallpaper_reality_sync_title" />
+
+            <TextView
+                style="@style/TextAppearance.LiveWeather.Body"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="@dimen/space_6"
+                android:text="@string/wallpaper_reality_sync_body" />
+        </LinearLayout>
+
         <TextView
             style="@style/TextAppearance.LiveWeather.Section"
             android:layout_width="wrap_content"
@@ -112,6 +134,7 @@
                 android:id="@+id/switchRainParticles"
                 android:layout_width="match_parent"
                 android:layout_height="52dp"
+                android:checked="true"
                 android:text="@string/wallpaper_effect_rain"
                 android:textColor="@color/weather_text_primary"
                 android:textSize="@dimen/text_body" />
@@ -120,6 +143,7 @@
                 android:id="@+id/switchCloudMovement"
                 android:layout_width="match_parent"
                 android:layout_height="52dp"
+                android:checked="true"
                 android:text="@string/wallpaper_effect_clouds"
                 android:textColor="@color/weather_text_primary"
                 android:textSize="@dimen/text_body" />
@@ -128,16 +152,35 @@
                 android:id="@+id/switchLightning"
                 android:layout_width="match_parent"
                 android:layout_height="52dp"
+                android:checked="true"
                 android:text="@string/wallpaper_effect_lightning"
                 android:textColor="@color/weather_text_primary"
                 android:textSize="@dimen/text_body" />
 
             <androidx.appcompat.widget.SwitchCompat
-                android:id="@+id/switchDayNight"
+                android:id="@+id/switchSnow"
                 android:layout_width="match_parent"
                 android:layout_height="52dp"
                 android:checked="true"
-                android:text="@string/wallpaper_effect_daynight"
+                android:text="@string/wallpaper_effect_snow"
+                android:textColor="@color/weather_text_primary"
+                android:textSize="@dimen/text_body" />
+
+            <androidx.appcompat.widget.SwitchCompat
+                android:id="@+id/switchFog"
+                android:layout_width="match_parent"
+                android:layout_height="52dp"
+                android:checked="true"
+                android:text="@string/wallpaper_effect_fog"
+                android:textColor="@color/weather_text_primary"
+                android:textSize="@dimen/text_body" />
+
+            <androidx.appcompat.widget.SwitchCompat
+                android:id="@+id/switchStars"
+                android:layout_width="match_parent"
+                android:layout_height="52dp"
+                android:checked="true"
+                android:text="@string/wallpaper_effect_stars"
                 android:textColor="@color/weather_text_primary"
                 android:textSize="@dimen/text_body" />
 
@@ -154,7 +197,7 @@
         <TextView
             android:id="@+id/applyWallpaperButton"
             android:layout_width="match_parent"
-            android:layout_height="50dp"
+            android:layout_height="52dp"
             android:layout_marginTop="@dimen/space_14"
             android:background="@drawable/bg_weather_button_primary"
             android:gravity="center"
@@ -169,8 +212,17 @@
             android:layout_height="wrap_content"
             android:layout_marginTop="@dimen/space_10"
             android:gravity="center"
-            android:text="@string/wallpaper_note_phase6"
+            android:text="@string/wallpaper_note"
             android:textAlignment="center" />
+
+        <TextView
+            style="@style/TextAppearance.LiveWeather.Caption"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center_horizontal"
+            android:layout_marginTop="@dimen/space_14"
+            android:text="@string/status_real_nature_engine"
+            android:textColor="@color/weather_aqua" />
 
     </LinearLayout>
 </androidx.core.widget.NestedScrollView>
