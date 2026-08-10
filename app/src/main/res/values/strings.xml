@@ -1,3 +1,9 @@
 <resources>
     <string name="app_name">Live Weather</string>
+    <string name="foundation_eyebrow">REAL ATMOSPHERE ENGINE</string>
+    <string name="foundation_title">Live Weather</string>
+    <string name="foundation_subtitle">Weather that feels alive on your screen.</string>
+    <string name="foundation_card_title">Visual foundation ready</string>
+    <string name="foundation_card_body">Atmospheric colors, glass surfaces, responsive spacing and Material 3 styling are now connected.</string>
+    <string name="foundation_status">PHASE 0 · DESIGN SYSTEM</string>
 </resources>
