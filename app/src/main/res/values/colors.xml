@@ -1,16 +1,20 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <!-- Core atmospheric backgrounds -->
-    <color name="weather_background">#08111F</color>
-    <color name="weather_background_mid">#0C1B2E</color>
-    <color name="weather_background_soft">#10243A</color>
+    <color name="weather_background">#07111F</color>
+    <color name="weather_background_mid">#0A1A2C</color>
+    <color name="weather_background_soft">#0F263E</color>
+    <color name="weather_background_deep">#040A12</color>
 
-    <!-- Glass surfaces -->
-    <color name="weather_surface">#15263A</color>
-    <color name="weather_surface_glass">#CC182B42</color>
-    <color name="weather_surface_glass_soft">#99182B42</color>
-    <color name="weather_border">#33DCEBFF</color>
-    <color name="weather_border_strong">#55DCEBFF</color>
+    <!-- Glass and compact navigation surfaces -->
+    <color name="weather_surface">#12253A</color>
+    <color name="weather_surface_glass">#D4142A41</color>
+    <color name="weather_surface_glass_soft">#A0122A42</color>
+    <color name="weather_surface_glass_light">#661B3854</color>
+    <color name="weather_nav_bar">#F20A1727</color>
+    <color name="weather_border">#2EDCEBFF</color>
+    <color name="weather_border_strong">#4DDCEBFF</color>
+    <color name="weather_divider">#1FDCEBFF</color>
 
     <!-- Weather accents -->
     <color name="weather_sky_blue">#79C7FF</color>
@@ -28,6 +32,11 @@
     <color name="weather_text_primary">#F6FAFF</color>
     <color name="weather_text_secondary">#B8C7D9</color>
     <color name="weather_text_tertiary">#7F91A6</color>
+    <color name="weather_text_muted">#62758A</color>
+
+    <!-- Navigation state -->
+    <color name="weather_nav_active">#79C7FF</color>
+    <color name="weather_nav_inactive">#93A7BC</color>
 
     <!-- Compatibility aliases -->
     <color name="black">#FF000000</color>
