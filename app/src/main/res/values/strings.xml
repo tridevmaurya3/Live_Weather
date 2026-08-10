@@ -29,6 +29,7 @@
     <string name="home_sync_weather_loading">Updating live weather…</string>
     <string name="home_sync_weather_retry">Weather unavailable · tap here to retry.</string>
     <string name="home_sync_cached">Offline / saved weather · tap here to refresh.</string>
+    <string name="home_refresh">Refresh</string>
     <string name="metric_humidity">Humidity</string>
     <string name="metric_wind">Wind</string>
     <string name="metric_rain">Rain</string>
@@ -50,6 +51,21 @@
     <string name="home_wallpaper_title">Live Wallpaper Engine</string>
     <string name="home_wallpaper_body">Weather-reactive scenes will mirror rain, clouds, lightning, fog, snow and day-night changes.</string>
     <string name="home_wallpaper_action">Open wallpaper controls</string>
+
+    <!-- Phase 4 dashboard intelligence -->
+    <string name="dashboard_insight_title">Weather insight</string>
+    <string name="dashboard_insight_waiting">Live weather intelligence will appear after the next successful sync.</string>
+    <string name="dashboard_details_title">Current details</string>
+    <string name="detail_sun">Sunrise / Sunset</string>
+    <string name="detail_pressure">Pressure</string>
+    <string name="detail_visibility">Visibility</string>
+    <string name="detail_uv">UV index</string>
+    <string name="detail_clouds">Cloud cover</string>
+    <string name="detail_dew_point">Dew point</string>
+    <string name="detail_gusts">Wind gusts</string>
+    <string name="detail_rain_chance">Rain chance</string>
+    <string name="detail_daylight">Daylight</string>
+    <string name="dashboard_quick_actions">Explore weather</string>
 
     <!-- Forecast -->
     <string name="forecast_title">Forecast</string>
@@ -126,4 +142,5 @@
     <string name="status_phase_two_location">PHASE 2 · LOCATION ENGINE READY</string>
     <string name="status_phase_two">PHASE 2 · REAL WEATHER ENGINE</string>
     <string name="status_phase_three">PHASE 3 · LOCATION &amp; CITY ENGINE</string>
+    <string name="status_phase_four">PHASE 4 · DASHBOARD INTELLIGENCE</string>
 </resources>
