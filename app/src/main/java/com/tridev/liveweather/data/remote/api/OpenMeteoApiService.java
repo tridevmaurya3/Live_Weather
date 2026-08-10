@@ -13,9 +13,12 @@ public interface OpenMeteoApiService {
             @Query("latitude") double latitude,
             @Query("longitude") double longitude,
             @Query("current") String currentVariables,
+            @Query("minutely_15") String minutely15Variables,
             @Query("hourly") String hourlyVariables,
             @Query("daily") String dailyVariables,
             @Query("timezone") String timezone,
-            @Query("forecast_days") int forecastDays
+            @Query("forecast_days") int forecastDays,
+            @Query("forecast_minutely_15") int forecastMinutely15,
+            @Query("past_minutely_15") int pastMinutely15
     );
 }
