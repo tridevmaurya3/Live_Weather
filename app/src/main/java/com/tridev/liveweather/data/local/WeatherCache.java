@@ -10,19 +10,29 @@ import com.google.gson.Gson;
 import com.google.gson.JsonSyntaxException;
 import com.tridev.liveweather.data.remote.dto.WeatherResponse;
 
+import java.util.Locale;
+
 /**
- * Small persistent cache for the last successful weather response.
+ * Persistent weather cache with per-location snapshots.
  *
- * Phase 2 keeps a single last-known snapshot so the app can show useful
- * weather immediately after launch and when a refresh temporarily fails.
+ * Phase 3 keeps separate saved weather for multiple locations so switching
+ * cities can display useful data immediately before the live refresh returns.
  */
 public final class WeatherCache {
 
     private static final String PREFS_NAME = "live_weather_cache";
-    private static final String KEY_WEATHER_JSON = "weather_json";
-    private static final String KEY_LATITUDE = "latitude";
-    private static final String KEY_LONGITUDE = "longitude";
-    private static final String KEY_SAVED_AT = "saved_at";
+
+    private static final String KEY_LAST_LOCATION = "last_location_key";
+    private static final String PREFIX_WEATHER = "weather_";
+    private static final String PREFIX_LATITUDE = "latitude_";
+    private static final String PREFIX_LONGITUDE = "longitude_";
+    private static final String PREFIX_SAVED_AT = "saved_at_";
+
+    // Phase 2 legacy keys retained for one-time migration.
+    private static final String LEGACY_WEATHER_JSON = "weather_json";
+    private static final String LEGACY_LATITUDE = "latitude";
+    private static final String LEGACY_LONGITUDE = "longitude";
+    private static final String LEGACY_SAVED_AT = "saved_at";
 
     private final SharedPreferences preferences;
     private final Gson gson;
@@ -31,6 +41,7 @@ public final class WeatherCache {
         preferences = context.getApplicationContext()
                 .getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
         gson = new Gson();
+        migrateLegacyCacheIfNeeded();
     }
 
     public void save(
@@ -39,19 +50,35 @@ public final class WeatherCache {
             double longitude,
             long savedAt
     ) {
+        String key = locationKey(latitude, longitude);
         preferences.edit()
-                .putString(KEY_WEATHER_JSON, gson.toJson(weather))
-                .putString(KEY_LATITUDE, Double.toString(latitude))
-                .putString(KEY_LONGITUDE, Double.toString(longitude))
-                .putLong(KEY_SAVED_AT, savedAt)
+                .putString(PREFIX_WEATHER + key, gson.toJson(weather))
+                .putString(PREFIX_LATITUDE + key, Double.toString(latitude))
+                .putString(PREFIX_LONGITUDE + key, Double.toString(longitude))
+                .putLong(PREFIX_SAVED_AT + key, savedAt)
+                .putString(KEY_LAST_LOCATION, key)
                 .apply();
     }
 
     @Nullable
     public CachedWeather load() {
-        String json = preferences.getString(KEY_WEATHER_JSON, null);
-        String latitudeValue = preferences.getString(KEY_LATITUDE, null);
-        String longitudeValue = preferences.getString(KEY_LONGITUDE, null);
+        String lastKey = preferences.getString(KEY_LAST_LOCATION, null);
+        if (lastKey == null) {
+            return null;
+        }
+        return loadByKey(lastKey);
+    }
+
+    @Nullable
+    public CachedWeather load(double latitude, double longitude) {
+        return loadByKey(locationKey(latitude, longitude));
+    }
+
+    @Nullable
+    private CachedWeather loadByKey(@NonNull String key) {
+        String json = preferences.getString(PREFIX_WEATHER + key, null);
+        String latitudeValue = preferences.getString(PREFIX_LATITUDE + key, null);
+        String longitudeValue = preferences.getString(PREFIX_LONGITUDE + key, null);
 
         if (json == null || latitudeValue == null || longitudeValue == null) {
             return null;
@@ -61,26 +88,69 @@ public final class WeatherCache {
             WeatherResponse weather = gson.fromJson(json, WeatherResponse.class);
             double latitude = Double.parseDouble(latitudeValue);
             double longitude = Double.parseDouble(longitudeValue);
-            long savedAt = preferences.getLong(KEY_SAVED_AT, 0L);
+            long savedAt = preferences.getLong(PREFIX_SAVED_AT + key, 0L);
 
             if (weather == null) {
                 return null;
             }
-
             return new CachedWeather(weather, latitude, longitude, savedAt);
         } catch (JsonSyntaxException | NumberFormatException exception) {
-            clear();
+            clearLocationKey(key);
             return null;
         }
     }
 
-    public void clear() {
-        preferences.edit()
-                .remove(KEY_WEATHER_JSON)
-                .remove(KEY_LATITUDE)
-                .remove(KEY_LONGITUDE)
-                .remove(KEY_SAVED_AT)
-                .apply();
+    private void migrateLegacyCacheIfNeeded() {
+        if (preferences.getString(KEY_LAST_LOCATION, null) != null) {
+            return;
+        }
+
+        String json = preferences.getString(LEGACY_WEATHER_JSON, null);
+        String latitudeValue = preferences.getString(LEGACY_LATITUDE, null);
+        String longitudeValue = preferences.getString(LEGACY_LONGITUDE, null);
+        if (json == null || latitudeValue == null || longitudeValue == null) {
+            return;
+        }
+
+        try {
+            double latitude = Double.parseDouble(latitudeValue);
+            double longitude = Double.parseDouble(longitudeValue);
+            String key = locationKey(latitude, longitude);
+            long savedAt = preferences.getLong(LEGACY_SAVED_AT, 0L);
+
+            preferences.edit()
+                    .putString(PREFIX_WEATHER + key, json)
+                    .putString(PREFIX_LATITUDE + key, latitudeValue)
+                    .putString(PREFIX_LONGITUDE + key, longitudeValue)
+                    .putLong(PREFIX_SAVED_AT + key, savedAt)
+                    .putString(KEY_LAST_LOCATION, key)
+                    .remove(LEGACY_WEATHER_JSON)
+                    .remove(LEGACY_LATITUDE)
+                    .remove(LEGACY_LONGITUDE)
+                    .remove(LEGACY_SAVED_AT)
+                    .apply();
+        } catch (NumberFormatException ignored) {
+            // Invalid legacy coordinates are simply discarded.
+        }
+    }
+
+    private void clearLocationKey(@NonNull String key) {
+        SharedPreferences.Editor editor = preferences.edit()
+                .remove(PREFIX_WEATHER + key)
+                .remove(PREFIX_LATITUDE + key)
+                .remove(PREFIX_LONGITUDE + key)
+                .remove(PREFIX_SAVED_AT + key);
+
+        String lastKey = preferences.getString(KEY_LAST_LOCATION, null);
+        if (key.equals(lastKey)) {
+            editor.remove(KEY_LAST_LOCATION);
+        }
+        editor.apply();
+    }
+
+    @NonNull
+    private String locationKey(double latitude, double longitude) {
+        return String.format(Locale.US, "%.3f_%.3f", latitude, longitude);
     }
 
     public static final class CachedWeather {
