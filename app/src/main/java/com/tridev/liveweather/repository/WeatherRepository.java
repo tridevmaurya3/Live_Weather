@@ -57,18 +57,7 @@ public class WeatherRepository {
             double longitude,
             @NonNull WeatherCallback callback
     ) {
-        Call<WeatherResponse> call = apiService.getWeather(
-                latitude,
-                longitude,
-                CURRENT_VARIABLES,
-                MINUTELY_15_VARIABLES,
-                HOURLY_VARIABLES,
-                DAILY_VARIABLES,
-                TIMEZONE_AUTO,
-                FORECAST_DAYS,
-                FORECAST_MINUTELY_15,
-                PAST_MINUTELY_15
-        );
+        Call<WeatherResponse> call = createCall(latitude, longitude);
 
         call.enqueue(new Callback<WeatherResponse>() {
             @Override
@@ -81,19 +70,7 @@ public class WeatherRepository {
                     return;
                 }
 
-                String message = "Weather request failed with HTTP " + response.code();
-                if (response.errorBody() != null) {
-                    try {
-                        String errorText = response.errorBody().string();
-                        if (!errorText.trim().isEmpty()) {
-                            message = message + ": " + errorText;
-                        }
-                    } catch (IOException ignored) {
-                        // Keep the HTTP status message if the error body cannot be read.
-                    }
-                }
-
-                callback.onError(message, null);
+                callback.onError(buildHttpError(response), null);
             }
 
             @Override
@@ -110,6 +87,53 @@ public class WeatherRepository {
         });
 
         return call;
+    }
+
+    /**
+     * Synchronous network path intended for WorkManager background threads.
+     * Never call this method from the Android main thread.
+     */
+    @NonNull
+    public WeatherResponse loadWeatherBlocking(
+            double latitude,
+            double longitude
+    ) throws IOException {
+        Response<WeatherResponse> response = createCall(latitude, longitude).execute();
+        if (response.isSuccessful() && response.body() != null) {
+            return response.body();
+        }
+        throw new IOException(buildHttpError(response));
+    }
+
+    private Call<WeatherResponse> createCall(double latitude, double longitude) {
+        return apiService.getWeather(
+                latitude,
+                longitude,
+                CURRENT_VARIABLES,
+                MINUTELY_15_VARIABLES,
+                HOURLY_VARIABLES,
+                DAILY_VARIABLES,
+                TIMEZONE_AUTO,
+                FORECAST_DAYS,
+                FORECAST_MINUTELY_15,
+                PAST_MINUTELY_15
+        );
+    }
+
+    @NonNull
+    private String buildHttpError(@NonNull Response<WeatherResponse> response) {
+        String message = "Weather request failed with HTTP " + response.code();
+        if (response.errorBody() != null) {
+            try {
+                String errorText = response.errorBody().string();
+                if (!errorText.trim().isEmpty()) {
+                    message = message + ": " + errorText;
+                }
+            } catch (IOException ignored) {
+                // Keep HTTP status when the optional error body cannot be read.
+            }
+        }
+        return message;
     }
 
     public interface WeatherCallback {
