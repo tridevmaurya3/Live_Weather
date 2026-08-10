@@ -388,6 +388,9 @@ public class WeatherResponse {
         @SerializedName("snowfall_sum")
         private List<Double> snowfallSum;
 
+        @SerializedName("precipitation_hours")
+        private List<Double> precipitationHours;
+
         @SerializedName("precipitation_probability_max")
         private List<Double> precipitationProbabilityMax;
 
@@ -458,6 +461,10 @@ public class WeatherResponse {
 
         public List<Double> getSnowfallSum() {
             return snowfallSum;
+        }
+
+        public List<Double> getPrecipitationHours() {
+            return precipitationHours;
         }
 
         public List<Double> getPrecipitationProbabilityMax() {
