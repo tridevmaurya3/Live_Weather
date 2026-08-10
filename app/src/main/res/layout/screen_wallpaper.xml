@@ -28,42 +28,67 @@
             android:layout_marginTop="@dimen/space_4"
             android:text="@string/wallpaper_subtitle" />
 
-        <LinearLayout
+        <FrameLayout
             android:layout_width="match_parent"
-            android:layout_height="300dp"
+            android:layout_height="320dp"
             android:layout_marginTop="@dimen/space_16"
-            android:background="@drawable/bg_weather_wallpaper_preview"
-            android:gravity="center"
-            android:orientation="vertical"
-            android:padding="@dimen/space_20">
+            android:background="@drawable/bg_weather_wallpaper_preview">
 
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:letterSpacing="0.12"
-                android:text="@string/wallpaper_preview_label"
-                android:textColor="@color/weather_aqua"
-                android:textSize="@dimen/text_caption"
-                android:textStyle="bold" />
+            <com.tridev.liveweather.ui.sky.LiveSkyView
+                android:id="@+id/wallpaperLiveSkyView"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent" />
 
-            <TextView
-                android:id="@+id/wallpaperPreviewTemperature"
-                style="@style/TextAppearance.LiveWeather.Display"
-                android:layout_width="wrap_content"
+            <LinearLayout
+                android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="@dimen/space_12"
-                android:text="@string/home_temperature_placeholder" />
+                android:layout_gravity="top"
+                android:orientation="vertical"
+                android:padding="@dimen/space_16">
 
-            <TextView
-                android:id="@+id/wallpaperPreviewCondition"
-                style="@style/TextAppearance.LiveWeather.BodyLarge"
-                android:layout_width="260dp"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="@dimen/space_8"
-                android:gravity="center"
-                android:text="@string/wallpaper_preview_waiting"
-                android:textAlignment="center" />
-        </LinearLayout>
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:letterSpacing="0.12"
+                    android:text="@string/wallpaper_preview_label"
+                    android:textColor="@color/weather_aqua"
+                    android:textSize="@dimen/text_caption"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:id="@+id/wallpaperPreviewTemperature"
+                    style="@style/TextAppearance.LiveWeather.Display"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="@dimen/space_6"
+                    android:shadowColor="#99000000"
+                    android:shadowDx="0"
+                    android:shadowDy="2"
+                    android:shadowRadius="4"
+                    android:text="@string/home_temperature_placeholder" />
+
+                <TextView
+                    android:id="@+id/wallpaperPreviewCondition"
+                    style="@style/TextAppearance.LiveWeather.BodyLarge"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="@dimen/space_4"
+                    android:shadowColor="#99000000"
+                    android:shadowDx="0"
+                    android:shadowDy="2"
+                    android:shadowRadius="4"
+                    android:text="@string/wallpaper_preview_waiting" />
+            </LinearLayout>
+        </FrameLayout>
+
+        <TextView
+            android:id="@+id/wallpaperCelestialSummary"
+            style="@style/TextAppearance.LiveWeather.Caption"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="@dimen/space_8"
+            android:text="@string/phase6_celestial_waiting"
+            android:textColor="@color/weather_text_secondary" />
 
         <TextView
             style="@style/TextAppearance.LiveWeather.Section"
@@ -144,7 +169,7 @@
             android:layout_height="wrap_content"
             android:layout_marginTop="@dimen/space_10"
             android:gravity="center"
-            android:text="@string/wallpaper_note"
+            android:text="@string/wallpaper_note_phase6"
             android:textAlignment="center" />
 
     </LinearLayout>
