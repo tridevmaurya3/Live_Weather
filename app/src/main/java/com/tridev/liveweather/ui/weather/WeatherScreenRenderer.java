@@ -15,7 +15,6 @@ import com.tridev.liveweather.R;
 import com.tridev.liveweather.data.remote.dto.WeatherResponse;
 import com.tridev.liveweather.domain.WeatherUiState;
 
-import java.util.List;
 import java.util.Locale;
 
 /**
@@ -25,6 +24,7 @@ public final class WeatherScreenRenderer {
 
     private final Activity activity;
 
+    private final View homeHeroCard;
     private final TextView homeTemperature;
     private final TextView homeCondition;
     private final TextView homeFeelsLike;
@@ -33,6 +33,16 @@ public final class WeatherScreenRenderer {
     private final TextView homeHumidityValue;
     private final TextView homeWindValue;
     private final TextView homeRainValue;
+    private final TextView homeWeatherInsight;
+    private final TextView homeSunValue;
+    private final TextView homeDaylightValue;
+    private final TextView homeUvValue;
+    private final TextView homePressureValue;
+    private final TextView homeVisibilityValue;
+    private final TextView homeCloudValue;
+    private final TextView homeDewPointValue;
+    private final TextView homeGustValue;
+    private final TextView homeRainChanceValue;
     private final TextView homeTenDaySummary;
     private final TextView homeWallpaperSummary;
     private final LinearLayout homeHourlyContainer;
@@ -50,6 +60,7 @@ public final class WeatherScreenRenderer {
     public WeatherScreenRenderer(@NonNull Activity activity) {
         this.activity = activity;
 
+        homeHeroCard = activity.findViewById(R.id.homeHeroCard);
         homeTemperature = activity.findViewById(R.id.homeTemperature);
         homeCondition = activity.findViewById(R.id.homeCondition);
         homeFeelsLike = activity.findViewById(R.id.homeFeelsLike);
@@ -58,6 +69,16 @@ public final class WeatherScreenRenderer {
         homeHumidityValue = activity.findViewById(R.id.homeHumidityValue);
         homeWindValue = activity.findViewById(R.id.homeWindValue);
         homeRainValue = activity.findViewById(R.id.homeRainValue);
+        homeWeatherInsight = activity.findViewById(R.id.homeWeatherInsight);
+        homeSunValue = activity.findViewById(R.id.homeSunValue);
+        homeDaylightValue = activity.findViewById(R.id.homeDaylightValue);
+        homeUvValue = activity.findViewById(R.id.homeUvValue);
+        homePressureValue = activity.findViewById(R.id.homePressureValue);
+        homeVisibilityValue = activity.findViewById(R.id.homeVisibilityValue);
+        homeCloudValue = activity.findViewById(R.id.homeCloudValue);
+        homeDewPointValue = activity.findViewById(R.id.homeDewPointValue);
+        homeGustValue = activity.findViewById(R.id.homeGustValue);
+        homeRainChanceValue = activity.findViewById(R.id.homeRainChanceValue);
         homeTenDaySummary = activity.findViewById(R.id.homeTenDaySummary);
         homeWallpaperSummary = activity.findViewById(R.id.homeWallpaperSummary);
         homeHourlyContainer = activity.findViewById(R.id.homeHourlyContainer);
@@ -86,12 +107,23 @@ public final class WeatherScreenRenderer {
         WeatherResponse.CurrentWeather current = response.getCurrent();
         WeatherResponse.DailyWeather daily = response.getDaily();
 
+        homeWeatherInsight.setText(DashboardIntelligence.insight(response));
+        homeSunValue.setText(DashboardIntelligence.sunriseSunset(daily));
+        homeDaylightValue.setText(DashboardIntelligence.daylight(daily));
+        homeUvValue.setText(DashboardIntelligence.uv(
+                daily == null ? null : WeatherFormatter.valueAt(daily.getUvIndexMax(), 0)
+        ));
+        homePressureValue.setText(DashboardIntelligence.pressure(response));
+        homeRainChanceValue.setText(DashboardIntelligence.rainChance(daily));
+
         if (current != null) {
             String condition = WeatherFormatter.condition(current.getWeatherCode());
             String symbol = WeatherFormatter.symbol(
                     current.getWeatherCode(),
                     current.getIsDay()
             );
+
+            applyHeroMode(DashboardIntelligence.heroMode(current));
 
             homeTemperature.setText(WeatherFormatter.temperature(current.getTemperature2m()));
             homeCondition.setText(symbol + "  " + condition);
@@ -101,16 +133,26 @@ public final class WeatherScreenRenderer {
             homeHumidityValue.setText(
                     WeatherFormatter.percent(current.getRelativeHumidity2m())
             );
-            homeWindValue.setText(WeatherFormatter.wind(current.getWindSpeed10m()));
+            homeWindValue.setText(String.format(
+                    Locale.getDefault(),
+                    "%s %s",
+                    WeatherFormatter.wind(current.getWindSpeed10m()),
+                    WeatherFormatter.windDirection(current.getWindDirection10m())
+            ));
             homeRainValue.setText(WeatherFormatter.precipitation(current.getPrecipitation()));
+            homeVisibilityValue.setText(DashboardIntelligence.visibility(current.getVisibility()));
+            homeCloudValue.setText(DashboardIntelligence.clouds(current.getCloudCover()));
+            homeDewPointValue.setText(DashboardIntelligence.dewPoint(current.getDewPoint2m()));
+            homeGustValue.setText(DashboardIntelligence.gusts(current.getWindGusts10m()));
 
             forecastCurrentSummary.setText(String.format(
                     Locale.getDefault(),
-                    "%s %s · Feels %s · Humidity %s",
+                    "%s %s · Feels %s · Humidity %s · %s",
                     symbol,
                     WeatherFormatter.temperature(current.getTemperature2m()),
                     WeatherFormatter.temperature(current.getApparentTemperature()),
-                    WeatherFormatter.percent(current.getRelativeHumidity2m())
+                    WeatherFormatter.percent(current.getRelativeHumidity2m()),
+                    DashboardIntelligence.visibility(current.getVisibility())
             ));
 
             String dayPart = current.getIsDay() != null && current.getIsDay() == 0
@@ -118,21 +160,57 @@ public final class WeatherScreenRenderer {
                     : "Day";
             homeWallpaperSummary.setText(String.format(
                     Locale.getDefault(),
-                    "Live scene source: %s · Clouds %s · %s",
+                    "Live scene source: %s · Clouds %s · Gusts %s · %s",
                     condition,
                     WeatherFormatter.percent(current.getCloudCover()),
+                    WeatherFormatter.wind(current.getWindGusts10m()),
                     dayPart
             ));
             wallpaperPreviewTemperature.setText(
                     WeatherFormatter.temperature(current.getTemperature2m())
             );
             wallpaperPreviewCondition.setText(symbol + "  " + condition + " · " + dayPart);
+        } else {
+            applyHeroMode(DashboardIntelligence.HeroMode.CLOUDY);
+            homeVisibilityValue.setText(R.string.metric_placeholder);
+            homeCloudValue.setText(R.string.metric_placeholder);
+            homeDewPointValue.setText(R.string.metric_placeholder);
+            homeGustValue.setText(R.string.metric_placeholder);
         }
 
         renderDailyHeadline(daily);
         renderHourly(response);
         renderDaily(response);
         renderWindSummary(current, daily);
+    }
+
+    private void applyHeroMode(@NonNull DashboardIntelligence.HeroMode mode) {
+        int background;
+        switch (mode) {
+            case CLEAR_DAY:
+                background = R.drawable.bg_weather_hero_clear_day;
+                break;
+            case CLEAR_NIGHT:
+                background = R.drawable.bg_weather_hero_clear_night;
+                break;
+            case RAIN:
+                background = R.drawable.bg_weather_hero_rain;
+                break;
+            case STORM:
+                background = R.drawable.bg_weather_hero_storm;
+                break;
+            case SNOW:
+                background = R.drawable.bg_weather_hero_snow;
+                break;
+            case FOG:
+                background = R.drawable.bg_weather_hero_fog;
+                break;
+            case CLOUDY:
+            default:
+                background = R.drawable.bg_weather_hero_cloudy;
+                break;
+        }
+        homeHeroCard.setBackgroundResource(background);
     }
 
     private void renderDailyHeadline(WeatherResponse.DailyWeather daily) {
@@ -344,6 +422,7 @@ public final class WeatherScreenRenderer {
     }
 
     private void renderEmptyWeather() {
+        applyHeroMode(DashboardIntelligence.HeroMode.CLOUDY);
         homeTemperature.setText(R.string.home_temperature_placeholder);
         homeCondition.setText(R.string.home_condition_waiting);
         homeFeelsLike.setText(R.string.home_feels_like);
@@ -351,6 +430,16 @@ public final class WeatherScreenRenderer {
         homeHumidityValue.setText(R.string.metric_placeholder);
         homeWindValue.setText(R.string.metric_placeholder);
         homeRainValue.setText(R.string.metric_placeholder);
+        homeWeatherInsight.setText(R.string.dashboard_insight_waiting);
+        homeSunValue.setText(R.string.metric_placeholder);
+        homeDaylightValue.setText(R.string.metric_placeholder);
+        homeUvValue.setText(R.string.metric_placeholder);
+        homePressureValue.setText(R.string.metric_placeholder);
+        homeVisibilityValue.setText(R.string.metric_placeholder);
+        homeCloudValue.setText(R.string.metric_placeholder);
+        homeDewPointValue.setText(R.string.metric_placeholder);
+        homeGustValue.setText(R.string.metric_placeholder);
+        homeRainChanceValue.setText(R.string.metric_placeholder);
         homeTenDaySummary.setText(R.string.quick_ten_day_sub);
         homeWallpaperSummary.setText(R.string.home_wallpaper_body);
         forecastCurrentSummary.setText(R.string.forecast_chart_waiting);
