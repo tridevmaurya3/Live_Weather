@@ -4,6 +4,7 @@ import android.Manifest;
 import android.content.Context;
 import android.location.Location;
 import android.os.Bundle;
+import android.view.HapticFeedbackConstants;
 import android.view.View;
 import android.widget.TextView;
 
@@ -157,12 +158,33 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void setupQuickActions() {
-        View wallpaperAction = findViewById(R.id.homeWallpaperAction);
-        if (wallpaperAction != null) {
-            wallpaperAction.setOnClickListener(view ->
-                    bottomNavigation.setSelectedItemId(R.id.nav_wallpaper)
-            );
+        bindNavigationAction(R.id.homeForecastAction, R.id.nav_forecast);
+        bindNavigationAction(R.id.homeRadarAction, R.id.nav_radar);
+        bindNavigationAction(R.id.homeAirAction, R.id.nav_more);
+        bindNavigationAction(R.id.homeWallpaperAction, R.id.nav_wallpaper);
+
+        View refreshAction = findViewById(R.id.homeRefreshAction);
+        if (refreshAction != null) {
+            refreshAction.setOnClickListener(view -> {
+                performLightHaptic(view);
+                refreshWeatherManually();
+            });
         }
+    }
+
+    private void bindNavigationAction(int viewId, int destinationId) {
+        View action = findViewById(viewId);
+        if (action == null) {
+            return;
+        }
+        action.setOnClickListener(view -> {
+            performLightHaptic(view);
+            bottomNavigation.setSelectedItemId(destinationId);
+        });
+    }
+
+    private void performLightHaptic(View view) {
+        view.performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY);
     }
 
     private void setupWeatherEngine() {
@@ -188,8 +210,14 @@ public class MainActivity extends AppCompatActivity {
             }
         });
 
-        homeSyncStatus.setOnClickListener(view -> refreshWeatherManually());
-        forecastStatus.setOnClickListener(view -> refreshWeatherManually());
+        homeSyncStatus.setOnClickListener(view -> {
+            performLightHaptic(view);
+            refreshWeatherManually();
+        });
+        forecastStatus.setOnClickListener(view -> {
+            performLightHaptic(view);
+            refreshWeatherManually();
+        });
     }
 
     private void setupCityEngine() {
@@ -237,6 +265,7 @@ public class MainActivity extends AppCompatActivity {
 
     private void setupLocationEngine() {
         homeLocationValue.setOnClickListener(view -> {
+            performLightHaptic(view);
             CityLocation selectedCity = cityViewModel.getSelectedCity();
             if (selectedCity != null) {
                 bottomNavigation.setSelectedItemId(R.id.nav_more);
