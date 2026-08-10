@@ -93,6 +93,9 @@ public class WeatherResponse {
         @SerializedName("apparent_temperature")
         private Double apparentTemperature;
 
+        @SerializedName("dew_point_2m")
+        private Double dewPoint2m;
+
         @SerializedName("is_day")
         private Integer isDay;
 
@@ -113,6 +116,9 @@ public class WeatherResponse {
 
         @SerializedName("cloud_cover")
         private Double cloudCover;
+
+        @SerializedName("visibility")
+        private Double visibility;
 
         @SerializedName("pressure_msl")
         private Double pressureMsl;
@@ -149,6 +155,10 @@ public class WeatherResponse {
             return apparentTemperature;
         }
 
+        public Double getDewPoint2m() {
+            return dewPoint2m;
+        }
+
         public Integer getIsDay() {
             return isDay;
         }
@@ -175,6 +185,10 @@ public class WeatherResponse {
 
         public Double getCloudCover() {
             return cloudCover;
+        }
+
+        public Double getVisibility() {
+            return visibility;
         }
 
         public Double getPressureMsl() {
@@ -211,6 +225,9 @@ public class WeatherResponse {
 
         @SerializedName("apparent_temperature")
         private List<Double> apparentTemperature;
+
+        @SerializedName("dew_point_2m")
+        private List<Double> dewPoint2m;
 
         @SerializedName("is_day")
         private List<Integer> isDay;
@@ -265,6 +282,10 @@ public class WeatherResponse {
 
         public List<Double> getApparentTemperature() {
             return apparentTemperature;
+        }
+
+        public List<Double> getDewPoint2m() {
+            return dewPoint2m;
         }
 
         public List<Integer> getIsDay() {
@@ -346,6 +367,12 @@ public class WeatherResponse {
         @SerializedName("sunset")
         private List<String> sunset;
 
+        @SerializedName("daylight_duration")
+        private List<Double> daylightDuration;
+
+        @SerializedName("sunshine_duration")
+        private List<Double> sunshineDuration;
+
         @SerializedName("uv_index_max")
         private List<Double> uvIndexMax;
 
@@ -403,6 +430,14 @@ public class WeatherResponse {
 
         public List<String> getSunset() {
             return sunset;
+        }
+
+        public List<Double> getDaylightDuration() {
+            return daylightDuration;
+        }
+
+        public List<Double> getSunshineDuration() {
+            return sunshineDuration;
         }
 
         public List<Double> getUvIndexMax() {
