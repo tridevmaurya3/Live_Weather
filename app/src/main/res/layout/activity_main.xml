@@ -8,75 +8,113 @@
     android:background="@drawable/bg_weather_foundation"
     tools:context=".MainActivity">
 
-    <LinearLayout
+    <androidx.core.widget.NestedScrollView
+        android:id="@+id/contentScroll"
         android:layout_width="0dp"
-        android:layout_height="wrap_content"
-        android:layout_marginStart="@dimen/space_24"
-        android:layout_marginEnd="@dimen/space_24"
-        android:orientation="vertical"
-        app:layout_constraintBottom_toBottomOf="parent"
+        android:layout_height="0dp"
+        android:clipToPadding="false"
+        android:fillViewport="true"
+        android:overScrollMode="never"
+        app:layout_constraintBottom_toTopOf="@id/bottomNavigation"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toTopOf="parent"
-        app:layout_constraintVertical_bias="0.40">
-
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:letterSpacing="0.12"
-            android:text="@string/foundation_eyebrow"
-            android:textColor="@color/weather_aqua"
-            android:textSize="@dimen/text_caption"
-            android:textStyle="bold" />
-
-        <TextView
-            style="@style/TextAppearance.LiveWeather.Display"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="@dimen/space_8"
-            android:text="@string/foundation_title" />
-
-        <TextView
-            style="@style/TextAppearance.LiveWeather.BodyLarge"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="@dimen/space_8"
-            android:text="@string/foundation_subtitle" />
+        app:layout_constraintTop_toTopOf="parent">
 
         <LinearLayout
             android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="@dimen/space_32"
-            android:background="@drawable/bg_weather_glass_panel"
+            android:layout_height="match_parent"
+            android:gravity="center_vertical"
             android:orientation="vertical"
-            android:padding="@dimen/space_20">
+            android:paddingStart="@dimen/space_24"
+            android:paddingTop="@dimen/space_32"
+            android:paddingEnd="@dimen/space_24"
+            android:paddingBottom="@dimen/space_24">
 
             <TextView
-                style="@style/TextAppearance.LiveWeather.Title"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:text="@string/foundation_card_title" />
-
-            <TextView
-                style="@style/TextAppearance.LiveWeather.Body"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="@dimen/space_12"
-                android:lineSpacingExtra="2dp"
-                android:text="@string/foundation_card_body" />
-
-            <TextView
+                android:id="@+id/destinationEyebrow"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="@dimen/space_20"
-                android:letterSpacing="0.08"
-                android:text="@string/foundation_status"
-                android:textColor="@color/weather_sky_blue"
+                android:letterSpacing="0.12"
+                android:text="@string/foundation_eyebrow"
+                android:textColor="@color/weather_aqua"
                 android:textSize="@dimen/text_caption"
                 android:textStyle="bold" />
 
+            <TextView
+                android:id="@+id/destinationTitle"
+                style="@style/TextAppearance.LiveWeather.Display"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="@dimen/space_8"
+                android:text="@string/foundation_title" />
+
+            <TextView
+                android:id="@+id/destinationSubtitle"
+                style="@style/TextAppearance.LiveWeather.BodyLarge"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="@dimen/space_8"
+                android:text="@string/foundation_subtitle" />
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="@dimen/space_32"
+                android:background="@drawable/bg_weather_glass_panel"
+                android:orientation="vertical"
+                android:padding="@dimen/space_20">
+
+                <TextView
+                    android:id="@+id/destinationCardTitle"
+                    style="@style/TextAppearance.LiveWeather.Title"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="@string/foundation_card_title" />
+
+                <TextView
+                    android:id="@+id/destinationCardBody"
+                    style="@style/TextAppearance.LiveWeather.Body"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="@dimen/space_12"
+                    android:lineSpacingExtra="2dp"
+                    android:text="@string/foundation_card_body" />
+
+                <TextView
+                    android:id="@+id/destinationStatus"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="@dimen/space_20"
+                    android:letterSpacing="0.08"
+                    android:text="@string/foundation_status"
+                    android:textColor="@color/weather_sky_blue"
+                    android:textSize="@dimen/text_caption"
+                    android:textStyle="bold" />
+
+            </LinearLayout>
+
         </LinearLayout>
 
-    </LinearLayout>
+    </androidx.core.widget.NestedScrollView>
+
+    <com.google.android.material.bottomnavigation.BottomNavigationView
+        android:id="@+id/bottomNavigation"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="@dimen/space_16"
+        android:layout_marginEnd="@dimen/space_16"
+        android:layout_marginBottom="@dimen/space_12"
+        android:background="@drawable/bg_weather_glass_panel"
+        android:elevation="0dp"
+        android:minHeight="68dp"
+        app:itemIconSize="22dp"
+        app:itemIconTint="@color/bottom_nav_item_tint"
+        app:itemRippleColor="@android:color/transparent"
+        app:itemTextColor="@color/bottom_nav_item_tint"
+        app:labelVisibilityMode="labeled"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:menu="@menu/bottom_navigation_menu" />
 
 </androidx.constraintlayout.widget.ConstraintLayout>
