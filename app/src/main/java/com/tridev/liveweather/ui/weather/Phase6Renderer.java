@@ -33,8 +33,10 @@ public final class Phase6Renderer {
     private final TextView homeCondition;
     private final TextView homeRainValue;
     private final TextView homeWeatherInsight;
+    private final TextView homeWallpaperSummary;
     private final TextView wallpaperPreviewCondition;
     private final TextView wallpaperCelestialSummary;
+    private final TextView forecastCurrentSummary;
 
     private final LiveSkyView forecastLiveSkyView;
     private final LiveSkyView wallpaperLiveSkyView;
@@ -58,8 +60,10 @@ public final class Phase6Renderer {
         homeCondition = activity.findViewById(R.id.homeCondition);
         homeRainValue = activity.findViewById(R.id.homeRainValue);
         homeWeatherInsight = activity.findViewById(R.id.homeWeatherInsight);
+        homeWallpaperSummary = activity.findViewById(R.id.homeWallpaperSummary);
         wallpaperPreviewCondition = activity.findViewById(R.id.wallpaperPreviewCondition);
         wallpaperCelestialSummary = activity.findViewById(R.id.wallpaperCelestialSummary);
+        forecastCurrentSummary = activity.findViewById(R.id.forecastCurrentSummary);
 
         forecastLiveSkyView = activity.findViewById(R.id.forecastLiveSkyView);
         wallpaperLiveSkyView = activity.findViewById(R.id.wallpaperLiveSkyView);
@@ -104,12 +108,23 @@ public final class Phase6Renderer {
         renderAdvancedDetails(response, resolved, state);
 
         if (current != null) {
+            String symbol = WeatherFormatter.symbol(resolved.getWeatherCode(), current.getIsDay());
             wallpaperPreviewCondition.setText(String.format(
                     Locale.getDefault(),
                     "%s  %s · %s",
-                    WeatherFormatter.symbol(resolved.getWeatherCode(), current.getIsDay()),
+                    symbol,
                     resolved.getLabel(),
                     resolved.getSource()
+            ));
+            forecastCurrentSummary.setText(String.format(
+                    Locale.getDefault(),
+                    "%s %s · %s · Feels %s · Humidity %s · %s",
+                    symbol,
+                    WeatherFormatter.temperature(current.getTemperature2m()),
+                    resolved.getLabel(),
+                    WeatherFormatter.temperature(current.getApparentTemperature()),
+                    WeatherFormatter.percent(current.getRelativeHumidity2m()),
+                    DashboardIntelligence.visibility(current.getVisibility())
             ));
         }
     }
@@ -131,6 +146,21 @@ public final class Phase6Renderer {
                     Locale.getDefault(),
                     "%.2f mm signal",
                     resolved.getPrecipitationSignalMm()
+            ));
+        }
+
+        if (current != null) {
+            String dayPart = current.getIsDay() != null && current.getIsDay() == 0
+                    ? "Night"
+                    : "Day";
+            homeWallpaperSummary.setText(String.format(
+                    Locale.getDefault(),
+                    "Reality source: %s · %s · Clouds %s · Gusts %s · %s",
+                    resolved.getLabel(),
+                    resolved.getSource(),
+                    WeatherFormatter.percent(current.getCloudCover()),
+                    WeatherFormatter.wind(current.getWindGusts10m()),
+                    dayPart
             ));
         }
 
@@ -247,11 +277,12 @@ public final class Phase6Renderer {
 
         forecastPrecipBreakdownValue.setText(String.format(
                 Locale.getDefault(),
-                "PRECIPITATION · Total %s · Rain %s · Showers %s · Snow %.2f cm",
+                "PRECIPITATION · Total %s · Rain %s · Showers %s · Snow %.2f cm · resolved signal %.2f mm",
                 WeatherFormatter.precipitation(current.getPrecipitation()),
                 WeatherFormatter.precipitation(current.getRain()),
                 WeatherFormatter.precipitation(current.getShowers()),
-                current.getSnowfall() == null ? 0d : current.getSnowfall()
+                current.getSnowfall() == null ? 0d : current.getSnowfall(),
+                resolved.getPrecipitationSignalMm()
         ));
 
         forecastWindDetailValue.setText(String.format(
@@ -264,9 +295,9 @@ public final class Phase6Renderer {
 
         forecastAtmosphereDetailValue.setText(String.format(
                 Locale.getDefault(),
-                "ATMOSPHERE · MSL %.0f hPa · Surface %.0f hPa · Clouds %s · Visibility %s",
-                safe(current.getPressureMsl()),
-                safe(current.getSurfacePressure()),
+                "ATMOSPHERE · MSL %s · Surface %s · Clouds %s · Visibility %s",
+                pressure(current.getPressureMsl()),
+                pressure(current.getSurfacePressure()),
                 WeatherFormatter.percent(current.getCloudCover()),
                 DashboardIntelligence.visibility(current.getVisibility())
         ));
@@ -293,7 +324,7 @@ public final class Phase6Renderer {
 
         forecastDataQualityValue.setText(String.format(
                 Locale.getDefault(),
-                "DATA QUALITY · %s · 15-minute precipitation cross-check · live updated %s%s",
+                "DATA QUALITY · %s · current + nearest 15-minute model cross-check (may be interpolated by region) · updated %s%s",
                 locationQuality,
                 WeatherFormatter.updatedTime(state.getUpdatedAt()),
                 state.isFromCache() ? " · saved/offline snapshot" : ""
@@ -314,8 +345,10 @@ public final class Phase6Renderer {
         forecastDataQualityValue.setText(R.string.phase6_data_quality_waiting);
     }
 
-    private double safe(Double value) {
-        return value == null ? 0d : value;
+    private String pressure(Double value) {
+        return value == null
+                ? "—"
+                : String.format(Locale.getDefault(), "%.0f hPa", value);
     }
 
     private int dp(int value) {
