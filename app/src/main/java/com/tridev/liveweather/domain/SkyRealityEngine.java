@@ -48,22 +48,30 @@ public final class SkyRealityEngine {
         double phaseAngle = normalizeDegrees(Astronomy.moonPhase(time));
 
         WeatherResponse.CurrentWeather current = weather.getCurrent();
+        LiveConditionResolver.ResolvedCondition resolved = LiveConditionResolver.resolve(weather);
+
         double cloudPercent = current == null || current.getCloudCover() == null
                 ? 0.0
                 : clamp(current.getCloudCover(), 0.0, 100.0);
         double visibilityMeters = current == null || current.getVisibility() == null
                 ? 12000.0
                 : Math.max(0.0, current.getVisibility());
-        double precipitation = current == null || current.getPrecipitation() == null
-                ? 0.0
-                : Math.max(0.0, current.getPrecipitation());
+        double precipitation = Math.max(0.0, resolved.getPrecipitationSignalMm());
+        boolean precipitationCondition = isPrecipitationCode(resolved.getWeatherCode());
 
         double darkness = darknessFactor(sun.getAltitude());
         double cloudTransparency = Math.pow(1.0 - (cloudPercent / 100.0), 1.35);
         double visibilityFactor = clamp(visibilityMeters / 20000.0, 0.12, 1.0);
-        double precipitationFactor = precipitation >= 1.0
-                ? 0.18
-                : precipitation > 0.0 ? 0.62 : 1.0;
+        double precipitationFactor;
+        if (precipitation >= 1.0) {
+            precipitationFactor = 0.18;
+        } else if (precipitation > 0.02) {
+            precipitationFactor = 0.48;
+        } else if (precipitationCondition) {
+            precipitationFactor = 0.38;
+        } else {
+            precipitationFactor = 1.0;
+        }
         double moonGlareFactor = moon.getAltitude() > 0.0
                 ? 1.0 - (0.40 * phaseFraction)
                 : 1.0;
@@ -78,8 +86,11 @@ public final class SkyRealityEngine {
 
         double daylight = daylightFactor(sun.getAltitude());
         double weatherDimmer = 1.0 - (0.30 * (cloudPercent / 100.0));
+        if (precipitationCondition) {
+            weatherDimmer *= 0.78;
+        }
         double moonLight = moon.getAltitude() > 0.0
-                ? 0.13 * phaseFraction * cloudTransparency
+                ? 0.13 * phaseFraction * cloudTransparency * precipitationFactor
                 : 0.0;
         double ambient = Math.max(0.012, daylight * weatherDimmer + moonLight);
         int ambientLight = clampPercent((int) Math.round(ambient * 100.0));
@@ -116,6 +127,15 @@ public final class SkyRealityEngine {
                 equatorial.getDec(),
                 Refraction.Normal
         );
+    }
+
+    private static boolean isPrecipitationCode(Integer code) {
+        if (code == null) {
+            return false;
+        }
+        return (code >= 51 && code <= 77)
+                || (code >= 80 && code <= 86)
+                || code >= 95;
     }
 
     private static String skyStage(double sunAltitude) {
