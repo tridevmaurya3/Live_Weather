@@ -1,9 +1,31 @@
 <resources xmlns:tools="http://schemas.android.com/tools">
-    <!-- Base application theme. -->
+
     <style name="Base.Theme.LiveWeather" parent="Theme.Material3.DayNight.NoActionBar">
-        <!-- Customize your light theme here. -->
-        <!-- <item name="colorPrimary">@color/my_light_primary</item> -->
+        <item name="colorPrimary">@color/weather_sky_blue</item>
+        <item name="colorOnPrimary">@color/weather_background</item>
+        <item name="colorSecondary">@color/weather_aqua</item>
+        <item name="colorOnSecondary">@color/weather_background</item>
+        <item name="colorTertiary">@color/weather_violet</item>
+        <item name="colorOnTertiary">@color/weather_background</item>
+
+        <item name="colorSurface">@color/weather_surface</item>
+        <item name="colorOnSurface">@color/weather_text_primary</item>
+        <item name="colorSurfaceVariant">@color/weather_surface_glass</item>
+        <item name="colorOnSurfaceVariant">@color/weather_text_secondary</item>
+        <item name="colorOutline">@color/weather_border_strong</item>
+
+        <item name="android:colorBackground">@color/weather_background</item>
+        <item name="android:windowBackground">@color/weather_background</item>
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:navigationBarColor">@color/weather_background</item>
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="android:windowLightNavigationBar">false</item>
+
+        <item name="shapeAppearanceSmallComponent">@style/ShapeAppearance.LiveWeather.Small</item>
+        <item name="shapeAppearanceMediumComponent">@style/ShapeAppearance.LiveWeather.Medium</item>
+        <item name="shapeAppearanceLargeComponent">@style/ShapeAppearance.LiveWeather.Large</item>
     </style>
 
     <style name="Theme.LiveWeather" parent="Base.Theme.LiveWeather" />
+
 </resources>
