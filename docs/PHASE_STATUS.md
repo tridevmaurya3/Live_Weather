@@ -57,75 +57,115 @@ Status: COMPLETE
 ## Phase 4 — Main Weather Dashboard Intelligence & Interaction
 Status: COMPLETE
 
-### Step 4.1 — Rich Current Conditions
+- Rich current conditions including visibility and dew point
+- Weather intelligence and interpretation layer
+- Sunrise, sunset, daylight, UV, pressure, cloud, gust and rain details
+- Weather-reactive Home hero modes
+- Interactive Home quick actions and explicit refresh
+- Compact professional dashboard layout
+
+## Phase 5 — Advanced Forecast System & Charts
 Status: COMPLETE
 
-- Current API request expanded with dew point and visibility
-- Daily request expanded with daylight and sunshine duration
-- Existing temperature, feels-like, humidity, precipitation, cloud cover, pressure, wind and gust values retained
-- Dashboard values still come from the shared WeatherViewModel response
-
-### Step 4.2 — Weather Intelligence Layer
+### Step 5.1 — Smart 24-Hour Forecast Intelligence
 Status: COMPLETE
 
-- DashboardIntelligence helper added
-- Current conditions are converted into concise user-facing weather insight
-- Thunderstorm, rain, strong-gust, low-visibility, high-UV, clear-sky and heavy-cloud states are interpreted
-- UV value is classified as Low, Moderate, High, Very high or Extreme
-- Visibility is converted to kilometres and interpreted
-- Dew point is interpreted into dry / comfortable / humid states
-- Wind gust strength is interpreted
-- Rain probability is interpreted
-- Pressure trend compares current pressure with the near-term hourly forecast
+- Next 24-hour temperature range is analysed automatically
+- Likely precipitation window is detected from hourly rain probability / precipitation
+- Peak rain probability and approximate peak time are surfaced
+- Maximum near-term wind is surfaced
+- One concise Smart Outlook summary is generated from the same shared weather response
 
-### Step 4.3 — Sun & Atmospheric Details
+### Step 5.2 — Native Forecast Charts
 Status: COMPLETE
 
-- Sunrise and sunset are shown in local API time
-- Daylight duration is shown
-- UV index is shown with interpretation
-- Pressure and trend are shown
-- Visibility and quality are shown
-- Cloud cover and sky interpretation are shown
-- Dew point is shown
-- Wind gusts are shown
-- Today rain chance is shown
+- Lightweight custom Android Canvas chart view added
+- Next-24-hour temperature line chart added
+- Next-24-hour precipitation-probability bar chart added
+- Charts consume the exact hourly arrays already used by the forecast cards
+- No heavyweight third-party chart SDK added
+- Empty / waiting chart state is handled
 
-### Step 4.4 — Weather-Reactive Hero Card
+### Step 5.3 — Rich 24-Hour Forecast Presentation
 Status: COMPLETE
 
-- Hero card changes visual theme from current WMO condition and day/night state
-- Separate visual modes added for clear day, clear night, cloudy, rain, thunderstorm, snow and fog
-- Live temperature, condition, feels-like and high/low remain readable over every hero state
-- Wallpaper preview summary now includes cloud, gust and day/night context
+- Existing 24-hour horizontally scrollable cards retained
+- Current-hour matching remains timestamp-based
+- Temperature, weather symbol and precipitation probability remain visible per hour
+- Smart summary and charts are synchronized with the same hourly sequence
 
-### Step 4.5 — Interactive Dashboard Actions
+### Step 5.4 — Expandable 10-Day Forecast
 Status: COMPLETE
 
-- Explicit Refresh action added to Home hero card
-- Existing sync status remains tap-to-refresh
-- 10-day forecast card navigates to Forecast
-- Live radar card navigates to Radar
-- Air quality card navigates to the More control center until the dedicated AQI phase is implemented
-- Live Wallpaper action navigates to Wallpaper controls
-- Location label keeps its Phase 3 current-location / city-manager behavior
-- Dashboard actions use light platform haptic feedback while respecting device haptic settings
+- Up to 10 daily rows remain dynamically generated
+- Each day can be expanded / collapsed by tap
+- Expanded details include feels-like high / low
+- Total precipitation and precipitation hours are shown
+- Sunrise and sunset are shown
+- Sunshine duration and daylight duration are shown
+- UV index is shown
+- Wind gusts and dominant wind direction are shown
+- Daily row expansion uses light platform haptic feedback
+- 10-day summary identifies wetter days, warmest day and highest rain-chance day
 
-### Step 4.6 — Compact Professional Dashboard Layout
+### Step 5.5 — Shared Sky Reality Foundation
 Status: COMPLETE
 
-- Home spacing tightened while preserving scroll safety
-- Smart weather insight card added
-- Advanced details are presented in compact two-column cards
-- Hourly forecast remains horizontally scrollable
-- Explore Weather quick actions grouped below current details
-- Phase 4 status shown at the bottom of Home
+- Astronomy Engine 2.1.19 dependency integrated for local astronomical calculations
+- Shared SkyRealityState added
+- Shared SkyRealityEngine added
+- Observer-relative Sun altitude and azimuth are calculated from active weather coordinates and current time
+- Observer-relative Moon altitude and azimuth are calculated
+- Moon phase and illuminated fraction are calculated
+- Astronomical sky stage is classified into daylight, golden hour, civil twilight, nautical twilight, astronomical twilight and astronomical night
+- Forecast page exposes a Sky Reality panel
+- Wallpaper preview consumes the same calculated sky-reality result instead of a separate fake astronomy state
 
-## Phase 4 Result
+### Step 5.6 — Weather-Aware Star Visibility & Scene Light
+Status: COMPLETE AS REALITY STATE FOUNDATION
 
-The Home dashboard is no longer only a raw weather readout. It now combines live weather values, interpretation, weather-reactive visual state and direct navigation actions while continuing to use the shared cached multi-city weather pipeline.
+- Star visibility is not treated as a permanent decorative texture
+- A normalized star-visibility estimate combines astronomical darkness, cloud cover, visibility, precipitation and Moon glare
+- A normalized ambient scene-light estimate combines Sun altitude, weather dimming and Moon contribution
+- Clear astronomical night can produce high star visibility
+- Daylight forces star visibility toward zero
+- Clouds, fog / poor visibility and precipitation suppress star visibility
+- Bright Moon above the horizon reduces faint-star visibility through the Moon-glare factor
+- Full star-catalog drawing / astronomical star-field orientation is intentionally NOT claimed complete in Phase 5
+- Full celestial rendering remains assigned to the later Live Wallpaper / Dynamic World rendering phases
+
+### Step 5.7 — Dynamic App Atmosphere Lighting Foundation
+Status: COMPLETE
+
+- Root app layout now includes a dedicated Sky Atmosphere overlay
+- The app atmosphere tint changes from the shared astronomical sky stage
+- Daylight uses a subtle sky tint
+- Golden hour uses a warm tint
+- Twilight uses restrained violet / blue transitions
+- Astronomical night uses a deeper dark atmosphere
+- Transitions are animated softly to preserve readability
+- This is the first app-level lighting consumer of the shared Sky Reality state
+
+### Step 5.8 — Reality-State Architecture Contract
+Status: COMPLETE
+
+- docs/SKY_REALITY_ENGINE.md defines the permanent product invariant
+- App UI, widgets and Live Wallpaper must consume one shared weather + astronomy reality state
+- Sun / Moon / stars must not be randomly placed as decorative production elements
+- Astronomy determines celestial position; live weather determines obstruction / visibility
+- Weather network refresh is kept separate from animation-frame rendering
+- Later wallpaper animation will read cached reality state instead of fetching weather every frame
+- Full future rendering scope includes moving Sun / Moon, astronomically oriented stars, cloud occlusion, fog / rain visibility loss and smooth twilight lighting
+
+## Phase 5 Result
+
+The Forecast experience now combines smart hourly interpretation, native temperature / rain charts, expandable 10-day intelligence and a shared astronomy-aware Sky Reality foundation.
+
+The application can now calculate and expose where the Sun and Moon are relative to the active weather location, the Moon phase / illumination, the astronomical sky stage, an environment-aware star-visibility estimate and a scene-light factor. These values are shared with the Live Wallpaper preview and the app atmosphere layer.
+
+Phase 5 does not fake completion of the final celestial renderer: the full moving Sun / Moon / star-field visuals will be implemented later by the Live Wallpaper and Dynamic World phases using this shared reality state.
 
 ## Next
-Phase 5 — Advanced Forecast System & Charts
+Phase 6 — Advanced Weather Details
 
-Planned scope: richer hourly presentation, temperature/rain charts, daily expansion, precipitation timing, forecast summaries and interaction polish.
+Planned scope: deeper atmospheric details, comfort/visibility/pressure intelligence, precipitation breakdowns, wind analysis, UV and sun/moon detail surfaces, plus production-ready detail interactions while preserving the shared Weather + Sky Reality architecture.
