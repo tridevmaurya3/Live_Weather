@@ -24,103 +24,101 @@ Status: COMPLETE
 - Forecast page shell
 - Radar page shell and layer controls
 - Live Wallpaper preview and atmosphere controls
-- More control center for Cities, Widgets, Alerts, AQI, Units and Performance
+- More control center
 - Responsive reusable glass cards, chips, buttons, typography and spacing
 - No fake live weather values
 
 ## Phase 2 — Real Weather Data Engine
 Status: COMPLETE
 
-### Step 2.1 — Real Weather API Core
+- Open-Meteo current, hourly and 10-day forecast integration
+- Device foreground location engine
+- Real current weather UI sync
+- Dynamic Home six-hour forecast
+- Dynamic Forecast next-24-hours strip
+- Dynamic 10-day forecast list
+- Shared WeatherViewModel state
+- Persistent weather cache
+- Retry, loading and offline fallback states
+- Home, Forecast and Wallpaper preview share the same weather response
+
+## Phase 3 — Location & City Engine
 Status: COMPLETE
 
-- INTERNET permission added
-- Open-Meteo Retrofit API service added
-- Reusable Retrofit weather client added
-- Current, hourly and daily weather DTO model added
-- Weather repository added with latitude/longitude input
-- Current weather variables include temperature, humidity, feels-like, precipitation, rain, snow, weather code, cloud cover, pressure and wind
-- Hourly forecast includes day/night state, precipitation probability, visibility, pressure and wind
-- Daily forecast includes max/min temperature, feels-like, sunrise/sunset, UV, precipitation and wind
-- 10-day forecast request configured
-- Automatic timezone selection configured
-- No hard-coded user location
-
-### Step 2.2 — Device Location Engine
+### Step 3.1 — Friendly Current Place Name
 Status: COMPLETE
 
-- Google Play services fused location dependency added
-- Foreground coarse and fine location permissions added
-- No background location permission requested
-- Battery-aware single current-location request added
-- Approximate location permission is accepted for weather lookup
-- Permission denial and location-unavailable states handled without crashing
-- Home location status is connected to the location engine
-- Location status text can be tapped to retry permission/location lookup
+- Android Geocoder reverse-geocoding layer added
+- API 33+ asynchronous GeocodeListener path added
+- Android 8–12 background-thread compatibility path added
+- Current coordinates are replaced by a friendly locality/admin/country label when available
+- Coordinates remain the fallback when geocoding is unavailable or fails
+- Weather loading never depends on reverse-geocoding success
 
-### Step 2.3 — Current Weather UI Sync
+### Step 3.2 — Global City Search
 Status: COMPLETE
 
-- Detected device coordinates are sent directly to WeatherRepository
-- Home temperature is populated from live current weather
-- Feels-like temperature is populated
-- Humidity, wind and current precipitation are populated
-- WMO weather code is converted into a readable condition
-- Current day/night state is connected to weather symbols and wallpaper preview data
-- Daily high and low are populated from the first daily forecast item
-- Current coordinates are shown until the later City Engine adds friendly place names
+- Open-Meteo Geocoding API client added
+- City or postal-code search added
+- Local device language is sent to the geocoding service when possible
+- Up to eight ranked results are shown
+- Search results include friendly place name, coordinates and timezone
+- Empty, loading and error search states are handled
+- Active search calls are cancelled before replacement searches
 
-### Step 2.4 — Live Hourly Forecast
+### Step 3.3 — Saved / Favourite Cities
 Status: COMPLETE
 
-- Home six-hour horizontal weather strip is dynamic
-- Forecast page next-24-hours strip is dynamic
-- Hour, condition symbol, temperature and precipitation probability are shown
-- Current-hour matching uses the API current timestamp instead of assuming index zero
-- Hourly day/night state is requested and mapped
+- Multiple cities can be saved locally
+- Saved cities survive app restart
+- Duplicate saved locations are prevented by stable identity/coordinates
+- Up to 20 saved cities are retained
+- Saved cities can be removed
+- Active-city removal safely returns the app to current-location mode
 
-### Step 2.5 — Live 10-Day Forecast
+### Step 3.4 — Active Weather Location Switching
 Status: COMPLETE
 
-- Forecast page daily rows are generated dynamically
-- Up to 10 daily forecast entries are rendered
-- Today and Tomorrow labels are handled specially
-- Daily condition, high, low, rain probability and maximum wind are shown
-- Home summary shows today condition, rain probability and UV index
-- Forecast wind card shows current speed, direction, gusts and today's rain chance
+- Search result can be used directly without saving
+- Saved city can be activated with one tap
+- Active selected city is persisted across app restarts
+- Selecting a city switches Home, Forecast and Wallpaper preview together
+- Current-location mode can be restored from the city manager
+- Startup restores the selected city without requesting GPS permission unnecessarily
+- Restoring a city does not override the currently restored bottom-navigation tab
 
-### Step 2.6 — Shared Weather State + Persistent Cache
+### Step 3.5 — Multi-City Weather Cache
 Status: COMPLETE
 
-- One WeatherViewModel owns the app weather state
-- Home, Forecast and Wallpaper preview consume the same WeatherResponse
-- Screens do not make independent duplicate API requests
-- Last successful WeatherResponse is persisted with Gson + SharedPreferences
-- Cached coordinates and update time are stored
-- Cached weather is restored immediately after app relaunch
-- Activity recreation keeps shared state through ViewModel
-- Recent live data in the same area is reused to avoid unnecessary refreshes
+- WeatherCache upgraded from one global snapshot to per-location snapshots
+- Phase 2 legacy cache is migrated automatically
+- Each location stores its own WeatherResponse, coordinates and update time
+- Switching to a previously visited city can show its saved weather immediately
+- Live network refresh replaces the saved snapshot when successful
+- Network failure keeps the selected city’s saved weather instead of another city’s data
 
-### Step 2.7 — Resilient Refresh + Offline Fallback
+### Step 3.6 — Professional City Manager UI
 Status: COMPLETE
 
-- Active Retrofit request is cancelled before a replacement request
-- Active request is cancelled when ViewModel is cleared
-- Live refresh preserves already displayed weather while loading
-- Network failure keeps the last available cached/saved weather on screen
-- Home sync status identifies live, loading and saved-weather states
-- Home status can be tapped to force refresh
-- Forecast status can be tapped to force refresh
-- If current location is unavailable, saved coordinates can still be used for manual refresh
-- No fake live weather values are inserted on failure
+- More page now contains a dedicated Locations & Cities manager
+- Active weather location is shown clearly
+- Use current device location action added
+- City/postal-code search box added
+- Search results render dynamically
+- Use, Save, Active and Remove actions added
+- Saved cities render dynamically
+- Existing Widgets, Alerts, Air Quality, Units and Performance controls remain available below the city manager
 
-## Phase 2 Result
+## Phase 3 Result
 
-The app now has one end-to-end real-weather pipeline:
+The app now supports two complete weather-location modes:
 
-Device location → WeatherRepository → Open-Meteo response → shared ViewModel → persistent cache → Home + Forecast + Wallpaper preview.
+1. Current device location with best-effort friendly place naming.
+2. Any searched/saved city with persistent selection and its own cached weather.
+
+Weather location switching updates the shared weather pipeline, so Home, Forecast and Wallpaper preview remain synchronized.
 
 ## Next
-Phase 3 — Location & City Engine
+Phase 4 — Main Weather Dashboard Intelligence & Interaction
 
-Planned scope: friendly place-name resolution, city search, saved/favourite locations, current-location switching and multi-city weather state.
+Planned scope: richer current-condition details, sunrise/sunset, pressure, visibility, cloud cover, UV interpretation, weather-aware visual state, interaction polish and dashboard actions.
