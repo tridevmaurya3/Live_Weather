@@ -31,6 +31,7 @@ import java.util.Locale;
 public final class WeatherScreenRenderer {
 
     private final Activity activity;
+    private final View skyAtmosphereOverlay;
 
     private final View homeHeroCard;
     private final TextView homeTemperature;
@@ -75,6 +76,7 @@ public final class WeatherScreenRenderer {
 
     public WeatherScreenRenderer(@NonNull Activity activity) {
         this.activity = activity;
+        skyAtmosphereOverlay = activity.findViewById(R.id.skyAtmosphereOverlay);
 
         homeHeroCard = activity.findViewById(R.id.homeHeroCard);
         homeTemperature = activity.findViewById(R.id.homeTemperature);
@@ -339,24 +341,12 @@ public final class WeatherScreenRenderer {
 
         for (int offset = 0; offset < homeCount; offset++) {
             int index = startIndex + offset;
-            addHourlyChip(
-                    homeHourlyContainer,
-                    hourly,
-                    index,
-                    offset == 0,
-                    78
-            );
+            addHourlyChip(homeHourlyContainer, hourly, index, offset == 0, 78);
         }
 
         for (int offset = 0; offset < forecastCount; offset++) {
             int index = startIndex + offset;
-            addHourlyChip(
-                    forecastHourlyContainer,
-                    hourly,
-                    index,
-                    offset == 0,
-                    88
-            );
+            addHourlyChip(forecastHourlyContainer, hourly, index, offset == 0, 88);
         }
     }
 
@@ -539,6 +529,7 @@ public final class WeatherScreenRenderer {
                     System.currentTimeMillis()
             );
 
+            applySkyAtmosphere(sky);
             forecastSkyStageValue.setText(sky.getSkyStage());
             forecastSunPositionValue.setText(String.format(
                     Locale.getDefault(),
@@ -587,6 +578,36 @@ public final class WeatherScreenRenderer {
         }
     }
 
+    private void applySkyAtmosphere(@NonNull SkyRealityState sky) {
+        int color;
+        float alpha;
+        String stage = sky.getSkyStage();
+        float light = sky.getAmbientLightPercent() / 100f;
+
+        if ("Daylight".equals(stage)) {
+            color = R.color.weather_sky_blue;
+            alpha = 0.07f + (0.10f * light);
+        } else if ("Golden hour".equals(stage)) {
+            color = R.color.weather_sun_warm;
+            alpha = 0.14f;
+        } else if ("Civil twilight".equals(stage)) {
+            color = R.color.weather_violet;
+            alpha = 0.11f;
+        } else if ("Nautical twilight".equals(stage)) {
+            color = R.color.weather_sky_blue;
+            alpha = 0.075f;
+        } else if ("Astronomical twilight".equals(stage)) {
+            color = R.color.weather_violet;
+            alpha = 0.055f;
+        } else {
+            color = R.color.weather_background_deep;
+            alpha = 0.28f;
+        }
+
+        skyAtmosphereOverlay.setBackgroundColor(ContextCompat.getColor(activity, color));
+        skyAtmosphereOverlay.animate().alpha(alpha).setDuration(700L).start();
+    }
+
     private String starVisibilityLabel(int percent) {
         if (percent <= 5) {
             return "not visible";
@@ -609,6 +630,10 @@ public final class WeatherScreenRenderer {
         forecastMoonPositionValue.setText(R.string.metric_placeholder);
         forecastStarVisibilityValue.setText(R.string.metric_placeholder);
         forecastSceneLightValue.setText(R.string.metric_placeholder);
+        skyAtmosphereOverlay.setBackgroundColor(
+                ContextCompat.getColor(activity, R.color.weather_sky_blue)
+        );
+        skyAtmosphereOverlay.animate().alpha(0.05f).setDuration(500L).start();
     }
 
     private void renderEmptyWeather() {
