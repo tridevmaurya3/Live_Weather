@@ -47,13 +47,15 @@
                 android:textStyle="bold" />
 
             <TextView
+                android:id="@+id/wallpaperPreviewTemperature"
                 style="@style/TextAppearance.LiveWeather.Display"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="@dimen/space_12"
-                android:text="—°" />
+                android:text="@string/home_temperature_placeholder" />
 
             <TextView
+                android:id="@+id/wallpaperPreviewCondition"
                 style="@style/TextAppearance.LiveWeather.BodyLarge"
                 android:layout_width="260dp"
                 android:layout_height="wrap_content"
