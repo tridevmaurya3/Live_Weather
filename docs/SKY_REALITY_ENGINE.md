@@ -12,19 +12,20 @@ A visible Sun, Moon, stars, cloud layer, precipitation effect or scene brightnes
 The Sky Reality Engine combines:
 
 1. Active weather latitude / longitude.
-2. Current UTC time and the location-aware weather timezone.
-3. Accurate Sun and Moon astronomical calculations.
+2. Current UTC time and location-aware timezone.
+3. Observer-relative Sun and Moon astronomy.
 4. Moon phase and illuminated fraction.
-5. Current cloud cover.
-6. Current visibility.
-7. Current precipitation / rain / snow / fog state.
-8. Weather day/night state and sunrise/sunset forecast data.
-9. Later performance/battery policy from the Smart Performance Engine.
+5. Sun/Moon rise and set events.
+6. Current cloud cover.
+7. Current visibility.
+8. Precipitation-first live condition state.
+9. Weather day/night state and sunrise/sunset forecast data.
+10. Later performance/battery policy from the Smart Performance Engine.
 
 ## Astronomy source
 
 Astronomy Engine for Kotlin/JVM is used from Java for local astronomical calculations.
-It provides observer-relative Sun/Moon positions, Moon illumination/phase and other astronomy primitives without requiring a network request for every frame.
+It provides observer-relative Sun/Moon positions, Moon illumination/phase and rise/set primitives without requiring a network request for every animation frame.
 
 The astronomical calculation result is separate from weather obstruction:
 
@@ -47,7 +48,9 @@ The final rendering must transition continuously between these stages instead of
 
 ## Sun
 
-The final app and Live Wallpaper must use real observer-relative Sun position.
+The app and Live Wallpaper must use real observer-relative Sun position.
+
+Phase 6 live preview recalculates the Sun's current position from the active coordinates and clock every 30 seconds while the preview is attached. This is a local astronomy calculation; it does not fetch weather every 30 seconds.
 
 Examples:
 
@@ -60,12 +63,15 @@ Cloud cover, fog, rain and storms can reduce or diffuse visible sunlight without
 
 ## Moon
 
-The final app and Live Wallpaper must use:
+The app and Live Wallpaper must use:
 
 - Real Moon altitude / azimuth.
 - Real Moon phase.
 - Real illuminated fraction.
 - Horizon visibility.
+- Location-aware moonrise / moonset.
+
+Phase 6 adds a 10-day Moon progression strip. Each day calculates its own phase, illuminated percentage and local moonrise/moonset events. The live preview recalculates the current Moon position every 30 seconds from the active location and clock.
 
 A Moon below the observer's horizon must not be rendered as if it were visible overhead.
 Clouds/fog/precipitation may dim or hide an otherwise astronomically visible Moon.
@@ -79,10 +85,10 @@ Star intensity is controlled by at least:
 - Sun altitude / astronomical darkness.
 - Cloud cover.
 - Visibility / fog.
-- Precipitation.
+- Precipitation-first live condition.
 - Moon illumination and Moon-above-horizon glare.
 
-Current Phase 5 exposes a normalized star-visibility percentage. The later Dynamic World / Live Wallpaper renderer will consume this value and combine it with an astronomically oriented star catalogue / sky rotation model.
+The current normalized star-visibility percentage is consumed by the Phase 6 live preview. The later Dynamic World / Live Wallpaper renderer will combine it with an astronomically oriented star catalogue / sky rotation model.
 
 Expected examples:
 
@@ -93,11 +99,17 @@ Expected examples:
 - Dense fog / heavy rain / storm → stars hidden.
 - Bright Moon above horizon → fewer faint stars visible than on a dark Moonless sky.
 
+## Precipitation consistency
+
+The visual sky must use the same precipitation-first condition resolver as the weather dashboard.
+
+If current/nearest 15-minute precipitation signals indicate rain while a raw weather code is clear, the stronger rain signal can override the clear presentation. The same resolved condition drives Home, Forecast current summary and the live Wallpaper preview.
+
 ## Scene light
 
 The engine exposes an ambient scene-light percentage derived from astronomical daylight plus weather dimming and Moon contribution.
 
-The final app shell, weather scene, widgets and Live Wallpaper will use this shared value for gradual brightness / atmosphere changes.
+The app shell, weather scene, widgets and Live Wallpaper use this shared value for gradual brightness / atmosphere changes.
 
 Examples:
 
@@ -118,28 +130,28 @@ Network weather refresh must never run per animation frame.
 - Astronomy state: inexpensive local calculations at controlled intervals.
 - Animation frame: reads the latest cached Reality State only.
 
-This separation is required for battery efficiency.
+Phase 6 preview uses a 30-second astronomy tick while the view is attached. Full wallpaper animation will use a battery-aware renderer and will not trigger a weather API request for every celestial-position update.
 
-## Phase 5 delivered foundation
+## Phase 6 delivered foundation
 
-Phase 5 provides:
+Phase 6 provides:
 
-- Accurate current Sun position state.
-- Accurate current Moon position state.
-- Moon phase / illumination state.
-- Astronomical sky-stage state.
-- Weather-aware star-visibility estimate.
-- Weather/astronomy-aware ambient-light estimate.
-- Sky Reality panel in Forecast.
-- The same state surfaced in the Live Wallpaper preview text.
+- Live Sun position preview.
+- Live Moon position preview.
+- Daily Moon phase / illumination progression.
+- Sun rise/set and Moon rise/set calculations.
+- Weather-aware stars and scene brightness in the live preview.
+- Precipitation graphics tied to the shared resolved current condition.
+- A shared live preview on Forecast and Wallpaper screens.
 
 ## Later rendering work
 
-The later Live Wallpaper and Dynamic World phases will turn the shared state into full real-time visuals:
+The later Live Wallpaper and Dynamic World phases will turn the shared state into the final Android home-screen renderer:
 
-- Moving Sun and Moon.
-- Astronomically oriented star field.
-- Cloud occlusion in front of celestial objects.
+- Android WallpaperService integration.
+- Smoother Sun and Moon movement.
+- Astronomically oriented star catalogue / sky rotation.
+- Cloud layers moving in front of celestial objects.
 - Fog / precipitation visibility loss.
 - Sunrise/sunset/twilight color transitions.
 - Night illumination influenced by Moon phase and cloud cover.
