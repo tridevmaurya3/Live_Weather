@@ -4,8 +4,10 @@ import androidx.annotation.Nullable;
 
 import com.tridev.liveweather.data.remote.dto.WeatherResponse;
 
+import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
 import java.util.List;
@@ -199,15 +201,10 @@ public final class WeatherFormatter {
         if (updatedAt <= 0L) {
             return "—";
         }
-        return LocalDateTime.now().withHour(
-                java.time.Instant.ofEpochMilli(updatedAt)
-                        .atZone(java.time.ZoneId.systemDefault())
-                        .getHour()
-        ).withMinute(
-                java.time.Instant.ofEpochMilli(updatedAt)
-                        .atZone(java.time.ZoneId.systemDefault())
-                        .getMinute()
-        ).format(UPDATED_FORMATTER);
+        return Instant.ofEpochMilli(updatedAt)
+                .atZone(ZoneId.systemDefault())
+                .toLocalDateTime()
+                .format(UPDATED_FORMATTER);
     }
 
     public static int findCurrentHourlyIndex(@Nullable WeatherResponse response) {
