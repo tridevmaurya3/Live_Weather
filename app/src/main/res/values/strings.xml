@@ -87,11 +87,28 @@
     <string name="wallpaper_apply">Apply Live Wallpaper</string>
     <string name="wallpaper_note">The real rendering engine will be connected to these controls in the wallpaper phase.</string>
 
-    <!-- More -->
+    <!-- More / City Engine -->
     <string name="more_title">More</string>
-    <string name="more_subtitle">Your weather control center.</string>
-    <string name="more_cities">Cities</string>
-    <string name="more_cities_sub">Saved locations</string>
+    <string name="more_subtitle">Locations, widgets, alerts and app controls.</string>
+    <string name="city_manager_title">Locations &amp; Cities</string>
+    <string name="city_manager_subtitle">Search globally, save favourites and switch the complete weather experience to any city.</string>
+    <string name="city_active_label">ACTIVE WEATHER LOCATION</string>
+    <string name="city_active_current">Current device location</string>
+    <string name="city_use_current">Use current device location</string>
+    <string name="city_search_hint">Search city or postal code</string>
+    <string name="city_search">Search</string>
+    <string name="city_searching">Searching cities…</string>
+    <string name="city_search_hint_status">Search by city name or postal code. Results can be used directly or saved.</string>
+    <string name="city_search_results_title">Search results</string>
+    <string name="city_saved_title">Saved cities</string>
+    <string name="city_no_search_results">No search results yet.</string>
+    <string name="city_no_saved_cities">No saved cities yet.</string>
+    <string name="city_use">Use</string>
+    <string name="city_active">Active</string>
+    <string name="city_save">Save</string>
+    <string name="city_saved">Saved</string>
+    <string name="city_remove">Remove</string>
+    <string name="more_tools_title">Other controls</string>
     <string name="more_widgets">Widgets</string>
     <string name="more_widgets_sub">Home screen layouts</string>
     <string name="more_alerts">Alerts</string>
@@ -103,9 +120,10 @@
     <string name="more_performance">Performance</string>
     <string name="more_performance_sub">Battery &amp; refresh</string>
     <string name="more_about">About Live Weather</string>
-    <string name="more_about_sub">Phase 2 real weather engine complete</string>
+    <string name="more_about_phase_three">Phase 3 location and multi-city engine complete</string>
 
     <string name="status_phase_one">PHASE 1 · UI SYSTEM READY</string>
     <string name="status_phase_two_location">PHASE 2 · LOCATION ENGINE READY</string>
     <string name="status_phase_two">PHASE 2 · REAL WEATHER ENGINE</string>
+    <string name="status_phase_three">PHASE 3 · LOCATION &amp; CITY ENGINE</string>
 </resources>
