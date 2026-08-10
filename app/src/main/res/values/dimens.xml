@@ -1,21 +1,35 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <dimen name="space_2">2dp</dimen>
     <dimen name="space_4">4dp</dimen>
+    <dimen name="space_6">6dp</dimen>
     <dimen name="space_8">8dp</dimen>
+    <dimen name="space_10">10dp</dimen>
     <dimen name="space_12">12dp</dimen>
+    <dimen name="space_14">14dp</dimen>
     <dimen name="space_16">16dp</dimen>
     <dimen name="space_20">20dp</dimen>
     <dimen name="space_24">24dp</dimen>
+    <dimen name="space_28">28dp</dimen>
     <dimen name="space_32">32dp</dimen>
 
+    <dimen name="radius_xsmall">8dp</dimen>
     <dimen name="radius_small">12dp</dimen>
     <dimen name="radius_medium">18dp</dimen>
     <dimen name="radius_large">24dp</dimen>
     <dimen name="stroke_thin">1dp</dimen>
 
+    <dimen name="text_nav">10sp</dimen>
     <dimen name="text_caption">12sp</dimen>
     <dimen name="text_body">14sp</dimen>
     <dimen name="text_body_large">16sp</dimen>
+    <dimen name="text_section">18sp</dimen>
     <dimen name="text_title">22sp</dimen>
     <dimen name="text_display">34sp</dimen>
+    <dimen name="text_temperature">64sp</dimen>
+
+    <dimen name="nav_bar_min_height">56dp</dimen>
+    <dimen name="nav_icon_size">20dp</dimen>
+    <dimen name="compact_card_min_height">76dp</dimen>
+    <dimen name="metric_card_min_height">82dp</dimen>
 </resources>
