@@ -24,6 +24,7 @@ import com.tridev.liveweather.domain.CityLocation;
 import com.tridev.liveweather.domain.WeatherUiState;
 import com.tridev.liveweather.ui.city.CityScreenRenderer;
 import com.tridev.liveweather.ui.city.CityViewModel;
+import com.tridev.liveweather.ui.weather.Phase6Renderer;
 import com.tridev.liveweather.ui.weather.WeatherFormatter;
 import com.tridev.liveweather.ui.weather.WeatherScreenRenderer;
 import com.tridev.liveweather.ui.weather.WeatherViewModel;
@@ -52,6 +53,7 @@ public class MainActivity extends AppCompatActivity {
     private ActivityResultLauncher<String[]> locationPermissionLauncher;
     private WeatherViewModel weatherViewModel;
     private WeatherScreenRenderer weatherScreenRenderer;
+    private Phase6Renderer phase6Renderer;
     private CityViewModel cityViewModel;
     private CityScreenRenderer cityScreenRenderer;
 
@@ -71,6 +73,7 @@ public class MainActivity extends AppCompatActivity {
 
         bindViews();
         weatherScreenRenderer = new WeatherScreenRenderer(this);
+        phase6Renderer = new Phase6Renderer(this);
         cityScreenRenderer = new CityScreenRenderer(this);
 
         applySystemInsets();
@@ -195,6 +198,7 @@ public class MainActivity extends AppCompatActivity {
             }
 
             weatherScreenRenderer.render(state);
+            phase6Renderer.render(state);
 
             if (Double.isNaN(latestLatitude)
                     && state.hasWeather()
@@ -306,6 +310,7 @@ public class MainActivity extends AppCompatActivity {
     ) {
         latestLatitude = city.getLatitude();
         latestLongitude = city.getLongitude();
+        phase6Renderer.clearLocationAccuracy();
         homeLocationValue.setText(city.getDisplayName());
         weatherViewModel.refreshWeather(latestLatitude, latestLongitude, force);
         if (navigateHome) {
@@ -353,12 +358,15 @@ public class MainActivity extends AppCompatActivity {
                         latestLongitude = location.getLongitude();
                         double resolvedLatitude = latestLatitude;
                         double resolvedLongitude = latestLongitude;
+                        float accuracy = location.hasAccuracy() ? location.getAccuracy() : Float.NaN;
+                        boolean precise = deviceLocationManager.hasFineLocationPermission();
 
                         runOnUiThread(() -> {
                             if (cityViewModel.getSelectedCity() != null) {
                                 return;
                             }
 
+                            phase6Renderer.setLocationAccuracy(accuracy, precise);
                             homeLocationValue.setText(
                                     WeatherFormatter.coordinates(
                                             resolvedLatitude,
