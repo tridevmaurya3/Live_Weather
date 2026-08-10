@@ -27,7 +27,6 @@ android {
             }
         }
     }
-
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_11
         targetCompatibility = JavaVersion.VERSION_11
@@ -55,6 +54,9 @@ dependencies {
 
     // Foreground device location used to resolve weather coordinates.
     implementation(libs.play.services.location)
+
+    // Accurate local astronomical calculations for Sun/Moon/sky reality state.
+    implementation(libs.astronomy)
 
     testImplementation(libs.junit)
     androidTestImplementation(libs.espresso.core)
