@@ -11,7 +11,7 @@
         android:layout_height="wrap_content"
         android:orientation="vertical"
         android:paddingStart="@dimen/space_16"
-        android:paddingTop="@dimen/space_16"
+        android:paddingTop="@dimen/space_14"
         android:paddingEnd="@dimen/space_16"
         android:paddingBottom="@dimen/space_24">
 
@@ -27,7 +27,7 @@
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginTop="@dimen/space_12"
+            android:layout_marginTop="@dimen/space_8"
             android:text="@string/home_location_label"
             android:textColor="@color/weather_text_tertiary"
             android:textSize="@dimen/text_caption" />
@@ -43,33 +43,55 @@
             android:text="@string/home_location_waiting" />
 
         <LinearLayout
+            android:id="@+id/homeHeroCard"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="@dimen/space_14"
-            android:background="@drawable/bg_weather_card_accent"
+            android:layout_marginTop="@dimen/space_12"
+            android:background="@drawable/bg_weather_hero_cloudy"
             android:orientation="vertical"
-            android:padding="@dimen/space_20">
+            android:padding="@dimen/space_18">
 
-            <TextView
-                android:id="@+id/homeTemperature"
-                style="@style/TextAppearance.LiveWeather.Temperature"
-                android:layout_width="wrap_content"
+            <LinearLayout
+                android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:includeFontPadding="false"
-                android:text="@string/home_temperature_placeholder" />
+                android:gravity="center_vertical"
+                android:orientation="horizontal">
+
+                <TextView
+                    android:id="@+id/homeTemperature"
+                    style="@style/TextAppearance.LiveWeather.Temperature"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:includeFontPadding="false"
+                    android:text="@string/home_temperature_placeholder" />
+
+                <TextView
+                    android:id="@+id/homeRefreshAction"
+                    android:layout_width="84dp"
+                    android:layout_height="44dp"
+                    android:background="@drawable/bg_weather_chip"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:gravity="center"
+                    android:text="@string/home_refresh"
+                    android:textColor="@color/weather_text_primary"
+                    android:textSize="@dimen/text_caption"
+                    android:textStyle="bold" />
+            </LinearLayout>
 
             <TextView
                 android:id="@+id/homeCondition"
                 style="@style/TextAppearance.LiveWeather.Title"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="@dimen/space_4"
+                android:layout_marginTop="@dimen/space_2"
                 android:text="@string/home_condition_waiting" />
 
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="@dimen/space_10"
+                android:layout_marginTop="@dimen/space_8"
                 android:orientation="horizontal">
 
                 <TextView
@@ -93,7 +115,7 @@
                 style="@style/TextAppearance.LiveWeather.Caption"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="@dimen/space_14"
+                android:layout_marginTop="@dimen/space_12"
                 android:clickable="true"
                 android:focusable="true"
                 android:text="@string/home_sync_status" />
@@ -102,7 +124,7 @@
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="@dimen/space_10"
+            android:layout_marginTop="@dimen/space_8"
             android:orientation="horizontal">
 
             <LinearLayout
@@ -182,17 +204,40 @@
             </LinearLayout>
         </LinearLayout>
 
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="@dimen/space_10"
+            android:background="@drawable/bg_weather_card_accent"
+            android:orientation="vertical"
+            android:padding="@dimen/space_14">
+
+            <TextView
+                style="@style/TextAppearance.LiveWeather.Section"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="@string/dashboard_insight_title" />
+
+            <TextView
+                android:id="@+id/homeWeatherInsight"
+                style="@style/TextAppearance.LiveWeather.Body"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="@dimen/space_6"
+                android:text="@string/dashboard_insight_waiting" />
+        </LinearLayout>
+
         <TextView
             style="@style/TextAppearance.LiveWeather.Section"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginTop="@dimen/space_20"
+            android:layout_marginTop="@dimen/space_18"
             android:text="@string/section_hourly" />
 
         <HorizontalScrollView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="@dimen/space_10"
+            android:layout_marginTop="@dimen/space_8"
             android:clipToPadding="false"
             android:overScrollMode="never"
             android:scrollbars="none">
@@ -208,31 +253,8 @@
             style="@style/TextAppearance.LiveWeather.Section"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginTop="@dimen/space_20"
-            android:text="@string/section_today_details" />
-
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="@dimen/space_10"
-            android:background="@drawable/bg_weather_card_compact"
-            android:orientation="vertical"
-            android:padding="@dimen/space_14">
-
-            <TextView
-                style="@style/TextAppearance.LiveWeather.Section"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:text="@string/quick_ten_day" />
-
-            <TextView
-                android:id="@+id/homeTenDaySummary"
-                style="@style/TextAppearance.LiveWeather.Caption"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="@dimen/space_4"
-                android:text="@string/quick_ten_day_sub" />
-        </LinearLayout>
+            android:layout_marginTop="@dimen/space_18"
+            android:text="@string/dashboard_details_title" />
 
         <LinearLayout
             android:layout_width="match_parent"
@@ -246,21 +268,13 @@
                 android:layout_marginEnd="@dimen/space_4"
                 android:layout_weight="1"
                 android:background="@drawable/bg_weather_card_compact"
+                android:minHeight="100dp"
                 android:orientation="vertical"
-                android:padding="@dimen/space_14">
+                android:padding="@dimen/space_12">
 
-                <TextView
-                    style="@style/TextAppearance.LiveWeather.Section"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:text="@string/quick_radar" />
-
-                <TextView
-                    style="@style/TextAppearance.LiveWeather.Caption"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="@dimen/space_4"
-                    android:text="@string/quick_radar_sub" />
+                <TextView style="@style/TextAppearance.LiveWeather.Caption" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="@string/detail_sun" />
+                <TextView android:id="@+id/homeSunValue" style="@style/TextAppearance.LiveWeather.MetricValue" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="@dimen/space_6" android:text="@string/metric_placeholder" />
+                <TextView android:id="@+id/homeDaylightValue" style="@style/TextAppearance.LiveWeather.Caption" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="@dimen/space_4" android:text="@string/metric_placeholder" />
             </LinearLayout>
 
             <LinearLayout
@@ -269,57 +283,92 @@
                 android:layout_marginStart="@dimen/space_4"
                 android:layout_weight="1"
                 android:background="@drawable/bg_weather_card_compact"
+                android:minHeight="100dp"
                 android:orientation="vertical"
-                android:padding="@dimen/space_14">
+                android:padding="@dimen/space_12">
 
-                <TextView
-                    style="@style/TextAppearance.LiveWeather.Section"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:text="@string/quick_air" />
+                <TextView style="@style/TextAppearance.LiveWeather.Caption" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="@string/detail_uv" />
+                <TextView android:id="@+id/homeUvValue" style="@style/TextAppearance.LiveWeather.MetricValue" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="@dimen/space_6" android:text="@string/metric_placeholder" />
+            </LinearLayout>
+        </LinearLayout>
 
-                <TextView
-                    style="@style/TextAppearance.LiveWeather.Caption"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="@dimen/space_4"
-                    android:text="@string/quick_air_sub" />
+        <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="@dimen/space_8" android:orientation="horizontal">
+            <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_marginEnd="@dimen/space_4" android:layout_weight="1" android:background="@drawable/bg_weather_card_compact" android:minHeight="92dp" android:orientation="vertical" android:padding="@dimen/space_12">
+                <TextView style="@style/TextAppearance.LiveWeather.Caption" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="@string/detail_pressure" />
+                <TextView android:id="@+id/homePressureValue" style="@style/TextAppearance.LiveWeather.MetricValue" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="@dimen/space_6" android:text="@string/metric_placeholder" />
+            </LinearLayout>
+            <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_marginStart="@dimen/space_4" android:layout_weight="1" android:background="@drawable/bg_weather_card_compact" android:minHeight="92dp" android:orientation="vertical" android:padding="@dimen/space_12">
+                <TextView style="@style/TextAppearance.LiveWeather.Caption" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="@string/detail_visibility" />
+                <TextView android:id="@+id/homeVisibilityValue" style="@style/TextAppearance.LiveWeather.MetricValue" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="@dimen/space_6" android:text="@string/metric_placeholder" />
+            </LinearLayout>
+        </LinearLayout>
+
+        <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="@dimen/space_8" android:orientation="horizontal">
+            <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_marginEnd="@dimen/space_4" android:layout_weight="1" android:background="@drawable/bg_weather_card_compact" android:minHeight="92dp" android:orientation="vertical" android:padding="@dimen/space_12">
+                <TextView style="@style/TextAppearance.LiveWeather.Caption" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="@string/detail_clouds" />
+                <TextView android:id="@+id/homeCloudValue" style="@style/TextAppearance.LiveWeather.MetricValue" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="@dimen/space_6" android:text="@string/metric_placeholder" />
+            </LinearLayout>
+            <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_marginStart="@dimen/space_4" android:layout_weight="1" android:background="@drawable/bg_weather_card_compact" android:minHeight="92dp" android:orientation="vertical" android:padding="@dimen/space_12">
+                <TextView style="@style/TextAppearance.LiveWeather.Caption" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="@string/detail_dew_point" />
+                <TextView android:id="@+id/homeDewPointValue" style="@style/TextAppearance.LiveWeather.MetricValue" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="@dimen/space_6" android:text="@string/metric_placeholder" />
+            </LinearLayout>
+        </LinearLayout>
+
+        <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="@dimen/space_8" android:orientation="horizontal">
+            <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_marginEnd="@dimen/space_4" android:layout_weight="1" android:background="@drawable/bg_weather_card_compact" android:minHeight="92dp" android:orientation="vertical" android:padding="@dimen/space_12">
+                <TextView style="@style/TextAppearance.LiveWeather.Caption" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="@string/detail_gusts" />
+                <TextView android:id="@+id/homeGustValue" style="@style/TextAppearance.LiveWeather.MetricValue" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="@dimen/space_6" android:text="@string/metric_placeholder" />
+            </LinearLayout>
+            <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_marginStart="@dimen/space_4" android:layout_weight="1" android:background="@drawable/bg_weather_card_compact" android:minHeight="92dp" android:orientation="vertical" android:padding="@dimen/space_12">
+                <TextView style="@style/TextAppearance.LiveWeather.Caption" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="@string/detail_rain_chance" />
+                <TextView android:id="@+id/homeRainChanceValue" style="@style/TextAppearance.LiveWeather.MetricValue" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="@dimen/space_6" android:text="@string/metric_placeholder" />
+            </LinearLayout>
+        </LinearLayout>
+
+        <TextView
+            style="@style/TextAppearance.LiveWeather.Section"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="@dimen/space_18"
+            android:text="@string/dashboard_quick_actions" />
+
+        <LinearLayout
+            android:id="@+id/homeForecastAction"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="@dimen/space_8"
+            android:background="@drawable/bg_weather_card_compact"
+            android:clickable="true"
+            android:focusable="true"
+            android:orientation="vertical"
+            android:padding="@dimen/space_14">
+
+            <TextView style="@style/TextAppearance.LiveWeather.Section" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="@string/quick_ten_day" />
+            <TextView android:id="@+id/homeTenDaySummary" style="@style/TextAppearance.LiveWeather.Caption" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="@dimen/space_4" android:text="@string/quick_ten_day_sub" />
+        </LinearLayout>
+
+        <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="@dimen/space_8" android:orientation="horizontal">
+            <LinearLayout android:id="@+id/homeRadarAction" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_marginEnd="@dimen/space_4" android:layout_weight="1" android:background="@drawable/bg_weather_card_compact" android:clickable="true" android:focusable="true" android:orientation="vertical" android:padding="@dimen/space_14">
+                <TextView style="@style/TextAppearance.LiveWeather.Section" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="@string/quick_radar" />
+                <TextView style="@style/TextAppearance.LiveWeather.Caption" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="@dimen/space_4" android:text="@string/quick_radar_sub" />
+            </LinearLayout>
+            <LinearLayout android:id="@+id/homeAirAction" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_marginStart="@dimen/space_4" android:layout_weight="1" android:background="@drawable/bg_weather_card_compact" android:clickable="true" android:focusable="true" android:orientation="vertical" android:padding="@dimen/space_14">
+                <TextView style="@style/TextAppearance.LiveWeather.Section" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="@string/quick_air" />
+                <TextView style="@style/TextAppearance.LiveWeather.Caption" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="@dimen/space_4" android:text="@string/quick_air_sub" />
             </LinearLayout>
         </LinearLayout>
 
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="@dimen/space_12"
+            android:layout_marginTop="@dimen/space_10"
             android:background="@drawable/bg_weather_wallpaper_preview"
             android:orientation="vertical"
             android:padding="@dimen/space_16">
 
-            <TextView
-                style="@style/TextAppearance.LiveWeather.Section"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:text="@string/home_wallpaper_title" />
-
-            <TextView
-                android:id="@+id/homeWallpaperSummary"
-                style="@style/TextAppearance.LiveWeather.Body"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="@dimen/space_6"
-                android:text="@string/home_wallpaper_body" />
-
-            <TextView
-                android:id="@+id/homeWallpaperAction"
-                android:layout_width="match_parent"
-                android:layout_height="48dp"
-                android:layout_marginTop="@dimen/space_14"
-                android:background="@drawable/bg_weather_button_primary"
-                android:gravity="center"
-                android:text="@string/home_wallpaper_action"
-                android:textColor="@color/white"
-                android:textSize="@dimen/text_body"
-                android:textStyle="bold" />
+            <TextView style="@style/TextAppearance.LiveWeather.Section" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="@string/home_wallpaper_title" />
+            <TextView android:id="@+id/homeWallpaperSummary" style="@style/TextAppearance.LiveWeather.Body" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="@dimen/space_6" android:text="@string/home_wallpaper_body" />
+            <TextView android:id="@+id/homeWallpaperAction" android:layout_width="match_parent" android:layout_height="48dp" android:layout_marginTop="@dimen/space_14" android:background="@drawable/bg_weather_button_primary" android:clickable="true" android:focusable="true" android:gravity="center" android:text="@string/home_wallpaper_action" android:textColor="@color/white" android:textSize="@dimen/text_body" android:textStyle="bold" />
         </LinearLayout>
 
         <TextView
@@ -328,8 +377,8 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_gravity="center_horizontal"
-            android:layout_marginTop="@dimen/space_16"
-            android:text="@string/status_phase_two"
+            android:layout_marginTop="@dimen/space_14"
+            android:text="@string/status_phase_four"
             android:textColor="@color/weather_sky_blue" />
 
     </LinearLayout>
