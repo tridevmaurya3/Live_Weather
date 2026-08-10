@@ -46,7 +46,20 @@ Status: COMPLETE
 - Automatic timezone selection configured
 - No hard-coded user location
 
-### Next — Step 2.2
-Device Location Engine
+### Step 2.2 — Device Location Engine
+Status: COMPLETE
 
-The next step will add runtime location permissions, current-device location retrieval, graceful permission handling and feed real latitude/longitude into the weather repository.
+- Google Play services fused location dependency added
+- Foreground coarse and fine location permissions added
+- No background location permission requested
+- Battery-aware single current-location request added
+- Approximate location permission is accepted for weather lookup
+- Permission denial and location-unavailable states handled without crashing
+- Home location status is connected to the location engine
+- Location status text can be tapped to retry permission/location lookup
+- Latest latitude and longitude are held in the activity ready for weather sync
+
+### Next — Step 2.3
+Current Weather UI Sync
+
+The next step will feed the detected latitude/longitude into WeatherRepository and populate the Home screen with real temperature, feels-like, humidity, wind, rain, condition and daily high/low data.
