@@ -50,7 +50,6 @@
         android:background="@drawable/bg_weather_nav_bar"
         android:elevation="0dp"
         android:minHeight="@dimen/nav_bar_min_height"
-        app:itemActiveIndicatorColor="@android:color/transparent"
         app:itemHorizontalTranslationEnabled="false"
         app:itemIconSize="@dimen/nav_icon_size"
         app:itemIconTint="@color/bottom_nav_item_tint"
