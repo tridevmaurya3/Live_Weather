@@ -55,6 +55,65 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="@dimen/space_10"
+            android:background="@drawable/bg_weather_card_accent"
+            android:orientation="vertical"
+            android:padding="@dimen/space_14">
+
+            <TextView
+                style="@style/TextAppearance.LiveWeather.Section"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="@string/phase6_live_sky_title" />
+
+            <TextView
+                style="@style/TextAppearance.LiveWeather.Caption"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="@dimen/space_4"
+                android:text="@string/phase6_live_sky_subtitle" />
+
+            <com.tridev.liveweather.ui.sky.LiveSkyView
+                android:id="@+id/forecastLiveSkyView"
+                android:layout_width="match_parent"
+                android:layout_height="240dp"
+                android:layout_marginTop="@dimen/space_10"
+                android:background="@drawable/bg_weather_card_compact" />
+
+            <TextView
+                android:id="@+id/forecastCelestialTodaySummary"
+                style="@style/TextAppearance.LiveWeather.Body"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="@dimen/space_10"
+                android:text="@string/phase6_celestial_waiting" />
+
+            <TextView
+                style="@style/TextAppearance.LiveWeather.Section"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="@dimen/space_14"
+                android:text="@string/phase6_moon_phase_title" />
+
+            <HorizontalScrollView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="@dimen/space_8"
+                android:clipToPadding="false"
+                android:overScrollMode="never"
+                android:scrollbars="none">
+
+                <LinearLayout
+                    android:id="@+id/forecastMoonPhaseContainer"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal" />
+            </HorizontalScrollView>
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="@dimen/space_10"
             android:background="@drawable/bg_weather_card_compact"
             android:orientation="vertical"
             android:padding="@dimen/space_14">
@@ -217,6 +276,70 @@
                 style="@style/TextAppearance.LiveWeather.Section"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
+                android:text="@string/phase6_details_title" />
+
+            <TextView
+                android:id="@+id/forecastConditionSourceValue"
+                style="@style/TextAppearance.LiveWeather.Body"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="@dimen/space_10"
+                android:text="@string/phase6_details_waiting" />
+
+            <TextView
+                android:id="@+id/forecastPrecipBreakdownValue"
+                style="@style/TextAppearance.LiveWeather.Body"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="@dimen/space_10"
+                android:text="@string/phase6_details_waiting" />
+
+            <TextView
+                android:id="@+id/forecastWindDetailValue"
+                style="@style/TextAppearance.LiveWeather.Body"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="@dimen/space_10"
+                android:text="@string/phase6_details_waiting" />
+
+            <TextView
+                android:id="@+id/forecastAtmosphereDetailValue"
+                style="@style/TextAppearance.LiveWeather.Body"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="@dimen/space_10"
+                android:text="@string/phase6_details_waiting" />
+
+            <TextView
+                android:id="@+id/forecastComfortDetailValue"
+                style="@style/TextAppearance.LiveWeather.Body"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="@dimen/space_10"
+                android:text="@string/phase6_details_waiting" />
+
+            <TextView
+                android:id="@+id/forecastDataQualityValue"
+                style="@style/TextAppearance.LiveWeather.Caption"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="@dimen/space_12"
+                android:text="@string/phase6_data_quality_waiting"
+                android:textColor="@color/weather_aqua" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="@dimen/space_10"
+            android:background="@drawable/bg_weather_card_accent"
+            android:orientation="vertical"
+            android:padding="@dimen/space_16">
+
+            <TextView
+                style="@style/TextAppearance.LiveWeather.Section"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
                 android:text="@string/forecast_sky_title" />
 
             <TextView
@@ -354,7 +477,7 @@
             android:layout_marginTop="@dimen/space_16"
             android:clickable="true"
             android:focusable="true"
-            android:text="@string/status_phase_five"
+            android:text="@string/status_phase_six"
             android:textColor="@color/weather_sky_blue" />
 
     </LinearLayout>
