@@ -1,7 +1,11 @@
 package com.tridev.liveweather;
 
 import android.Manifest;
+import android.app.WallpaperManager;
+import android.content.ActivityNotFoundException;
+import android.content.ComponentName;
 import android.content.Context;
+import android.content.Intent;
 import android.location.Location;
 import android.os.Bundle;
 import android.view.HapticFeedbackConstants;
@@ -12,6 +16,7 @@ import androidx.activity.EdgeToEdge;
 import androidx.activity.result.ActivityResultLauncher;
 import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.appcompat.widget.SwitchCompat;
 import androidx.core.graphics.Insets;
 import androidx.core.view.ViewCompat;
 import androidx.core.view.WindowInsetsCompat;
@@ -20,14 +25,18 @@ import androidx.lifecycle.ViewModelProvider;
 import com.google.android.material.bottomnavigation.BottomNavigationView;
 import com.tridev.liveweather.core.location.DeviceLocationManager;
 import com.tridev.liveweather.core.location.PlaceNameResolver;
+import com.tridev.liveweather.data.local.WallpaperPreferences;
 import com.tridev.liveweather.domain.CityLocation;
 import com.tridev.liveweather.domain.WeatherUiState;
 import com.tridev.liveweather.ui.city.CityScreenRenderer;
 import com.tridev.liveweather.ui.city.CityViewModel;
+import com.tridev.liveweather.ui.sky.LiveSkyView;
 import com.tridev.liveweather.ui.weather.Phase6Renderer;
 import com.tridev.liveweather.ui.weather.WeatherFormatter;
 import com.tridev.liveweather.ui.weather.WeatherScreenRenderer;
 import com.tridev.liveweather.ui.weather.WeatherViewModel;
+import com.tridev.liveweather.wallpaper.LiveWeatherWallpaperService;
+import com.tridev.liveweather.worker.WallpaperWeatherScheduler;
 
 import java.util.Map;
 
@@ -56,6 +65,7 @@ public class MainActivity extends AppCompatActivity {
     private Phase6Renderer phase6Renderer;
     private CityViewModel cityViewModel;
     private CityScreenRenderer cityScreenRenderer;
+    private WallpaperPreferences wallpaperPreferences;
 
     private double latestLatitude = Double.NaN;
     private double latestLongitude = Double.NaN;
@@ -70,6 +80,7 @@ public class MainActivity extends AppCompatActivity {
 
         deviceLocationManager = new DeviceLocationManager(this);
         placeNameResolver = new PlaceNameResolver(this);
+        wallpaperPreferences = new WallpaperPreferences(this);
 
         bindViews();
         weatherScreenRenderer = new WeatherScreenRenderer(this);
@@ -79,9 +90,12 @@ public class MainActivity extends AppCompatActivity {
         applySystemInsets();
         setupBottomNavigation(savedInstanceState);
         setupQuickActions();
+        setupWallpaperEngine();
         setupWeatherEngine();
         setupCityEngine();
         setupLocationEngine();
+
+        WallpaperWeatherScheduler.schedule(this);
     }
 
     private void registerLocationPermissionLauncher() {
@@ -172,6 +186,74 @@ public class MainActivity extends AppCompatActivity {
                 performLightHaptic(view);
                 refreshWeatherManually();
             });
+        }
+    }
+
+    private void setupWallpaperEngine() {
+        SwitchCompat rain = findViewById(R.id.switchRainParticles);
+        SwitchCompat clouds = findViewById(R.id.switchCloudMovement);
+        SwitchCompat lightning = findViewById(R.id.switchLightning);
+        SwitchCompat snow = findViewById(R.id.switchSnow);
+        SwitchCompat fog = findViewById(R.id.switchFog);
+        SwitchCompat stars = findViewById(R.id.switchStars);
+        SwitchCompat batteryAdaptive = findViewById(R.id.switchBatteryAdaptive);
+        LiveSkyView preview = findViewById(R.id.wallpaperLiveSkyView);
+
+        WallpaperPreferences.Options saved = wallpaperPreferences.load();
+        rain.setChecked(saved.isRain());
+        clouds.setChecked(saved.isClouds());
+        lightning.setChecked(saved.isLightning());
+        snow.setChecked(saved.isSnow());
+        fog.setChecked(saved.isFog());
+        stars.setChecked(saved.isStars());
+        batteryAdaptive.setChecked(saved.isBatteryAdaptive());
+        preview.setRenderOptions(saved);
+
+        android.widget.CompoundButton.OnCheckedChangeListener listener = (button, checked) -> {
+            WallpaperPreferences.Options updated = new WallpaperPreferences.Options(
+                    rain.isChecked(),
+                    clouds.isChecked(),
+                    lightning.isChecked(),
+                    snow.isChecked(),
+                    fog.isChecked(),
+                    stars.isChecked(),
+                    batteryAdaptive.isChecked()
+            );
+            wallpaperPreferences.save(updated);
+            preview.setRenderOptions(updated);
+        };
+
+        rain.setOnCheckedChangeListener(listener);
+        clouds.setOnCheckedChangeListener(listener);
+        lightning.setOnCheckedChangeListener(listener);
+        snow.setOnCheckedChangeListener(listener);
+        fog.setOnCheckedChangeListener(listener);
+        stars.setOnCheckedChangeListener(listener);
+        batteryAdaptive.setOnCheckedChangeListener(listener);
+
+        View applyButton = findViewById(R.id.applyWallpaperButton);
+        applyButton.setOnClickListener(view -> {
+            performLightHaptic(view);
+            openLiveWallpaperPreview();
+        });
+    }
+
+    private void openLiveWallpaperPreview() {
+        ComponentName component = new ComponentName(
+                this,
+                LiveWeatherWallpaperService.class
+        );
+        Intent previewIntent = new Intent(WallpaperManager.ACTION_CHANGE_LIVE_WALLPAPER);
+        previewIntent.putExtra(
+                WallpaperManager.EXTRA_LIVE_WALLPAPER_COMPONENT,
+                component
+        );
+
+        try {
+            startActivity(previewIntent);
+        } catch (ActivityNotFoundException exception) {
+            Intent chooserIntent = new Intent(WallpaperManager.ACTION_LIVE_WALLPAPER_CHOOSER);
+            startActivity(chooserIntent);
         }
     }
 
@@ -421,8 +503,6 @@ public class MainActivity extends AppCompatActivity {
             return;
         }
 
-        // Current-location mode intentionally obtains a new GPS fix before a
-        // forced network refresh so manual Refresh cannot silently reuse an old position.
         if (deviceLocationManager.hasLocationPermission()) {
             requestCurrentLocation(true);
             return;
