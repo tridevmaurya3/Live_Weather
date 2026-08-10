@@ -56,6 +56,7 @@ public class MainActivity extends AppCompatActivity {
     private TextView homeLocationValue;
     private TextView homeSyncStatus;
     private TextView forecastStatus;
+    private LiveSkyView appLiveNatureBackground;
 
     private DeviceLocationManager deviceLocationManager;
     private PlaceNameResolver placeNameResolver;
@@ -131,6 +132,7 @@ public class MainActivity extends AppCompatActivity {
         homeLocationValue = findViewById(R.id.homeLocationValue);
         homeSyncStatus = findViewById(R.id.homeSyncStatus);
         forecastStatus = findViewById(R.id.forecastStatus);
+        appLiveNatureBackground = findViewById(R.id.appLiveNatureBackground);
     }
 
     private void applySystemInsets() {
@@ -208,6 +210,7 @@ public class MainActivity extends AppCompatActivity {
         stars.setChecked(saved.isStars());
         batteryAdaptive.setChecked(saved.isBatteryAdaptive());
         preview.setRenderOptions(saved);
+        appLiveNatureBackground.setRenderOptions(saved);
 
         android.widget.CompoundButton.OnCheckedChangeListener listener = (button, checked) -> {
             WallpaperPreferences.Options updated = new WallpaperPreferences.Options(
@@ -221,6 +224,7 @@ public class MainActivity extends AppCompatActivity {
             );
             wallpaperPreferences.save(updated);
             preview.setRenderOptions(updated);
+            appLiveNatureBackground.setRenderOptions(updated);
         };
 
         rain.setOnCheckedChangeListener(listener);
@@ -253,7 +257,11 @@ public class MainActivity extends AppCompatActivity {
             startActivity(previewIntent);
         } catch (ActivityNotFoundException exception) {
             Intent chooserIntent = new Intent(WallpaperManager.ACTION_LIVE_WALLPAPER_CHOOSER);
-            startActivity(chooserIntent);
+            try {
+                startActivity(chooserIntent);
+            } catch (ActivityNotFoundException ignored) {
+                // Device does not expose a live-wallpaper picker.
+            }
         }
     }
 
@@ -281,6 +289,19 @@ public class MainActivity extends AppCompatActivity {
 
             weatherScreenRenderer.render(state);
             phase6Renderer.render(state);
+
+            if (state.hasWeather()
+                    && state.getWeather() != null
+                    && !Double.isNaN(state.getLatitude())
+                    && !Double.isNaN(state.getLongitude())) {
+                appLiveNatureBackground.setWeatherData(
+                        state.getWeather(),
+                        state.getLatitude(),
+                        state.getLongitude()
+                );
+            } else {
+                appLiveNatureBackground.clearWeatherData();
+            }
 
             if (Double.isNaN(latestLatitude)
                     && state.hasWeather()
