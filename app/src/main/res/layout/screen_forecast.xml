@@ -43,15 +43,27 @@
                 android:text="@string/forecast_hourly_title" />
 
             <TextView
+                android:id="@+id/forecastCurrentSummary"
                 style="@style/TextAppearance.LiveWeather.Body"
                 android:layout_width="match_parent"
-                android:layout_height="96dp"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="@dimen/space_8"
+                android:text="@string/forecast_chart_waiting" />
+
+            <HorizontalScrollView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
                 android:layout_marginTop="@dimen/space_12"
-                android:background="@drawable/bg_weather_card_compact"
-                android:gravity="center"
-                android:padding="@dimen/space_16"
-                android:text="@string/forecast_chart_waiting"
-                android:textAlignment="center" />
+                android:clipToPadding="false"
+                android:overScrollMode="never"
+                android:scrollbars="none">
+
+                <LinearLayout
+                    android:id="@+id/forecastHourlyContainer"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal" />
+            </HorizontalScrollView>
         </LinearLayout>
 
         <LinearLayout
@@ -69,38 +81,19 @@
                 android:text="@string/forecast_daily_title" />
 
             <TextView
+                android:id="@+id/forecastDailySummary"
                 style="@style/TextAppearance.LiveWeather.Body"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="@dimen/space_8"
                 android:text="@string/forecast_daily_waiting" />
 
-            <View
+            <LinearLayout
+                android:id="@+id/forecastDailyContainer"
                 android:layout_width="match_parent"
-                android:layout_height="1dp"
-                android:layout_marginTop="@dimen/space_14"
-                android:background="@color/weather_divider" />
-
-            <TextView
-                style="@style/TextAppearance.LiveWeather.BodyLarge"
-                android:layout_width="match_parent"
-                android:layout_height="52dp"
-                android:gravity="center_vertical"
-                android:text="Today        —° / —°" />
-
-            <TextView
-                style="@style/TextAppearance.LiveWeather.BodyLarge"
-                android:layout_width="match_parent"
-                android:layout_height="52dp"
-                android:gravity="center_vertical"
-                android:text="Tomorrow     —° / —°" />
-
-            <TextView
-                style="@style/TextAppearance.LiveWeather.BodyLarge"
-                android:layout_width="match_parent"
-                android:layout_height="52dp"
-                android:gravity="center_vertical"
-                android:text="Day 3        —° / —°" />
+                android:layout_height="wrap_content"
+                android:layout_marginTop="@dimen/space_10"
+                android:orientation="vertical" />
         </LinearLayout>
 
         <LinearLayout
@@ -118,6 +111,7 @@
                 android:text="@string/forecast_wind_title" />
 
             <TextView
+                android:id="@+id/forecastWindSummary"
                 style="@style/TextAppearance.LiveWeather.Body"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
@@ -126,12 +120,15 @@
         </LinearLayout>
 
         <TextView
+            android:id="@+id/forecastStatus"
             style="@style/TextAppearance.LiveWeather.Caption"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_gravity="center_horizontal"
             android:layout_marginTop="@dimen/space_16"
-            android:text="@string/status_phase_one"
+            android:clickable="true"
+            android:focusable="true"
+            android:text="@string/status_phase_two"
             android:textColor="@color/weather_sky_blue" />
 
     </LinearLayout>
