@@ -22,10 +22,13 @@
     <string name="home_high_low">H: —°  ·  L: —°</string>
     <string name="home_sync_status">Connect weather data to activate the live atmosphere.</string>
     <string name="home_sync_location_requesting">Getting a fresh location for local weather…</string>
-    <string name="home_sync_location_ready">Location detected · ready for real weather sync.</string>
+    <string name="home_sync_location_ready">Location detected · syncing live weather…</string>
     <string name="home_sync_location_permission_denied">Location permission is needed for local weather. Tap the location text to retry.</string>
     <string name="home_sync_location_unavailable">Turn on device Location and tap the location text to retry.</string>
     <string name="home_sync_location_service_unavailable">Google Play location service is not available on this device.</string>
+    <string name="home_sync_weather_loading">Updating live weather…</string>
+    <string name="home_sync_weather_retry">Weather unavailable · tap here to retry.</string>
+    <string name="home_sync_cached">Offline / saved weather · tap here to refresh.</string>
     <string name="metric_humidity">Humidity</string>
     <string name="metric_wind">Wind</string>
     <string name="metric_rain">Rain</string>
@@ -52,11 +55,11 @@
     <string name="forecast_title">Forecast</string>
     <string name="forecast_subtitle">Hourly and multi-day weather intelligence.</string>
     <string name="forecast_hourly_title">Next 24 hours</string>
-    <string name="forecast_chart_waiting">Temperature &amp; rain chart will appear after live data sync.</string>
+    <string name="forecast_chart_waiting">Waiting for live hourly weather…</string>
     <string name="forecast_daily_title">10-day outlook</string>
-    <string name="forecast_daily_waiting">Daily forecast is ready for real API data.</string>
+    <string name="forecast_daily_waiting">Waiting for live daily forecast…</string>
     <string name="forecast_wind_title">Wind &amp; precipitation</string>
-    <string name="forecast_wind_waiting">Wind direction, speed and precipitation probability will populate here.</string>
+    <string name="forecast_wind_waiting">Wind and precipitation details will appear after sync.</string>
 
     <!-- Radar -->
     <string name="radar_title">Radar</string>
@@ -100,8 +103,9 @@
     <string name="more_performance">Performance</string>
     <string name="more_performance_sub">Battery &amp; refresh</string>
     <string name="more_about">About Live Weather</string>
-    <string name="more_about_sub">Phase 1 professional UI foundation complete</string>
+    <string name="more_about_sub">Phase 2 real weather engine complete</string>
 
     <string name="status_phase_one">PHASE 1 · UI SYSTEM READY</string>
     <string name="status_phase_two_location">PHASE 2 · LOCATION ENGINE READY</string>
+    <string name="status_phase_two">PHASE 2 · REAL WEATHER ENGINE</string>
 </resources>
