@@ -203,7 +203,7 @@ public class MainActivity extends AppCompatActivity {
             @Override
             public void onUseCity(CityLocation city) {
                 cityViewModel.selectCity(city);
-                activateCity(city, true);
+                activateCity(city, true, true);
             }
 
             @Override
@@ -247,7 +247,7 @@ public class MainActivity extends AppCompatActivity {
 
         CityLocation selectedCity = cityViewModel.getSelectedCity();
         if (selectedCity != null) {
-            activateCity(selectedCity, false);
+            activateCity(selectedCity, false, false);
             return;
         }
 
@@ -270,12 +270,18 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
-    private void activateCity(CityLocation city, boolean force) {
+    private void activateCity(
+            CityLocation city,
+            boolean force,
+            boolean navigateHome
+    ) {
         latestLatitude = city.getLatitude();
         latestLongitude = city.getLongitude();
         homeLocationValue.setText(city.getDisplayName());
         weatherViewModel.refreshWeather(latestLatitude, latestLongitude, force);
-        bottomNavigation.setSelectedItemId(R.id.nav_home);
+        if (navigateHome) {
+            bottomNavigation.setSelectedItemId(R.id.nav_home);
+        }
     }
 
     private void activateCurrentLocation() {
