@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+
+    <style name="TextAppearance.LiveWeather.Display" parent="TextAppearance.Material3.DisplaySmall">
+        <item name="android:textColor">@color/weather_text_primary</item>
+        <item name="android:textSize">@dimen/text_display</item>
+        <item name="android:textStyle">bold</item>
+    </style>
+
+    <style name="TextAppearance.LiveWeather.Title" parent="TextAppearance.Material3.TitleLarge">
+        <item name="android:textColor">@color/weather_text_primary</item>
+        <item name="android:textSize">@dimen/text_title</item>
+        <item name="android:textStyle">bold</item>
+    </style>
+
+    <style name="TextAppearance.LiveWeather.Body" parent="TextAppearance.Material3.BodyMedium">
+        <item name="android:textColor">@color/weather_text_secondary</item>
+        <item name="android:textSize">@dimen/text_body</item>
+    </style>
+
+    <style name="TextAppearance.LiveWeather.BodyLarge" parent="TextAppearance.Material3.BodyLarge">
+        <item name="android:textColor">@color/weather_text_secondary</item>
+        <item name="android:textSize">@dimen/text_body_large</item>
+    </style>
+
+    <style name="TextAppearance.LiveWeather.Caption" parent="TextAppearance.Material3.LabelMedium">
+        <item name="android:textColor">@color/weather_text_tertiary</item>
+        <item name="android:textSize">@dimen/text_caption</item>
+    </style>
+
+    <style name="ShapeAppearance.LiveWeather.Small" parent="ShapeAppearance.Material3.Corner.Medium">
+        <item name="cornerSize">@dimen/radius_small</item>
+    </style>
+
+    <style name="ShapeAppearance.LiveWeather.Medium" parent="ShapeAppearance.Material3.Corner.Large">
+        <item name="cornerSize">@dimen/radius_medium</item>
+    </style>
+
+    <style name="ShapeAppearance.LiveWeather.Large" parent="ShapeAppearance.Material3.Corner.ExtraLarge">
+        <item name="cornerSize">@dimen/radius_large</item>
+    </style>
+
+</resources>
