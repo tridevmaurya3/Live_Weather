@@ -18,7 +18,11 @@ import androidx.lifecycle.ViewModelProvider;
 
 import com.google.android.material.bottomnavigation.BottomNavigationView;
 import com.tridev.liveweather.core.location.DeviceLocationManager;
+import com.tridev.liveweather.core.location.PlaceNameResolver;
+import com.tridev.liveweather.domain.CityLocation;
 import com.tridev.liveweather.domain.WeatherUiState;
+import com.tridev.liveweather.ui.city.CityScreenRenderer;
+import com.tridev.liveweather.ui.city.CityViewModel;
 import com.tridev.liveweather.ui.weather.WeatherFormatter;
 import com.tridev.liveweather.ui.weather.WeatherScreenRenderer;
 import com.tridev.liveweather.ui.weather.WeatherViewModel;
@@ -43,9 +47,12 @@ public class MainActivity extends AppCompatActivity {
     private TextView forecastStatus;
 
     private DeviceLocationManager deviceLocationManager;
+    private PlaceNameResolver placeNameResolver;
     private ActivityResultLauncher<String[]> locationPermissionLauncher;
     private WeatherViewModel weatherViewModel;
     private WeatherScreenRenderer weatherScreenRenderer;
+    private CityViewModel cityViewModel;
+    private CityScreenRenderer cityScreenRenderer;
 
     private double latestLatitude = Double.NaN;
     private double latestLongitude = Double.NaN;
@@ -59,13 +66,17 @@ public class MainActivity extends AppCompatActivity {
         setContentView(R.layout.activity_main);
 
         deviceLocationManager = new DeviceLocationManager(this);
+        placeNameResolver = new PlaceNameResolver(this);
 
         bindViews();
         weatherScreenRenderer = new WeatherScreenRenderer(this);
+        cityScreenRenderer = new CityScreenRenderer(this);
+
         applySystemInsets();
         setupBottomNavigation(savedInstanceState);
         setupQuickActions();
         setupWeatherEngine();
+        setupCityEngine();
         setupLocationEngine();
     }
 
@@ -165,6 +176,7 @@ public class MainActivity extends AppCompatActivity {
 
             if (Double.isNaN(latestLatitude)
                     && state.hasWeather()
+                    && cityViewModel == null
                     && !Double.isNaN(state.getLatitude())
                     && !Double.isNaN(state.getLongitude())) {
                 homeLocationValue.setText(
@@ -180,8 +192,64 @@ public class MainActivity extends AppCompatActivity {
         forecastStatus.setOnClickListener(view -> refreshWeatherManually());
     }
 
+    private void setupCityEngine() {
+        cityViewModel = new ViewModelProvider(this).get(CityViewModel.class);
+        cityScreenRenderer.setCallbacks(new CityScreenRenderer.Callbacks() {
+            @Override
+            public void onSearch(String query) {
+                cityViewModel.searchCities(query);
+            }
+
+            @Override
+            public void onUseCity(CityLocation city) {
+                cityViewModel.selectCity(city);
+                activateCity(city, true);
+            }
+
+            @Override
+            public void onSaveCity(CityLocation city) {
+                cityViewModel.saveCity(city);
+            }
+
+            @Override
+            public void onRemoveCity(CityLocation city) {
+                boolean wasSelected = cityViewModel.isSelected(city);
+                cityViewModel.removeCity(city);
+                if (wasSelected) {
+                    cityViewModel.useCurrentLocation();
+                    activateCurrentLocation();
+                }
+            }
+
+            @Override
+            public void onUseCurrentLocation() {
+                cityViewModel.useCurrentLocation();
+                activateCurrentLocation();
+            }
+        });
+
+        cityViewModel.getCityState().observe(this, state -> {
+            if (state != null) {
+                cityScreenRenderer.render(state);
+            }
+        });
+    }
+
     private void setupLocationEngine() {
-        homeLocationValue.setOnClickListener(view -> requestLocationAccess());
+        homeLocationValue.setOnClickListener(view -> {
+            CityLocation selectedCity = cityViewModel.getSelectedCity();
+            if (selectedCity != null) {
+                bottomNavigation.setSelectedItemId(R.id.nav_more);
+            } else {
+                requestLocationAccess();
+            }
+        });
+
+        CityLocation selectedCity = cityViewModel.getSelectedCity();
+        if (selectedCity != null) {
+            activateCity(selectedCity, false);
+            return;
+        }
 
         if (deviceLocationManager.hasLocationPermission()) {
             requestCurrentLocation();
@@ -202,6 +270,21 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
+    private void activateCity(CityLocation city, boolean force) {
+        latestLatitude = city.getLatitude();
+        latestLongitude = city.getLongitude();
+        homeLocationValue.setText(city.getDisplayName());
+        weatherViewModel.refreshWeather(latestLatitude, latestLongitude, force);
+        bottomNavigation.setSelectedItemId(R.id.nav_home);
+    }
+
+    private void activateCurrentLocation() {
+        latestLatitude = Double.NaN;
+        latestLongitude = Double.NaN;
+        requestLocationAccess();
+        bottomNavigation.setSelectedItemId(R.id.nav_home);
+    }
+
     private void requestLocationAccess() {
         if (deviceLocationManager.hasLocationPermission()) {
             requestCurrentLocation();
@@ -218,6 +301,10 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void requestCurrentLocation() {
+        if (cityViewModel.getSelectedCity() != null) {
+            return;
+        }
+
         homeLocationValue.setText(R.string.home_location_requesting);
         if (!hasWeatherData()) {
             homeSyncStatus.setText(R.string.home_sync_location_requesting);
@@ -229,21 +316,45 @@ public class MainActivity extends AppCompatActivity {
                     public void onLocation(Location location) {
                         latestLatitude = location.getLatitude();
                         latestLongitude = location.getLongitude();
+                        double resolvedLatitude = latestLatitude;
+                        double resolvedLongitude = latestLongitude;
 
                         runOnUiThread(() -> {
+                            if (cityViewModel.getSelectedCity() != null) {
+                                return;
+                            }
+
                             homeLocationValue.setText(
                                     WeatherFormatter.coordinates(
-                                            latestLatitude,
-                                            latestLongitude
+                                            resolvedLatitude,
+                                            resolvedLongitude
                                     )
                             );
                             homeSyncStatus.setText(R.string.home_sync_location_ready);
                             weatherViewModel.refreshWeather(
-                                    latestLatitude,
-                                    latestLongitude,
+                                    resolvedLatitude,
+                                    resolvedLongitude,
                                     false
                             );
                         });
+
+                        placeNameResolver.resolve(
+                                resolvedLatitude,
+                                resolvedLongitude,
+                                label -> runOnUiThread(() -> {
+                                    if (label == null || label.trim().isEmpty()) {
+                                        return;
+                                    }
+                                    if (cityViewModel.getSelectedCity() != null) {
+                                        return;
+                                    }
+                                    if (Math.abs(latestLatitude - resolvedLatitude) > 0.001d
+                                            || Math.abs(latestLongitude - resolvedLongitude) > 0.001d) {
+                                        return;
+                                    }
+                                    homeLocationValue.setText(label);
+                                })
+                        );
                     }
 
                     @Override
@@ -259,6 +370,14 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void refreshWeatherManually() {
+        CityLocation selectedCity = cityViewModel.getSelectedCity();
+        if (selectedCity != null) {
+            latestLatitude = selectedCity.getLatitude();
+            latestLongitude = selectedCity.getLongitude();
+            weatherViewModel.refreshWeather(latestLatitude, latestLongitude, true);
+            return;
+        }
+
         if (!Double.isNaN(latestLatitude) && !Double.isNaN(latestLongitude)) {
             weatherViewModel.refreshWeather(latestLatitude, latestLongitude, true);
             return;
@@ -281,6 +400,10 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void renderLocationError(DeviceLocationManager.LocationError error) {
+        if (cityViewModel.getSelectedCity() != null) {
+            return;
+        }
+
         if (error == DeviceLocationManager.LocationError.PERMISSION_REQUIRED) {
             showLocationPermissionNeeded();
             return;
@@ -305,6 +428,9 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void showLocationPermissionNeeded() {
+        if (cityViewModel.getSelectedCity() != null) {
+            return;
+        }
         homeLocationValue.setText(R.string.home_location_permission_needed);
         if (!hasWeatherData()) {
             homeSyncStatus.setText(R.string.home_sync_location_permission_denied);
