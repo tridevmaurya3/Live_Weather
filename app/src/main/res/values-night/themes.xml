@@ -17,7 +17,7 @@
         <item name="android:colorBackground">@color/weather_background</item>
         <item name="android:windowBackground">@color/weather_background</item>
         <item name="android:statusBarColor">@android:color/transparent</item>
-        <item name="android:navigationBarColor">@color/weather_background</item>
+        <item name="android:navigationBarColor">@color/weather_nav_bar</item>
         <item name="android:windowLightStatusBar">false</item>
         <item name="android:windowLightNavigationBar">false</item>
 
