@@ -4,6 +4,7 @@ import android.app.Activity;
 import android.graphics.Typeface;
 import android.util.TypedValue;
 import android.view.Gravity;
+import android.view.HapticFeedbackConstants;
 import android.view.View;
 import android.widget.LinearLayout;
 import android.widget.TextView;
@@ -13,8 +14,15 @@ import androidx.core.content.ContextCompat;
 
 import com.tridev.liveweather.R;
 import com.tridev.liveweather.data.remote.dto.WeatherResponse;
+import com.tridev.liveweather.domain.SkyRealityEngine;
+import com.tridev.liveweather.domain.SkyRealityState;
 import com.tridev.liveweather.domain.WeatherUiState;
+import com.tridev.liveweather.ui.forecast.ForecastChartView;
+import com.tridev.liveweather.ui.forecast.ForecastIntelligence;
 
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
 import java.util.Locale;
 
 /**
@@ -47,12 +55,20 @@ public final class WeatherScreenRenderer {
     private final TextView homeWallpaperSummary;
     private final LinearLayout homeHourlyContainer;
 
+    private final TextView forecastSmartSummary;
+    private final ForecastChartView forecastTemperatureChart;
+    private final ForecastChartView forecastRainChart;
     private final TextView forecastCurrentSummary;
     private final TextView forecastDailySummary;
     private final TextView forecastWindSummary;
     private final TextView forecastStatus;
     private final LinearLayout forecastHourlyContainer;
     private final LinearLayout forecastDailyContainer;
+    private final TextView forecastSkyStageValue;
+    private final TextView forecastSunPositionValue;
+    private final TextView forecastMoonPositionValue;
+    private final TextView forecastStarVisibilityValue;
+    private final TextView forecastSceneLightValue;
 
     private final TextView wallpaperPreviewTemperature;
     private final TextView wallpaperPreviewCondition;
@@ -83,12 +99,23 @@ public final class WeatherScreenRenderer {
         homeWallpaperSummary = activity.findViewById(R.id.homeWallpaperSummary);
         homeHourlyContainer = activity.findViewById(R.id.homeHourlyContainer);
 
+        forecastSmartSummary = activity.findViewById(R.id.forecastSmartSummary);
+        forecastTemperatureChart = activity.findViewById(R.id.forecastTemperatureChart);
+        forecastRainChart = activity.findViewById(R.id.forecastRainChart);
         forecastCurrentSummary = activity.findViewById(R.id.forecastCurrentSummary);
         forecastDailySummary = activity.findViewById(R.id.forecastDailySummary);
         forecastWindSummary = activity.findViewById(R.id.forecastWindSummary);
         forecastStatus = activity.findViewById(R.id.forecastStatus);
         forecastHourlyContainer = activity.findViewById(R.id.forecastHourlyContainer);
         forecastDailyContainer = activity.findViewById(R.id.forecastDailyContainer);
+        forecastSkyStageValue = activity.findViewById(R.id.forecastSkyStageValue);
+        forecastSunPositionValue = activity.findViewById(R.id.forecastSunPositionValue);
+        forecastMoonPositionValue = activity.findViewById(R.id.forecastMoonPositionValue);
+        forecastStarVisibilityValue = activity.findViewById(R.id.forecastStarVisibilityValue);
+        forecastSceneLightValue = activity.findViewById(R.id.forecastSceneLightValue);
+
+        forecastTemperatureChart.setMode(ForecastChartView.Mode.TEMPERATURE);
+        forecastRainChart.setMode(ForecastChartView.Mode.PRECIPITATION);
 
         wallpaperPreviewTemperature = activity.findViewById(R.id.wallpaperPreviewTemperature);
         wallpaperPreviewCondition = activity.findViewById(R.id.wallpaperPreviewCondition);
@@ -96,14 +123,26 @@ public final class WeatherScreenRenderer {
 
     public void render(@NonNull WeatherUiState state) {
         if (state.hasWeather() && state.getWeather() != null) {
-            renderWeather(state.getWeather());
+            double latitude = state.getLatitude();
+            double longitude = state.getLongitude();
+            if (Double.isNaN(latitude) && state.getWeather().getLatitude() != null) {
+                latitude = state.getWeather().getLatitude();
+            }
+            if (Double.isNaN(longitude) && state.getWeather().getLongitude() != null) {
+                longitude = state.getWeather().getLongitude();
+            }
+            renderWeather(state.getWeather(), latitude, longitude);
         } else {
             renderEmptyWeather();
         }
         renderStatus(state);
     }
 
-    private void renderWeather(@NonNull WeatherResponse response) {
+    private void renderWeather(
+            @NonNull WeatherResponse response,
+            double latitude,
+            double longitude
+    ) {
         WeatherResponse.CurrentWeather current = response.getCurrent();
         WeatherResponse.DailyWeather daily = response.getDaily();
 
@@ -115,6 +154,9 @@ public final class WeatherScreenRenderer {
         ));
         homePressureValue.setText(DashboardIntelligence.pressure(response));
         homeRainChanceValue.setText(DashboardIntelligence.rainChance(daily));
+
+        forecastSmartSummary.setText(ForecastIntelligence.next24Hours(response));
+        forecastDailySummary.setText(ForecastIntelligence.tenDayOverview(response));
 
         if (current != null) {
             String condition = WeatherFormatter.condition(current.getWeatherCode());
@@ -179,9 +221,11 @@ public final class WeatherScreenRenderer {
         }
 
         renderDailyHeadline(daily);
+        renderCharts(response);
         renderHourly(response);
         renderDaily(response);
         renderWindSummary(current, daily);
+        renderSkyReality(response, latitude, longitude);
     }
 
     private void applyHeroMode(@NonNull DashboardIntelligence.HeroMode mode) {
@@ -217,7 +261,6 @@ public final class WeatherScreenRenderer {
         if (daily == null) {
             homeHighLow.setText(R.string.home_high_low);
             homeTenDaySummary.setText(R.string.quick_ten_day_sub);
-            forecastDailySummary.setText(R.string.forecast_daily_waiting);
             return;
         }
 
@@ -245,10 +288,37 @@ public final class WeatherScreenRenderer {
                 WeatherFormatter.percent(rainChance),
                 uvText
         ));
+    }
 
-        forecastDailySummary.setText(
-                "Daily highs, lows, conditions, rain chance and wind for 10 days."
-        );
+    private void renderCharts(@NonNull WeatherResponse response) {
+        WeatherResponse.HourlyWeather hourly = response.getHourly();
+        if (hourly == null || hourly.getTime() == null || hourly.getTime().isEmpty()) {
+            forecastTemperatureChart.setData(Collections.emptyList(), Collections.emptyList());
+            forecastRainChart.setData(Collections.emptyList(), Collections.emptyList());
+            return;
+        }
+
+        int start = WeatherFormatter.findCurrentHourlyIndex(response);
+        int end = Math.min(hourly.getTime().size(), start + 24);
+        List<String> labels = new ArrayList<>();
+        List<Double> temperatures = new ArrayList<>();
+        List<Double> rainChances = new ArrayList<>();
+
+        for (int index = start; index < end; index++) {
+            labels.add(index == start
+                    ? "Now"
+                    : WeatherFormatter.hourLabel(
+                            WeatherFormatter.valueAt(hourly.getTime(), index)
+                    ));
+            temperatures.add(WeatherFormatter.valueAt(hourly.getTemperature2m(), index));
+            rainChances.add(WeatherFormatter.valueAt(
+                    hourly.getPrecipitationProbability(),
+                    index
+            ));
+        }
+
+        forecastTemperatureChart.setData(labels, temperatures);
+        forecastRainChart.setData(labels, rainChances);
     }
 
     private void renderHourly(@NonNull WeatherResponse response) {
@@ -360,18 +430,22 @@ public final class WeatherScreenRenderer {
             );
             Double wind = WeatherFormatter.valueAt(daily.getWindSpeed10mMax(), index);
 
-            TextView row = new TextView(activity);
-            LinearLayout.LayoutParams rowParams = new LinearLayout.LayoutParams(
+            LinearLayout dayContainer = new LinearLayout(activity);
+            dayContainer.setOrientation(LinearLayout.VERTICAL);
+            dayContainer.setPadding(dp(2), dp(4), dp(2), dp(4));
+            dayContainer.setClickable(true);
+            dayContainer.setFocusable(true);
+            dayContainer.setLayoutParams(new LinearLayout.LayoutParams(
                     LinearLayout.LayoutParams.MATCH_PARENT,
                     LinearLayout.LayoutParams.WRAP_CONTENT
-            );
-            row.setLayoutParams(rowParams);
-            row.setMinHeight(dp(64));
-            row.setGravity(Gravity.CENTER_VERTICAL);
-            row.setPadding(dp(2), dp(8), dp(2), dp(8));
-            row.setTextColor(ContextCompat.getColor(activity, R.color.weather_text_primary));
-            row.setTextSize(TypedValue.COMPLEX_UNIT_SP, 14f);
-            row.setText(String.format(
+            ));
+
+            TextView header = new TextView(activity);
+            header.setMinHeight(dp(62));
+            header.setGravity(Gravity.CENTER_VERTICAL);
+            header.setTextColor(ContextCompat.getColor(activity, R.color.weather_text_primary));
+            header.setTextSize(TypedValue.COMPLEX_UNIT_SP, 14f);
+            header.setText(String.format(
                     Locale.getDefault(),
                     "%s   %s %s\nH %s · L %s · Rain %s · Wind %s",
                     day,
@@ -382,7 +456,25 @@ public final class WeatherScreenRenderer {
                     WeatherFormatter.percent(rainChance),
                     WeatherFormatter.wind(wind)
             ));
-            forecastDailyContainer.addView(row);
+
+            TextView details = new TextView(activity);
+            details.setVisibility(View.GONE);
+            details.setBackgroundResource(R.drawable.bg_weather_chip);
+            details.setPadding(dp(12), dp(10), dp(12), dp(10));
+            details.setTextColor(ContextCompat.getColor(activity, R.color.weather_text_secondary));
+            details.setTextSize(TypedValue.COMPLEX_UNIT_SP, 12f);
+            details.setText(ForecastIntelligence.dailyDetails(daily, index));
+
+            dayContainer.addView(header);
+            dayContainer.addView(details);
+            dayContainer.setOnClickListener(view -> {
+                view.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK);
+                details.setVisibility(
+                        details.getVisibility() == View.VISIBLE ? View.GONE : View.VISIBLE
+                );
+            });
+
+            forecastDailyContainer.addView(dayContainer);
 
             if (index < count - 1) {
                 View divider = new View(activity);
@@ -410,15 +502,113 @@ public final class WeatherScreenRenderer {
         Double todayRainChance = daily == null
                 ? null
                 : WeatherFormatter.valueAt(daily.getPrecipitationProbabilityMax(), 0);
+        Double wetHours = daily == null
+                ? null
+                : WeatherFormatter.valueAt(daily.getPrecipitationHours(), 0);
+
+        String wetHoursText = wetHours == null
+                ? "—"
+                : String.format(Locale.getDefault(), "%.1f h", wetHours);
 
         forecastWindSummary.setText(String.format(
                 Locale.getDefault(),
-                "Wind %s %s · Gusts %s · Today rain chance %s",
+                "Wind %s %s · Gusts %s · Today rain chance %s · Wet hours %s",
                 WeatherFormatter.wind(current.getWindSpeed10m()),
                 WeatherFormatter.windDirection(current.getWindDirection10m()),
                 WeatherFormatter.wind(current.getWindGusts10m()),
-                WeatherFormatter.percent(todayRainChance)
+                WeatherFormatter.percent(todayRainChance),
+                wetHoursText
         ));
+    }
+
+    private void renderSkyReality(
+            @NonNull WeatherResponse response,
+            double latitude,
+            double longitude
+    ) {
+        if (Double.isNaN(latitude) || Double.isNaN(longitude)) {
+            renderEmptySkyReality();
+            return;
+        }
+
+        try {
+            SkyRealityState sky = SkyRealityEngine.calculate(
+                    response,
+                    latitude,
+                    longitude,
+                    System.currentTimeMillis()
+            );
+
+            forecastSkyStageValue.setText(sky.getSkyStage());
+            forecastSunPositionValue.setText(String.format(
+                    Locale.getDefault(),
+                    "%s · alt %.1f° · az %.0f°",
+                    sky.getSunAltitude() >= -0.8 ? "visible" : "below horizon",
+                    sky.getSunAltitude(),
+                    sky.getSunAzimuth()
+            ));
+            forecastMoonPositionValue.setText(String.format(
+                    Locale.getDefault(),
+                    "%s · %.0f%% lit\n%s · alt %.1f° · az %.0f°",
+                    sky.getMoonPhaseName(),
+                    sky.getMoonIlluminationPercent(),
+                    sky.getMoonAltitude() >= -0.8 ? "visible" : "below horizon",
+                    sky.getMoonAltitude(),
+                    sky.getMoonAzimuth()
+            ));
+            forecastStarVisibilityValue.setText(String.format(
+                    Locale.getDefault(),
+                    "%d%% · %s",
+                    sky.getStarVisibilityPercent(),
+                    starVisibilityLabel(sky.getStarVisibilityPercent())
+            ));
+            forecastSceneLightValue.setText(String.format(
+                    Locale.getDefault(),
+                    "%d%% · %s",
+                    sky.getAmbientLightPercent(),
+                    sky.getSkyStage()
+            ));
+
+            WeatherResponse.CurrentWeather current = response.getCurrent();
+            String condition = current == null
+                    ? "Weather"
+                    : WeatherFormatter.condition(current.getWeatherCode());
+            wallpaperPreviewCondition.setText(String.format(
+                    Locale.getDefault(),
+                    "%s · %s\nMoon %.0f%% · Stars %d%% · Light %d%%",
+                    condition,
+                    sky.getSkyStage(),
+                    sky.getMoonIlluminationPercent(),
+                    sky.getStarVisibilityPercent(),
+                    sky.getAmbientLightPercent()
+            ));
+        } catch (RuntimeException exception) {
+            renderEmptySkyReality();
+        }
+    }
+
+    private String starVisibilityLabel(int percent) {
+        if (percent <= 5) {
+            return "not visible";
+        }
+        if (percent <= 25) {
+            return "low";
+        }
+        if (percent <= 55) {
+            return "moderate";
+        }
+        if (percent <= 80) {
+            return "good";
+        }
+        return "excellent";
+    }
+
+    private void renderEmptySkyReality() {
+        forecastSkyStageValue.setText(R.string.metric_placeholder);
+        forecastSunPositionValue.setText(R.string.metric_placeholder);
+        forecastMoonPositionValue.setText(R.string.metric_placeholder);
+        forecastStarVisibilityValue.setText(R.string.metric_placeholder);
+        forecastSceneLightValue.setText(R.string.metric_placeholder);
     }
 
     private void renderEmptyWeather() {
@@ -442,9 +632,15 @@ public final class WeatherScreenRenderer {
         homeRainChanceValue.setText(R.string.metric_placeholder);
         homeTenDaySummary.setText(R.string.quick_ten_day_sub);
         homeWallpaperSummary.setText(R.string.home_wallpaper_body);
+
+        forecastSmartSummary.setText(R.string.forecast_smart_waiting);
         forecastCurrentSummary.setText(R.string.forecast_chart_waiting);
         forecastDailySummary.setText(R.string.forecast_daily_waiting);
         forecastWindSummary.setText(R.string.forecast_wind_waiting);
+        forecastTemperatureChart.setData(Collections.emptyList(), Collections.emptyList());
+        forecastRainChart.setData(Collections.emptyList(), Collections.emptyList());
+        renderEmptySkyReality();
+
         wallpaperPreviewTemperature.setText(R.string.home_temperature_placeholder);
         wallpaperPreviewCondition.setText(R.string.wallpaper_preview_waiting);
 
