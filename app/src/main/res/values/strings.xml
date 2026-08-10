@@ -48,9 +48,9 @@
     <string name="quick_radar_sub">Rain movement &amp; layers</string>
     <string name="quick_air">Air quality</string>
     <string name="quick_air_sub">AQI &amp; pollutants</string>
-    <string name="home_wallpaper_title">Live Wallpaper Engine</string>
-    <string name="home_wallpaper_body">Weather-reactive scenes will mirror rain, clouds, lightning, fog, snow and day-night changes.</string>
-    <string name="home_wallpaper_action">Open wallpaper controls</string>
+    <string name="home_wallpaper_title">Real Live Nature Engine</string>
+    <string name="home_wallpaper_body">Animated Sun, Moon, stars, clouds, wind-driven rain, lightning, snow and fog follow one shared weather + astronomy reality state.</string>
+    <string name="home_wallpaper_action">Open live wallpaper controls</string>
 
     <!-- Phase 4 dashboard intelligence -->
     <string name="dashboard_insight_title">Weather insight</string>
@@ -84,7 +84,7 @@
     <string name="forecast_wind_title">Wind &amp; precipitation</string>
     <string name="forecast_wind_waiting">Wind and precipitation details will appear after sync.</string>
     <string name="forecast_sky_title">Sky Reality</string>
-    <string name="forecast_sky_subtitle">Astronomical position + live weather obstruction. This same state is reserved for the app, widgets and Live Wallpaper.</string>
+    <string name="forecast_sky_subtitle">Astronomical position + live weather obstruction. App and Live Wallpaper consume the same reality state.</string>
     <string name="forecast_sky_stage">Sky stage</string>
     <string name="forecast_sun_position">Sun</string>
     <string name="forecast_moon_position">Moon</string>
@@ -93,14 +93,14 @@
     <string name="forecast_sky_waiting">Waiting for location, weather and astronomy state.</string>
 
     <!-- Phase 6 advanced details + celestial timeline -->
-    <string name="phase6_live_sky_title">Live Sun, Moon &amp; Stars</string>
-    <string name="phase6_live_sky_subtitle">Sun and Moon positions update from the clock and active location. Clouds, rain, visibility and Moon glare control the visible sky.</string>
+    <string name="phase6_live_sky_title">Live Animated Sky</string>
+    <string name="phase6_live_sky_subtitle">Procedural Sun, Moon, stars, clouds and precipitation animate from the clock, active location and current weather.</string>
     <string name="phase6_celestial_waiting">Waiting for astronomical rise/set and Moon phase data…</string>
     <string name="phase6_moon_phase_title">Moon phase · next 10 days</string>
     <string name="phase6_details_title">Advanced weather details</string>
     <string name="phase6_details_waiting">Waiting for live weather details…</string>
     <string name="phase6_data_quality_waiting">Waiting for location accuracy and live-condition source…</string>
-    <string name="wallpaper_note_phase6">This preview now uses the shared live sky engine. The Android home-screen WallpaperService renderer will reuse the same weather + astronomy state in the dedicated wallpaper phase.</string>
+    <string name="wallpaper_note_phase6">The preview and Android home-screen Live Wallpaper now share the same animated nature renderer and cached weather + astronomy reality state.</string>
 
     <!-- Radar -->
     <string name="radar_title">Radar</string>
@@ -114,19 +114,26 @@
     <string name="radar_timeline_title">Storm timeline</string>
     <string name="radar_timeline_waiting">Past and future precipitation animation controls are ready.</string>
 
-    <!-- Wallpaper -->
+    <!-- Real animated Live Wallpaper -->
     <string name="wallpaper_title">Live Wallpaper</string>
-    <string name="wallpaper_subtitle">A weather-aware atmosphere designed for your home screen.</string>
-    <string name="wallpaper_preview_label">LIVE PREVIEW</string>
+    <string name="wallpaper_subtitle">A real-time procedural nature scene driven by current weather, local astronomy and your active location.</string>
+    <string name="wallpaper_preview_label">REAL LIVE PREVIEW</string>
     <string name="wallpaper_preview_waiting">Scene waiting for current weather</string>
-    <string name="wallpaper_effects_title">Atmosphere controls</string>
-    <string name="wallpaper_effect_rain">Rain particles</string>
-    <string name="wallpaper_effect_clouds">Cloud movement</string>
-    <string name="wallpaper_effect_lightning">Dynamic lightning</string>
-    <string name="wallpaper_effect_daynight">Day / night sync</string>
-    <string name="wallpaper_effect_battery">Battery adaptive</string>
-    <string name="wallpaper_apply">Apply Live Wallpaper</string>
-    <string name="wallpaper_note">The real rendering engine will consume the shared weather + Sky Reality state in the wallpaper phase.</string>
+    <string name="wallpaper_effects_title">Nature layers</string>
+    <string name="wallpaper_effect_rain">Animated rain / drizzle</string>
+    <string name="wallpaper_effect_clouds">Wind-driven cloud layers</string>
+    <string name="wallpaper_effect_lightning">Dynamic storm lightning</string>
+    <string name="wallpaper_effect_snow">Animated snow drift</string>
+    <string name="wallpaper_effect_fog">Moving fog / mist</string>
+    <string name="wallpaper_effect_stars">Animated stars / twinkle</string>
+    <string name="wallpaper_effect_daynight">Astronomical day / night sync</string>
+    <string name="wallpaper_effect_battery">Adaptive FPS / battery saver</string>
+    <string name="wallpaper_reality_sync_title">Reality Sync · Always On</string>
+    <string name="wallpaper_reality_sync_body">Sun position, Moon position and phase, sunrise/sunset, twilight, scene light and weather condition always follow the shared live state.</string>
+    <string name="wallpaper_apply">Apply Real Live Wallpaper</string>
+    <string name="wallpaper_note">The system wallpaper renders only while visible, adapts FPS in Power Saver / low battery, and refreshes weather separately from animation frames.</string>
+    <string name="live_wallpaper_service_name">Live Weather · Real Nature</string>
+    <string name="live_wallpaper_description">Animated weather and astronomical live wallpaper with Sun, Moon phases, stars, clouds, rain, snow, fog and lightning.</string>
 
     <!-- More / City Engine -->
     <string name="more_title">More</string>
@@ -170,4 +177,5 @@
     <string name="status_phase_four">PHASE 4 · DASHBOARD INTELLIGENCE</string>
     <string name="status_phase_five">PHASE 5 · ADVANCED FORECAST &amp; SKY REALITY</string>
     <string name="status_phase_six">PHASE 6 · LIVE DETAILS &amp; CELESTIAL TIMELINE</string>
+    <string name="status_real_nature_engine">REAL LIVE NATURE ENGINE · A+B+C+D ACTIVE</string>
 </resources>
