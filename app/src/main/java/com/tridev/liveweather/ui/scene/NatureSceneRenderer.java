@@ -269,7 +269,7 @@ public final class NatureSceneRenderer {
         paint.setShader(null);
 
         canvas.save();
-        canvas.rotate((nowMillis / 220d) % 360f, x, y);
+        canvas.rotate((float) ((nowMillis / 220d) % 360d), x, y);
         strokePaint.setStrokeWidth(Math.max(1.3f, radius * 0.06f));
         strokePaint.setColor(withAlpha(Color.rgb(255, 226, 132), (int) (115 * visibility)));
         for (int i = 0; i < 12; i++) {
