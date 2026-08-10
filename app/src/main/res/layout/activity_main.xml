@@ -8,6 +8,18 @@
     android:background="@drawable/bg_weather_foundation"
     tools:context=".MainActivity">
 
+    <View
+        android:id="@+id/skyAtmosphereOverlay"
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        android:alpha="0.05"
+        android:background="@color/weather_sky_blue"
+        android:importantForAccessibility="no"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent" />
+
     <FrameLayout
         android:id="@+id/pageContainer"
         android:layout_width="0dp"
