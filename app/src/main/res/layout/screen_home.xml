@@ -33,10 +33,13 @@
             android:textSize="@dimen/text_caption" />
 
         <TextView
+            android:id="@+id/homeLocationValue"
             style="@style/TextAppearance.LiveWeather.Section"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginTop="@dimen/space_2"
+            android:clickable="true"
+            android:focusable="true"
             android:text="@string/home_location_waiting" />
 
         <LinearLayout
@@ -82,6 +85,7 @@
             </LinearLayout>
 
             <TextView
+                android:id="@+id/homeSyncStatus"
                 style="@style/TextAppearance.LiveWeather.Caption"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
@@ -372,7 +376,7 @@
             android:layout_height="wrap_content"
             android:layout_gravity="center_horizontal"
             android:layout_marginTop="@dimen/space_16"
-            android:text="@string/status_phase_one"
+            android:text="@string/status_phase_two_location"
             android:textColor="@color/weather_sky_blue" />
 
     </LinearLayout>
