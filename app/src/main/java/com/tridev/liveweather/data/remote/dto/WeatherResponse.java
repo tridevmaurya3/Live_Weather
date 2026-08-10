@@ -212,6 +212,9 @@ public class WeatherResponse {
         @SerializedName("apparent_temperature")
         private List<Double> apparentTemperature;
 
+        @SerializedName("is_day")
+        private List<Integer> isDay;
+
         @SerializedName("precipitation_probability")
         private List<Double> precipitationProbability;
 
@@ -262,6 +265,10 @@ public class WeatherResponse {
 
         public List<Double> getApparentTemperature() {
             return apparentTemperature;
+        }
+
+        public List<Integer> getIsDay() {
+            return isDay;
         }
 
         public List<Double> getPrecipitationProbability() {
