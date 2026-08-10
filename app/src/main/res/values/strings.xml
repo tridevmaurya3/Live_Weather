@@ -1,9 +1,44 @@
 <resources>
     <string name="app_name">Live Weather</string>
+
+    <string name="nav_home">Home</string>
+    <string name="nav_forecast">Forecast</string>
+    <string name="nav_radar">Radar</string>
+    <string name="nav_wallpaper">Wallpaper</string>
+    <string name="nav_more">More</string>
+
     <string name="foundation_eyebrow">REAL ATMOSPHERE ENGINE</string>
     <string name="foundation_title">Live Weather</string>
     <string name="foundation_subtitle">Weather that feels alive on your screen.</string>
     <string name="foundation_card_title">Visual foundation ready</string>
-    <string name="foundation_card_body">Atmospheric colors, glass surfaces, responsive spacing and Material 3 styling are now connected.</string>
-    <string name="foundation_status">PHASE 0 · DESIGN SYSTEM</string>
+    <string name="foundation_card_body">Atmospheric colors, glass surfaces, responsive spacing and Material 3 styling are connected. Real weather data comes in the next phases.</string>
+    <string name="foundation_status">PHASE 0 · HOME SHELL</string>
+
+    <string name="forecast_eyebrow">SMART FORECAST</string>
+    <string name="forecast_title">Forecast</string>
+    <string name="forecast_subtitle">Hourly and multi-day weather intelligence.</string>
+    <string name="forecast_card_title">Forecast destination ready</string>
+    <string name="forecast_card_body">Hourly timeline, precipitation probability, temperature, wind and daily forecast components will plug into this section.</string>
+    <string name="forecast_status">PHASE 0 · FORECAST SHELL</string>
+
+    <string name="radar_eyebrow">LIVE WEATHER MAP</string>
+    <string name="radar_title">Radar</string>
+    <string name="radar_subtitle">Rain, cloud, wind and temperature layers.</string>
+    <string name="radar_card_title">Radar destination ready</string>
+    <string name="radar_card_body">Interactive weather-map layers, location tracking and precipitation movement will be connected here in the radar phase.</string>
+    <string name="radar_status">PHASE 0 · RADAR SHELL</string>
+
+    <string name="wallpaper_eyebrow">REAL ATMOSPHERE WALLPAPER</string>
+    <string name="wallpaper_title">Wallpaper</string>
+    <string name="wallpaper_subtitle">Your current weather, alive on the home screen.</string>
+    <string name="wallpaper_card_title">Hero destination ready</string>
+    <string name="wallpaper_card_body">Rain, clouds, lightning, snow, fog, wind and day-night transitions will be controlled from this section.</string>
+    <string name="wallpaper_status">PHASE 0 · WALLPAPER SHELL</string>
+
+    <string name="more_eyebrow">APP CONTROL CENTER</string>
+    <string name="more_title">More</string>
+    <string name="more_subtitle">Cities, widgets, alerts and app preferences.</string>
+    <string name="more_card_title">Control center ready</string>
+    <string name="more_card_body">Saved locations, widget setup, weather alerts, units, refresh options and performance controls will live here.</string>
+    <string name="more_status">PHASE 0 · MORE SHELL</string>
 </resources>
