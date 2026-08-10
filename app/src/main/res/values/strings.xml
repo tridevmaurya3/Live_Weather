@@ -92,6 +92,16 @@
     <string name="forecast_scene_light">Scene light</string>
     <string name="forecast_sky_waiting">Waiting for location, weather and astronomy state.</string>
 
+    <!-- Phase 6 advanced details + celestial timeline -->
+    <string name="phase6_live_sky_title">Live Sun, Moon &amp; Stars</string>
+    <string name="phase6_live_sky_subtitle">Sun and Moon positions update from the clock and active location. Clouds, rain, visibility and Moon glare control the visible sky.</string>
+    <string name="phase6_celestial_waiting">Waiting for astronomical rise/set and Moon phase data…</string>
+    <string name="phase6_moon_phase_title">Moon phase · next 10 days</string>
+    <string name="phase6_details_title">Advanced weather details</string>
+    <string name="phase6_details_waiting">Waiting for live weather details…</string>
+    <string name="phase6_data_quality_waiting">Waiting for location accuracy and live-condition source…</string>
+    <string name="wallpaper_note_phase6">This preview now uses the shared live sky engine. The Android home-screen WallpaperService renderer will reuse the same weather + astronomy state in the dedicated wallpaper phase.</string>
+
     <!-- Radar -->
     <string name="radar_title">Radar</string>
     <string name="radar_subtitle">A focused map surface for rain, clouds, temperature and wind.</string>
@@ -159,4 +169,5 @@
     <string name="status_phase_three">PHASE 3 · LOCATION &amp; CITY ENGINE</string>
     <string name="status_phase_four">PHASE 4 · DASHBOARD INTELLIGENCE</string>
     <string name="status_phase_five">PHASE 5 · ADVANCED FORECAST &amp; SKY REALITY</string>
+    <string name="status_phase_six">PHASE 6 · LIVE DETAILS &amp; CELESTIAL TIMELINE</string>
 </resources>
