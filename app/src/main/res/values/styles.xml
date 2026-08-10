@@ -7,9 +7,21 @@
         <item name="android:textStyle">bold</item>
     </style>
 
+    <style name="TextAppearance.LiveWeather.Temperature" parent="TextAppearance.Material3.DisplayLarge">
+        <item name="android:textColor">@color/weather_text_primary</item>
+        <item name="android:textSize">@dimen/text_temperature</item>
+        <item name="android:textStyle">normal</item>
+    </style>
+
     <style name="TextAppearance.LiveWeather.Title" parent="TextAppearance.Material3.TitleLarge">
         <item name="android:textColor">@color/weather_text_primary</item>
         <item name="android:textSize">@dimen/text_title</item>
+        <item name="android:textStyle">bold</item>
+    </style>
+
+    <style name="TextAppearance.LiveWeather.Section" parent="TextAppearance.Material3.TitleMedium">
+        <item name="android:textColor">@color/weather_text_primary</item>
+        <item name="android:textSize">@dimen/text_section</item>
         <item name="android:textStyle">bold</item>
     </style>
 
@@ -26,6 +38,22 @@
     <style name="TextAppearance.LiveWeather.Caption" parent="TextAppearance.Material3.LabelMedium">
         <item name="android:textColor">@color/weather_text_tertiary</item>
         <item name="android:textSize">@dimen/text_caption</item>
+    </style>
+
+    <style name="TextAppearance.LiveWeather.MetricValue" parent="TextAppearance.Material3.TitleMedium">
+        <item name="android:textColor">@color/weather_text_primary</item>
+        <item name="android:textSize">@dimen/text_body_large</item>
+        <item name="android:textStyle">bold</item>
+    </style>
+
+    <style name="TextAppearance.LiveWeather.Nav.Active" parent="TextAppearance.Material3.LabelSmall">
+        <item name="android:textSize">@dimen/text_nav</item>
+        <item name="android:textStyle">bold</item>
+    </style>
+
+    <style name="TextAppearance.LiveWeather.Nav.Inactive" parent="TextAppearance.Material3.LabelSmall">
+        <item name="android:textSize">@dimen/text_nav</item>
+        <item name="android:textStyle">normal</item>
     </style>
 
     <style name="ShapeAppearance.LiveWeather.Small" parent="ShapeAppearance.Material3.Corner.Medium">
