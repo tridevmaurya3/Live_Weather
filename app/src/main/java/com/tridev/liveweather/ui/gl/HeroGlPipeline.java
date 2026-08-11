@@ -6,15 +6,16 @@ import androidx.annotation.Nullable;
 import com.tridev.liveweather.data.local.WallpaperPreferences;
 
 /**
- * ODM-5 shared GPU composition pipeline used by both the in-app live scene and
+ * Shared GPU composition pipeline used by both the in-app live scene and
  * Android system Live Wallpaper.
  *
- * Render ownership/order is intentionally centralized here so app and wallpaper
- * cannot drift into different visual engines again.
+ * Render ownership/order is centralized here so app and wallpaper cannot drift
+ * into different visual engines.
  */
 public final class HeroGlPipeline {
 
     private final HeroGlCloudSceneRenderer sceneRenderer = new HeroGlCloudSceneRenderer();
+    private final HeroGlWorldLayerRenderer worldRenderer = new HeroGlWorldLayerRenderer();
     private final HeroGlAtmosphereOverlayRenderer atmosphereRenderer = new HeroGlAtmosphereOverlayRenderer();
     private final HeroGlStormOverlayRenderer stormRenderer = new HeroGlStormOverlayRenderer();
     private final HeroGlRainOverlayRenderer rainRenderer = new HeroGlRainOverlayRenderer();
@@ -29,6 +30,7 @@ public final class HeroGlPipeline {
 
     public void onSurfaceCreated() {
         sceneRenderer.onSurfaceCreated();
+        worldRenderer.onSurfaceCreated();
         atmosphereRenderer.onSurfaceCreated();
         stormRenderer.onSurfaceCreated();
         rainRenderer.onSurfaceCreated();
@@ -37,6 +39,7 @@ public final class HeroGlPipeline {
 
     public void onSurfaceChanged(int width, int height) {
         sceneRenderer.onSurfaceChanged(width, height);
+        worldRenderer.onSurfaceChanged(width, height);
         atmosphereRenderer.onSurfaceChanged(width, height);
         stormRenderer.onSurfaceChanged(width, height);
         rainRenderer.onSurfaceChanged(width, height);
@@ -54,6 +57,7 @@ public final class HeroGlPipeline {
 
     public void drawFrame() {
         sceneRenderer.drawFrame();
+        worldRenderer.drawFrame();
         atmosphereRenderer.drawFrame();
         stormRenderer.drawFrame();
         rainRenderer.drawFrame();
@@ -61,6 +65,7 @@ public final class HeroGlPipeline {
 
     public void release() {
         sceneRenderer.release();
+        worldRenderer.release();
         atmosphereRenderer.release();
         stormRenderer.release();
         rainRenderer.release();
@@ -70,16 +75,13 @@ public final class HeroGlPipeline {
         GlSceneSnapshot state = fullSnapshot;
         if (state == null) {
             sceneRenderer.setSnapshot(null);
+            worldRenderer.setSnapshot(null);
             atmosphereRenderer.setSnapshot(null);
             stormRenderer.setSnapshot(null);
             rainRenderer.setSnapshot(null);
             return;
         }
 
-        /*
-         * Base scene now contains no legacy lightning/rain shader blocks, so it
-         * may keep the real storm intensity for correct storm cloud coloration.
-         */
         GlSceneSnapshot sceneSnapshot = state.withVisualOptions(
                 options.isClouds(),
                 false,
@@ -90,9 +92,19 @@ public final class HeroGlPipeline {
         );
 
         /*
-         * Cinematic atmosphere is weather-aware even when rain particles are
-         * disabled. Fog respects the user's visual Fog option.
+         * The world layer uses the real scene intensities only to choose how its
+         * artistic environment is lit and whether rain/storm should reveal the
+         * restrained urban/wet-ground treatment. It never changes weather data.
          */
+        GlSceneSnapshot worldSnapshot = state.withVisualOptions(
+                options.isClouds(),
+                options.isRain(),
+                true,
+                options.isSnow(),
+                options.isFog(),
+                options.isStars()
+        );
+
         GlSceneSnapshot atmosphereSnapshot = state.withVisualOptions(
                 options.isClouds(),
                 true,
@@ -102,10 +114,6 @@ public final class HeroGlPipeline {
                 options.isStars()
         );
 
-        /*
-         * Storm darkness remains reality-driven. Electrical visibility is a
-         * separate preference and is gated directly on the storm renderer.
-         */
         GlSceneSnapshot stormSnapshot = state.withVisualOptions(
                 options.isClouds(),
                 false,
@@ -115,11 +123,6 @@ public final class HeroGlPipeline {
                 options.isStars()
         );
 
-        /*
-         * Rain particles/wet glass follow the Rain preference. Storm intensity
-         * is zeroed here only when Lightning is disabled so foreground water does
-         * not receive electrical exposure flashes while lightning is off.
-         */
         GlSceneSnapshot rainSnapshot = state.withVisualOptions(
                 true,
                 options.isRain(),
@@ -130,6 +133,7 @@ public final class HeroGlPipeline {
         );
 
         sceneRenderer.setSnapshot(sceneSnapshot);
+        worldRenderer.setSnapshot(worldSnapshot);
         atmosphereRenderer.setSnapshot(atmosphereSnapshot);
         stormRenderer.setSnapshot(stormSnapshot);
         stormRenderer.setElectricalEnabled(options.isLightning());
