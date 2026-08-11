@@ -240,8 +240,11 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_marginTop="@dimen/space_8"
+        android:background="@drawable/bg_weather_card_compact"
         android:gravity="center_horizontal"
+        android:padding="@dimen/space_8"
         android:text="RainViewer radar • Open-Meteo model overlays • OpenStreetMap base"
-        android:textAlignment="center" />
+        android:textAlignment="center"
+        android:textColor="@color/weather_text_primary" />
 
 </com.tridev.liveweather.ui.radar.RadarPageLayout>
