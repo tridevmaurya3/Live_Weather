@@ -15,10 +15,13 @@ import com.tridev.liveweather.domain.LiveConditionResolver;
 /**
  * Continuous Hero rain renderer.
  *
- * HRS-1B guarantees that active rain never "runs out" after a short animation:
- * every far/mid/near drop is clock-driven and deterministically recycled. A
- * short rain-signal hold prevents a single transient model sample from abruptly
- * turning an obviously wet scene into a dry screen.
+ * HRS-1B contract:
+ * - rain never runs out while the wallpaper/view remains visible and rain is active;
+ * - far/mid/near layers have different scale, speed, alpha and blur character;
+ * - drop brightness and length are intentionally non-uniform;
+ * - wind and slow gust modulation change slant/motion continuously;
+ * - heavy rain adds atmospheric curtain + low spray;
+ * - wet-glass droplets remain a separate foreground plane.
  */
 public final class HeroRainRenderer {
 
@@ -27,6 +30,7 @@ public final class HeroRainRenderer {
 
     private final Paint streakPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Paint veilPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+    private final Paint dropPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final WetGlassOverlay wetGlass = new WetGlassOverlay();
 
     private WeatherResponse weather;
@@ -51,6 +55,7 @@ public final class HeroRainRenderer {
     public HeroRainRenderer() {
         streakPaint.setStyle(Paint.Style.STROKE);
         streakPaint.setStrokeCap(Paint.Cap.ROUND);
+        dropPaint.setStyle(Paint.Style.FILL);
     }
 
     public void setEnabled(boolean enabled) {
@@ -60,9 +65,7 @@ public final class HeroRainRenderer {
     public void setWeatherData(@Nullable WeatherResponse weather) {
         this.weather = weather;
         lastStateRefresh = 0L;
-        if (weather == null) {
-            clearWeatherData();
-        }
+        if (weather == null) clearWeatherData();
     }
 
     public void clearWeatherData() {
@@ -110,16 +113,20 @@ public final class HeroRainRenderer {
         drawRainCurtain(canvas, width, height, effective, seconds);
 
         if (drizzle > rain) {
-            drawDepthLayer(canvas, width, height, drizzle, seconds, 0.20f, true, 0);
-            drawDepthLayer(canvas, width, height, drizzle, seconds, 0.52f, true, 1);
-            drawDepthLayer(canvas, width, height, drizzle, seconds, 0.86f, true, 2);
+            drawDepthLayer(canvas, width, height, drizzle, seconds, 0.18f, true, 0);
+            drawDepthLayer(canvas, width, height, drizzle, seconds, 0.48f, true, 1);
+            drawDepthLayer(canvas, width, height, drizzle, seconds, 0.82f, true, 2);
         } else {
-            drawDepthLayer(canvas, width, height, rain, seconds, 0.18f, false, 0);
-            drawDepthLayer(canvas, width, height, rain, seconds, 0.50f, false, 1);
-            drawDepthLayer(canvas, width, height, rain, seconds, 0.92f, false, 2);
+            drawDepthLayer(canvas, width, height, rain, seconds, 0.16f, false, 0);
+            drawDepthLayer(canvas, width, height, rain, seconds, 0.48f, false, 1);
+            drawDepthLayer(canvas, width, height, rain, seconds, 0.90f, false, 2);
         }
 
-        float wetness = clamp01((Math.max(effective, stormIntensity * 0.78f) - 0.10f) / 0.90f);
+        if (effective > 0.48f) {
+            drawLowerSpray(canvas, width, height, effective, seconds);
+        }
+
+        float wetness = clamp01((Math.max(effective, stormIntensity * 0.80f) - 0.08f) / 0.92f);
         wetGlass.draw(canvas, width, height, wetness, clamp01(lightningFlash), nowMillis);
     }
 
@@ -206,21 +213,21 @@ public final class HeroRainRenderer {
             float intensity,
             float seconds
     ) {
-        float heavy = clamp01((intensity - 0.22f) / 0.78f);
+        float heavy = clamp01((intensity - 0.20f) / 0.80f);
         if (heavy <= 0.01f) return;
 
-        int topAlpha = clampInt(Math.round(4f + heavy * 15f), 0, 22);
-        int midAlpha = clampInt(Math.round(8f + heavy * 28f), 0, 40);
-        int lowerAlpha = clampInt(Math.round(12f + heavy * 38f), 0, 54);
+        int topAlpha = clampInt(Math.round(3f + heavy * 13f), 0, 19);
+        int midAlpha = clampInt(Math.round(7f + heavy * 24f), 0, 35);
+        int lowerAlpha = clampInt(Math.round(10f + heavy * 34f), 0, 48);
         veilPaint.setShader(new LinearGradient(
                 0f,
                 0f,
                 0f,
                 height,
                 new int[]{
-                        Color.argb(topAlpha, 94, 119, 139),
-                        Color.argb(midAlpha, 113, 137, 153),
-                        Color.argb(lowerAlpha, 133, 149, 156)
+                        Color.argb(topAlpha, 86, 111, 132),
+                        Color.argb(midAlpha, 104, 130, 149),
+                        Color.argb(lowerAlpha, 126, 145, 155)
                 },
                 new float[]{0f, 0.58f, 1f},
                 Shader.TileMode.CLAMP
@@ -230,29 +237,30 @@ public final class HeroRainRenderer {
 
         float direction = (float) Math.toRadians(windDirectionDegrees + 180f);
         float windNorm = clamp01(windSpeedKmh / 75f);
-        int count = 90 + Math.round(heavy * 150f);
-        float margin = 100f;
-
-        streakPaint.setStrokeCap(Paint.Cap.ROUND);
-        streakPaint.setStrokeWidth(0.55f + heavy * 0.38f);
-        streakPaint.setColor(Color.argb(
-                clampInt(Math.round(28f + heavy * 38f), 20, 78),
-                181,
-                207,
-                224
-        ));
+        float gust = 0.84f + 0.16f * (float) Math.sin(seconds * 0.52f + 0.9f);
+        int count = 110 + Math.round(heavy * 170f);
+        float margin = 110f;
 
         for (int i = 0; i < count; i++) {
             int seed = 701 + i * 151;
-            float length = 8f + hash01(seed * 17 + 3) * (14f + heavy * 20f);
-            float speed = 210f + heavy * 330f + hash01(seed * 29 + 9) * 150f;
+            float visibility = 0.35f + hash01(seed * 13 + 5) * 0.65f;
+            float length = 5f + hash01(seed * 17 + 3) * (12f + heavy * 18f);
+            float speed = (190f + heavy * 300f + hash01(seed * 29 + 9) * 180f) * gust;
             float cycle = height + length * 3f;
             float y0 = hash01(seed * 37 + 11) * cycle;
             float y = positiveMod(y0 + seconds * speed, cycle) - length * 1.5f;
             float x0 = hash01(seed * 43 + 19) * (width + margin) - margin * 0.5f;
-            float drift = seconds * (float) Math.sin(direction) * windSpeedKmh * 0.28f;
+            float drift = seconds * (float) Math.sin(direction) * windSpeedKmh * 0.27f;
             float x = positiveMod(x0 + drift, width + margin) - margin * 0.5f;
-            float slant = (float) Math.sin(direction) * length * (0.10f + windNorm * 0.78f);
+            float slant = (float) Math.sin(direction) * length * (0.08f + windNorm * 0.72f);
+
+            streakPaint.setStrokeWidth(0.40f + visibility * 0.42f + heavy * 0.14f);
+            streakPaint.setColor(Color.argb(
+                    clampInt(Math.round((18f + heavy * 35f) * visibility), 8, 66),
+                    179,
+                    207,
+                    226
+            ));
             canvas.drawLine(x, y, x + slant, y + length, streakPaint);
         }
     }
@@ -269,32 +277,31 @@ public final class HeroRainRenderer {
     ) {
         float direction = (float) Math.toRadians(windDirectionDegrees + 180f);
         float windNorm = clamp01(windSpeedKmh / 70f);
+        float gust = 0.86f + 0.14f * (float) Math.sin(seconds * (0.44f + layerIndex * 0.06f) + layerIndex * 1.9f);
 
         int count;
         if (drizzle) {
-            count = Math.round(72f + intensity * 92f + depth * 30f);
+            count = Math.round(58f + intensity * 80f + depth * 22f);
         } else {
-            count = Math.round(82f + intensity * 125f + depth * 42f);
+            count = Math.round(62f + intensity * 108f + depth * 34f);
         }
 
         float baseLength = drizzle
-                ? lerp(7f, 22f, depth)
-                : lerp(12f, 78f, depth);
+                ? lerp(5f, 18f, depth)
+                : lerp(8f, 64f, depth);
         float speed = drizzle
-                ? lerp(150f, 390f, depth) * (0.82f + intensity * 0.45f)
-                : lerp(300f, 1040f, depth) * (0.80f + intensity * 0.65f);
-        float thickness = drizzle
-                ? lerp(0.60f, 1.30f, depth)
-                : lerp(0.68f, 2.55f, depth);
-        int alpha = drizzle
-                ? clampInt(Math.round(42f + depth * 58f + intensity * 46f), 30, 150)
-                : clampInt(Math.round(48f + depth * 112f + intensity * 62f), 38, 226);
+                ? lerp(145f, 360f, depth) * (0.82f + intensity * 0.45f)
+                : lerp(290f, 980f, depth) * (0.80f + intensity * 0.65f);
+        float baseThickness = drizzle
+                ? lerp(0.48f, 1.12f, depth)
+                : lerp(0.55f, 2.15f, depth);
 
-        float margin = 170f;
+        float margin = 180f;
         for (int i = 0; i < count; i++) {
             int seed = layerIndex * 10_007 + i * 131 + (drizzle ? 73 : 19);
-            float length = baseLength * (0.68f + hash01(seed * 17 + 5) * 0.72f);
-            float localSpeed = speed * (0.74f + hash01(seed * 29 + 11) * 0.52f);
+            float visibility = 0.34f + hash01(seed * 11 + 3) * 0.66f;
+            float length = baseLength * (0.48f + hash01(seed * 17 + 5) * 1.05f);
+            float localSpeed = speed * gust * (0.68f + hash01(seed * 29 + 11) * 0.64f);
             float cycle = height + length * 3f;
             float y0 = hash01(seed * 37 + 7) * cycle;
             float y = positiveMod(y0 + seconds * localSpeed, cycle) - length * 1.4f;
@@ -303,47 +310,112 @@ public final class HeroRainRenderer {
             float horizontalTravel = seconds
                     * (float) Math.sin(direction)
                     * windSpeedKmh
-                    * (0.20f + depth * 0.52f);
+                    * (0.18f + depth * 0.48f);
             float x = positiveMod(x0 + horizontalTravel, width + margin) - margin * 0.5f;
 
             float slant = (float) Math.sin(direction)
                     * length
-                    * (0.08f + windNorm * (0.50f + depth * 0.78f));
+                    * (0.07f + windNorm * (0.48f + depth * 0.74f));
             float vertical = length * (0.95f + Math.abs((float) Math.cos(direction)) * 0.05f);
+            float thickness = baseThickness * (0.72f + visibility * 0.50f);
+
+            int alpha = drizzle
+                    ? clampInt(Math.round((32f + depth * 58f + intensity * 42f) * visibility), 18, 132)
+                    : clampInt(Math.round((38f + depth * 105f + intensity * 58f) * visibility), 20, 214);
 
             if (depth > 0.78f) {
-                streakPaint.setStrokeWidth(thickness * 2.6f);
+                // Soft motion body.
+                streakPaint.setStrokeWidth(thickness * 2.5f);
                 streakPaint.setColor(Color.argb(
-                        clampInt(Math.round(alpha * 0.20f), 10, 56),
-                        151,
-                        184,
+                        clampInt(Math.round(alpha * 0.18f), 7, 44),
+                        150,
+                        183,
                         207
                 ));
                 canvas.drawLine(x, y, x + slant, y + vertical, streakPaint);
 
+                // Main drop streak.
                 streakPaint.setStrokeWidth(thickness);
-                streakPaint.setColor(Color.argb(alpha, 215, 236, 249));
+                streakPaint.setColor(Color.argb(alpha, 211, 234, 248));
                 canvas.drawLine(x, y, x + slant, y + vertical, streakPaint);
 
-                streakPaint.setStrokeWidth(Math.max(0.55f, thickness * 0.34f));
+                // Small bright head on only some near drops, avoiding the old
+                // "all identical white lines" appearance.
+                if (hash01(seed * 79 + 23) > 0.54f) {
+                    dropPaint.setColor(Color.argb(
+                            clampInt(Math.round(alpha * 0.56f), 18, 132),
+                            244,
+                            251,
+                            255
+                    ));
+                    float headRadius = Math.max(0.7f, thickness * 0.70f);
+                    canvas.drawCircle(x, y, headRadius, dropPaint);
+                }
+
+                streakPaint.setStrokeWidth(Math.max(0.45f, thickness * 0.31f));
                 streakPaint.setColor(Color.argb(
-                        clampInt(Math.round(alpha * 0.60f), 20, 152),
-                        250,
+                        clampInt(Math.round(alpha * 0.52f), 14, 138),
+                        249,
                         253,
                         255
                 ));
                 canvas.drawLine(
                         x,
                         y,
-                        x + slant * 0.42f,
-                        y + vertical * 0.42f,
+                        x + slant * 0.34f,
+                        y + vertical * 0.34f,
                         streakPaint
                 );
             } else {
                 streakPaint.setStrokeWidth(thickness);
-                streakPaint.setColor(Color.argb(alpha, 187, 214, 233));
+                streakPaint.setColor(Color.argb(alpha, 183, 211, 231));
                 canvas.drawLine(x, y, x + slant, y + vertical, streakPaint);
             }
+        }
+    }
+
+    private void drawLowerSpray(
+            Canvas canvas,
+            int width,
+            int height,
+            float intensity,
+            float seconds
+    ) {
+        float heavy = clamp01((intensity - 0.48f) / 0.52f);
+        if (heavy <= 0f) return;
+
+        int alpha = clampInt(Math.round(14f + heavy * 32f), 0, 48);
+        veilPaint.setShader(new LinearGradient(
+                0f,
+                height * 0.62f,
+                0f,
+                height,
+                new int[]{
+                        Color.TRANSPARENT,
+                        Color.argb(alpha / 2, 184, 202, 213),
+                        Color.argb(alpha, 197, 211, 218)
+                },
+                new float[]{0f, 0.58f, 1f},
+                Shader.TileMode.CLAMP
+        ));
+        canvas.drawRect(0f, height * 0.62f, width, height, veilPaint);
+        veilPaint.setShader(null);
+
+        int streaks = 12 + Math.round(heavy * 18f);
+        for (int i = 0; i < streaks; i++) {
+            int seed = 9001 + i * 101;
+            float x = hash01(seed * 17) * width;
+            float y = height * (0.72f + hash01(seed * 31) * 0.26f);
+            float sway = (float) Math.sin(seconds * 0.9f + i * 1.7f) * (2f + heavy * 5f);
+            float len = 3f + hash01(seed * 43) * (5f + heavy * 8f);
+            streakPaint.setStrokeWidth(0.7f + heavy * 0.7f);
+            streakPaint.setColor(Color.argb(
+                    clampInt(Math.round(24f + heavy * 42f), 18, 70),
+                    218,
+                    232,
+                    239
+            ));
+            canvas.drawLine(x, y, x + sway, y - len, streakPaint);
         }
     }
 
