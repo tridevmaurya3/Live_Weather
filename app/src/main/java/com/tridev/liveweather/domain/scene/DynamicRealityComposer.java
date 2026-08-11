@@ -5,10 +5,10 @@ import androidx.annotation.Nullable;
 
 import com.tridev.liveweather.data.remote.dto.AirQualityResponse;
 import com.tridev.liveweather.data.remote.dto.WeatherResponse;
+import com.tridev.liveweather.domain.AirQualityReality;
 import com.tridev.liveweather.domain.LiveConditionResolver;
 import com.tridev.liveweather.domain.SkyRealityEngine;
 import com.tridev.liveweather.domain.SkyRealityState;
-import com.tridev.liveweather.ui.air.AirQualityIntelligence;
 
 /**
  * Converts live weather + AQI haze + local astronomy into animation intensities.
@@ -50,7 +50,7 @@ public final class DynamicRealityComposer {
                 ? 16000d
                 : Math.max(0d, current.getVisibility());
         double visibilityFactor = clamp(visibilityMeters / 16000d, 0.08d, 1d);
-        double airHaze = AirQualityIntelligence.hazeIntensity(airQuality);
+        double airHaze = AirQualityReality.hazeIntensity(airQuality);
         visibilityFactor = clamp(visibilityFactor * (1d - airHaze * 0.48d), 0.05d, 1d);
 
         double windSpeed = current == null || current.getWindSpeed10m() == null
@@ -77,9 +77,11 @@ public final class DynamicRealityComposer {
                 ? clamp(0.25d + precipSignal * 0.45d, 0.18d, 0.72d)
                 : 0d;
         double rain = rainCode || currentRain > 0d || currentShowers > 0d || precipSignal > 0.06d
-                ? clamp(0.24d + precipSignal * 0.62d + currentRain * 0.38d + currentShowers * 0.48d,
-                0.18d,
-                1d)
+                ? clamp(
+                        0.24d + precipSignal * 0.62d + currentRain * 0.38d + currentShowers * 0.48d,
+                        0.18d,
+                        1d
+                )
                 : 0d;
         if (drizzleCode && rain < 0.4d) {
             rain = 0d;
@@ -95,12 +97,20 @@ public final class DynamicRealityComposer {
                 : 0d;
 
         if (rain > 0d || drizzle > 0d || snow > 0d || storm > 0d) {
-            clouds = Math.max(clouds, 0.68d + 0.30d * Math.max(rain, Math.max(snow, storm)));
+            clouds = Math.max(
+                    clouds,
+                    0.68d + 0.30d * Math.max(rain, Math.max(snow, storm))
+            );
         }
         clouds = clamp(clouds, 0d, 1d);
 
         double weatherTransparency = clamp(
-                1d - clouds * 0.82d - fog * 0.70d - rain * 0.30d - snow * 0.20d - airHaze * 0.38d,
+                1d
+                        - clouds * 0.82d
+                        - fog * 0.70d
+                        - rain * 0.30d
+                        - snow * 0.20d
+                        - airHaze * 0.38d,
                 0.025d,
                 1d
         );
@@ -111,7 +121,9 @@ public final class DynamicRealityComposer {
                 ? clamp(weatherTransparency * visibilityFactor, 0d, 1d)
                 : 0d;
         double starVisibility = clamp(
-                sky.getStarVisibilityPercent() / 100d * weatherTransparency * (1d - airHaze * 0.45d),
+                sky.getStarVisibilityPercent() / 100d
+                        * weatherTransparency
+                        * (1d - airHaze * 0.45d),
                 0d,
                 1d
         );
