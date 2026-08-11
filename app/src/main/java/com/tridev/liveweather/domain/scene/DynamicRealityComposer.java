@@ -120,22 +120,33 @@ public final class DynamicRealityComposer {
                 : 0d;
 
         /*
-         * A physically dark/new Moon must not appear as a black sticker in a
-         * bright daytime sky. Astronomy still determines the real Moon
-         * position/phase, but visual contrast is reduced by daylight and by the
-         * illuminated fraction. Bright gibbous/full phases can remain visible
-         * in daylight; very thin/new phases naturally disappear.
+         * Daylight Moon contrast must solve two opposite problems:
+         * 1) a near-new Moon must never become an opaque black sticker;
+         * 2) a genuine thin crescent above the horizon should not vanish entirely.
+         *
+         * Astronomy continues to control the actual phase and position. This
+         * block only supplies a restrained presentation floor for the lit
+         * crescent when it is physically above the horizon and illumination is
+         * meaningful enough to have a visible sliver.
          */
         double moonIllumination = clamp(sky.getMoonIlluminationPercent() / 100d, 0d, 1d);
         double daylightMoonContrast = 1d;
         if (sky.getSunAltitude() > -6d) {
-            double daylightStrength = clamp((sky.getSunAltitude() + 6d) / 34d, 0d, 1d);
-            double phaseContrast = clamp((moonIllumination - 0.055d) / 0.42d, 0d, 1d);
-            daylightMoonContrast = phaseContrast * (1d - daylightStrength * 0.48d);
-            if (moonIllumination < 0.035d && sky.getSunAltitude() > -2d) {
+            double daylightStrength = clamp((sky.getSunAltitude() + 6d) / 42d, 0d, 1d);
+            double phaseContrast = clamp((moonIllumination - 0.008d) / 0.34d, 0d, 1d);
+            double naturalContrast = phaseContrast * (1d - daylightStrength * 0.56d);
+
+            double crescentReadabilityFloor = moonIllumination >= 0.015d
+                    ? 0.16d + 0.14d * Math.sqrt(moonIllumination)
+                    : 0d;
+
+            daylightMoonContrast = Math.max(naturalContrast, crescentReadabilityFloor);
+
+            if (moonIllumination < 0.008d && sky.getSunAltitude() > -2d) {
                 daylightMoonContrast = 0d;
             }
         }
+
         double moonVisibility = sky.getMoonAltitude() > -4d
                 ? clamp(
                         weatherTransparency
