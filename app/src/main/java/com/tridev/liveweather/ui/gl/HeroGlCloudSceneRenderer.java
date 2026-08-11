@@ -10,13 +10,16 @@ import java.nio.ByteOrder;
 import java.nio.FloatBuffer;
 
 /**
- * ODM-1C active OpenGL ES 2.0 Hero renderer.
+ * ODM-1D final Sky + Cloud Foundation renderer.
  *
- * Cloud rendering is split into independent far, mid, near and storm-ceiling
- * fields. Each field has a different scale, motion speed, vertical envelope and
- * opacity so the sky reads as layered cloud masses rather than one scrolling
- * grey/noise sheet. All cloud amounts come from CloudPresenceResolver through
- * GlSceneSnapshot; this renderer only decides how those resolved layers look.
+ * Cloud presence comes from CloudPresenceResolver. This renderer turns that
+ * presence into independent far, mid, near and storm-ceiling fields with
+ * centered parallax, different wind speeds, subtle cross-wind turbulence,
+ * feathered coverage, sun-facing edge light and darker internal cloud mass.
+ *
+ * The main acceptance contract is deliberately strict: no decorative clouds in
+ * genuinely clear conditions, no full-screen cloud tint outside a cloud mask,
+ * no rectangular texture bounds and no single scrolling grey sheet.
  */
 public final class HeroGlCloudSceneRenderer {
 
@@ -93,15 +96,22 @@ public final class HeroGlCloudSceneRenderer {
             "  return v;\n" +
             "}\n" +
             "float cloudNoise(vec2 p,float seed){\n" +
-            "  float body=fbm(p+vec2(seed*0.31,seed*0.17));\n" +
-            "  float breakup=fbm(p*1.91+vec2(seed*1.73,seed*0.83));\n" +
-            "  return body*0.79+breakup*0.21;\n" +
+            "  float warp=noise(p*0.47+vec2(seed*0.13,seed*0.29))-0.5;\n" +
+            "  vec2 wp=p+vec2(warp,-warp)*0.22;\n" +
+            "  float body=fbm(wp+vec2(seed*0.31,seed*0.17));\n" +
+            "  float breakup=fbm(wp*1.91+vec2(seed*1.73,seed*0.83));\n" +
+            "  return body*0.80+breakup*0.20;\n" +
             "}\n" +
             "float verticalBand(float y,float top,float bottom,float feather){\n" +
             "  return smoothstep(top-feather,top+feather,y)*(1.0-smoothstep(bottom-feather,bottom+feather,y));\n" +
             "}\n" +
             "float cloudMask(float n,float threshold,float softness){\n" +
             "  return smoothstep(threshold,threshold+softness,n);\n" +
+            "}\n" +
+            "float cloudEdge(float n,float threshold,float softness){\n" +
+            "  float outer=cloudMask(n,threshold,softness);\n" +
+            "  float inner=cloudMask(n,threshold+softness*0.48,softness*0.72);\n" +
+            "  return max(0.0,outer-inner);\n" +
             "}\n" +
 
             "float rainLayer(vec2 p,float scale,float speed,float seed,float slope){\n" +
@@ -161,60 +171,77 @@ public final class HeroGlCloudSceneRenderer {
             "  color+=vec3(0.82,0.90,1.0)*star;\n" +
 
             "  vec2 windVec=vec2(sin(uWindDir),-cos(uWindDir));\n" +
-            "  float driftBase=0.55+uWind*1.45;\n" +
+            "  vec2 crossWind=vec2(-windVec.y,windVec.x);\n" +
+            "  float driftBase=0.48+uWind*1.32;\n" +
+            "  float centeredParallax=uParallax-0.5;\n" +
+            "  float presenceGate=smoothstep(0.025,0.11,uCloud);\n" +
 
-            "  vec2 qFar=p*vec2(1.18,1.82)+windVec*uTime*(0.0036*driftBase)+vec2(uParallax*0.012,0.0);\n" +
+            "  vec2 qFar=p*vec2(1.08,1.64)+windVec*uTime*(0.0030*driftBase)+crossWind*sin(uTime*0.031+1.4)*0.008+vec2(centeredParallax*0.014,0.0);\n" +
             "  float nFar=cloudNoise(qFar,2.7);\n" +
-            "  float farThreshold=0.72-uCloudDensity*0.15;\n" +
-            "  float farCloud=cloudMask(nFar,farThreshold,0.16)*verticalBand(p.y,0.015,0.64,0.065)*uCloudFar;\n" +
+            "  float farThreshold=0.73-uCloudDensity*0.15;\n" +
+            "  float farCloud=cloudMask(nFar,farThreshold,0.17)*verticalBand(p.y,0.025,0.58,0.080)*uCloudFar*presenceGate;\n" +
+            "  float farEdge=cloudEdge(nFar,farThreshold,0.17)*farCloud;\n" +
 
-            "  vec2 qMid=p*vec2(1.72,2.48)+windVec*uTime*(0.0072*driftBase)+vec2(4.7,1.6)+vec2(uParallax*0.022,0.0);\n" +
+            "  vec2 qMid=p*vec2(1.58,2.18)+windVec*uTime*(0.0061*driftBase)+crossWind*sin(uTime*0.041+3.2)*0.012+vec2(4.7,1.6)+vec2(centeredParallax*0.028,0.0);\n" +
             "  float nMid=cloudNoise(qMid,7.1);\n" +
-            "  float midThreshold=0.68-uCloudDensity*0.18;\n" +
-            "  float midCloud=cloudMask(nMid,midThreshold,0.135)*verticalBand(p.y,0.025,0.72,0.070)*uCloudMid;\n" +
+            "  float midThreshold=0.69-uCloudDensity*0.18;\n" +
+            "  float midCloud=cloudMask(nMid,midThreshold,0.145)*verticalBand(p.y,0.045,0.68,0.082)*uCloudMid*presenceGate;\n" +
+            "  float midEdge=cloudEdge(nMid,midThreshold,0.145)*midCloud;\n" +
 
-            "  vec2 qNear=p*vec2(2.32,3.12)+windVec*uTime*(0.0115*driftBase)+vec2(9.4,5.3)+vec2(uParallax*0.034,0.0);\n" +
+            "  vec2 qNear=p*vec2(2.08,2.76)+windVec*uTime*(0.0092*driftBase)+crossWind*sin(uTime*0.052+5.6)*0.016+vec2(9.4,5.3)+vec2(centeredParallax*0.044,0.0);\n" +
             "  float nNear=cloudNoise(qNear,12.9);\n" +
-            "  float nearThreshold=0.65-uCloudDensity*0.19;\n" +
-            "  float nearCloud=cloudMask(nNear,nearThreshold,0.12)*verticalBand(p.y,0.035,0.78,0.075)*uCloudNear;\n" +
+            "  float nearThreshold=0.66-uCloudDensity*0.19;\n" +
+            "  float nearCloud=cloudMask(nNear,nearThreshold,0.13)*verticalBand(p.y,0.075,0.77,0.088)*uCloudNear*presenceGate;\n" +
+            "  float nearEdge=cloudEdge(nNear,nearThreshold,0.13)*nearCloud;\n" +
 
-            "  vec2 qCeil=p*vec2(1.46,2.02)+windVec*uTime*(0.0090*driftBase)+vec2(15.2,3.7);\n" +
+            "  vec2 qCeil=p*vec2(1.30,1.78)+windVec*uTime*(0.0070*driftBase)+crossWind*sin(uTime*0.036+8.1)*0.010+vec2(15.2,3.7)+vec2(centeredParallax*0.022,0.0);\n" +
             "  float nCeil=cloudNoise(qCeil,18.6);\n" +
-            "  float ceilingShape=cloudMask(nCeil,0.53-uCloudCeiling*0.13,0.13);\n" +
-            "  float ceiling=ceilingShape*verticalBand(p.y,0.0,0.61,0.075)*uCloudCeiling;\n" +
+            "  float ceilingShape=cloudMask(nCeil,0.54-uCloudCeiling*0.13,0.145);\n" +
+            "  float ceiling=ceilingShape*verticalBand(p.y,0.0,0.60,0.085)*uCloudCeiling*presenceGate;\n" +
 
-            "  float farShade=clamp((nFar-farThreshold)*2.4+0.48,0.0,1.0);\n" +
-            "  float midShade=clamp((nMid-midThreshold)*2.7+0.40,0.0,1.0);\n" +
-            "  float nearShade=clamp((nNear-nearThreshold)*3.0+0.34,0.0,1.0);\n" +
+            "  float farShade=clamp((nFar-farThreshold)*2.25+0.43,0.0,1.0);\n" +
+            "  float midShade=clamp((nMid-midThreshold)*2.55+0.36,0.0,1.0);\n" +
+            "  float nearShade=clamp((nNear-nearThreshold)*2.85+0.30,0.0,1.0);\n" +
             "  float stormShade=clamp(uStorm*0.90+uRain*0.16+uCloudCeiling*0.28,0.0,1.0);\n" +
             "  float bright=clamp(uCloudBrightness,0.18,1.0);\n" +
+            "  vec2 sunDelta=(uSunPos-p)*vec2(aspect,1.0);\n" +
+            "  float sunEdge=exp(-length(sunDelta)*1.55)*uSunVis*(1.0-stormShade*0.72);\n" +
+            "  float silver=(farEdge*0.22+midEdge*0.48+nearEdge*0.72)*sunEdge;\n" +
 
-            "  vec3 farLow=mix(vec3(0.60,0.66,0.72),vec3(0.20,0.24,0.30),stormShade);\n" +
-            "  vec3 farHigh=mix(vec3(0.93,0.95,0.96),vec3(0.42,0.46,0.52),stormShade);\n" +
+            "  vec3 farLow=mix(vec3(0.58,0.64,0.70),vec3(0.19,0.23,0.29),stormShade);\n" +
+            "  vec3 farHigh=mix(vec3(0.92,0.94,0.95),vec3(0.40,0.44,0.50),stormShade);\n" +
             "  vec3 farColor=mix(farLow,farHigh,farShade)*mix(0.78,1.0,bright);\n" +
-            "  color=mix(color,farColor,clamp(farCloud*(0.20+uCloudDensity*0.16),0.0,0.38));\n" +
+            "  float farAlpha=clamp(farCloud*(0.17+uCloudDensity*0.15),0.0,0.34);\n" +
+            "  color=mix(color,farColor,farAlpha);\n" +
 
-            "  vec3 midLow=mix(vec3(0.52,0.58,0.64),vec3(0.12,0.15,0.20),stormShade);\n" +
-            "  vec3 midHigh=mix(vec3(0.92,0.94,0.95),vec3(0.34,0.38,0.44),stormShade);\n" +
-            "  vec3 midColor=mix(midLow,midHigh,midShade)*mix(0.72,1.0,bright);\n" +
-            "  color=mix(color,midColor,clamp(midCloud*(0.36+uCloudDensity*0.28),0.0,0.68));\n" +
+            "  vec3 midLow=mix(vec3(0.49,0.55,0.61),vec3(0.11,0.14,0.19),stormShade);\n" +
+            "  vec3 midHigh=mix(vec3(0.91,0.93,0.94),vec3(0.32,0.36,0.42),stormShade);\n" +
+            "  vec3 midColor=mix(midLow,midHigh,midShade)*mix(0.71,1.0,bright);\n" +
+            "  float midAlpha=clamp(midCloud*(0.33+uCloudDensity*0.27),0.0,0.64);\n" +
+            "  color=mix(color,midColor,midAlpha);\n" +
 
-            "  vec3 nearLow=mix(vec3(0.46,0.52,0.58),vec3(0.065,0.085,0.12),stormShade);\n" +
-            "  vec3 nearHigh=mix(vec3(0.90,0.92,0.93),vec3(0.27,0.31,0.37),stormShade);\n" +
-            "  vec3 nearColor=mix(nearLow,nearHigh,nearShade)*mix(0.68,1.0,bright);\n" +
-            "  color=mix(color,nearColor,clamp(nearCloud*(0.48+uCloudDensity*0.36),0.0,0.86));\n" +
+            "  vec3 nearLow=mix(vec3(0.42,0.48,0.55),vec3(0.055,0.075,0.105),stormShade);\n" +
+            "  vec3 nearHigh=mix(vec3(0.89,0.91,0.92),vec3(0.25,0.29,0.35),stormShade);\n" +
+            "  vec3 nearColor=mix(nearLow,nearHigh,nearShade)*mix(0.66,1.0,bright);\n" +
+            "  float nearAlpha=clamp(nearCloud*(0.45+uCloudDensity*0.35),0.0,0.83);\n" +
+            "  color=mix(color,nearColor,nearAlpha);\n" +
 
-            "  float ceilShade=clamp(nCeil*1.8-0.38,0.0,1.0);\n" +
-            "  vec3 ceilLow=vec3(0.035,0.050,0.075);\n" +
-            "  vec3 ceilHigh=mix(vec3(0.20,0.24,0.28),vec3(0.31,0.35,0.40),bright*0.45);\n" +
+            "  float ceilShade=clamp(nCeil*1.72-0.36,0.0,1.0);\n" +
+            "  vec3 ceilLow=vec3(0.032,0.046,0.070);\n" +
+            "  vec3 ceilHigh=mix(vec3(0.18,0.22,0.27),vec3(0.29,0.33,0.39),bright*0.43);\n" +
             "  vec3 ceilColor=mix(ceilLow,ceilHigh,ceilShade);\n" +
-            "  color=mix(color,ceilColor,clamp(ceiling*(0.60+uStorm*0.26),0.0,0.91));\n" +
+            "  float ceilingAlpha=clamp(ceiling*(0.56+uStorm*0.28),0.0,0.90);\n" +
+            "  color=mix(color,ceilColor,ceilingAlpha);\n" +
 
-            "  float cloudTotal=1.0-(1.0-farCloud*0.30)*(1.0-midCloud*0.62)*(1.0-nearCloud*0.80)*(1.0-ceiling*0.88);\n" +
+            "  color+=vec3(1.0,0.94,0.78)*silver*0.20;\n" +
+            "  float internalShadow=clamp((nearCloud*nearAlpha+midCloud*midAlpha)*stormShade*0.07,0.0,0.065);\n" +
+            "  color*=1.0-internalShadow;\n" +
+
+            "  float cloudTotal=1.0-(1.0-farCloud*0.28)*(1.0-midCloud*0.60)*(1.0-nearCloud*0.79)*(1.0-ceiling*0.88);\n" +
             "  cloudTotal=clamp(cloudTotal,0.0,1.0);\n" +
 
             "  vec2 sp=(p-uSunPos)*vec2(aspect,1.0); float sd=length(sp);\n" +
-            "  float sunObscure=1.0-cloudTotal*0.90;\n" +
+            "  float sunObscure=clamp(1.0-cloudTotal*0.90,0.03,1.0);\n" +
             "  float sunGlow=exp(-sd*22.0)*uSunVis*sunObscure;\n" +
             "  float sunDisc=1.0-smoothstep(0.028,0.033,sd);\n" +
             "  color+=vec3(1.0,0.72,0.25)*sunGlow*0.82;\n" +
@@ -227,7 +254,7 @@ public final class HeroGlCloudSceneRenderer {
             "    float lit=smoothstep(-0.035,0.055,incident);\n" +
             "    float earth=0.016+0.030*(1.0-uSceneLight);\n" +
             "    float lunar=earth+lit*(0.98-earth)*(0.58+0.42*max(0.0,incident));\n" +
-            "    float limb=smoothstep(1.0,0.88,sqrt(m2));\n" +
+            "    float limb=1.0-smoothstep(0.88,1.0,sqrt(m2));\n" +
             "    float crater=0.88+0.12*noise(ml*5.8+vec2(3.7,1.9));\n" +
             "    float ma=uMoonVis*(1.0-cloudTotal*0.86)*limb;\n" +
             "    vec3 moonCol=vec3(0.86,0.89,0.94)*lunar*crater;\n" +
