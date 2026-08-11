@@ -11,15 +11,13 @@ import android.view.SurfaceHolder;
 
 import androidx.annotation.NonNull;
 
+import com.tridev.liveweather.data.local.AirQualityCache;
 import com.tridev.liveweather.data.local.WallpaperPreferences;
 import com.tridev.liveweather.data.local.WeatherCache;
+import com.tridev.liveweather.ui.scene.AirHazeOverlayRenderer;
 import com.tridev.liveweather.ui.scene.NatureSceneRenderer;
 import com.tridev.liveweather.worker.WallpaperWeatherScheduler;
 
-/**
- * Real Android live wallpaper that shares the exact procedural nature renderer
- * used by the in-app preview.
- */
 public final class LiveWeatherWallpaperService extends WallpaperService {
 
     @Override
@@ -36,21 +34,22 @@ public final class LiveWeatherWallpaperService extends WallpaperService {
 
         private final Handler handler = new Handler(Looper.getMainLooper());
         private final NatureSceneRenderer renderer = new NatureSceneRenderer();
+        private final AirHazeOverlayRenderer airHazeRenderer = new AirHazeOverlayRenderer();
         private final WeatherCache weatherCache = new WeatherCache(LiveWeatherWallpaperService.this);
+        private final AirQualityCache airQualityCache = new AirQualityCache(LiveWeatherWallpaperService.this);
         private final WallpaperPreferences preferences = new WallpaperPreferences(LiveWeatherWallpaperService.this);
 
         private boolean visible;
         private boolean surfaceReady;
         private long lastCacheReload;
-        private long loadedSavedAt = Long.MIN_VALUE;
+        private long loadedWeatherSavedAt = Long.MIN_VALUE;
+        private long loadedAirSavedAt = Long.MIN_VALUE;
         private WallpaperPreferences.Options options = preferences.load();
 
         private final Runnable drawRunnable = new Runnable() {
             @Override
             public void run() {
-                if (!visible || !surfaceReady) {
-                    return;
-                }
+                if (!visible || !surfaceReady) return;
                 drawFrame();
                 handler.postDelayed(this, frameIntervalMillis());
             }
@@ -78,12 +77,7 @@ public final class LiveWeatherWallpaperService extends WallpaperService {
         }
 
         @Override
-        public void onSurfaceChanged(
-                @NonNull SurfaceHolder holder,
-                int format,
-                int width,
-                int height
-        ) {
+        public void onSurfaceChanged(@NonNull SurfaceHolder holder, int format, int width, int height) {
             super.onSurfaceChanged(holder, format, width, height);
             surfaceReady = true;
             if (visible) {
@@ -109,9 +103,7 @@ public final class LiveWeatherWallpaperService extends WallpaperService {
                 int yPixelOffset
         ) {
             renderer.setParallaxOffset(xOffset);
-            if (visible) {
-                drawFrame();
-            }
+            if (visible) drawFrame();
         }
 
         @Override
@@ -123,27 +115,20 @@ public final class LiveWeatherWallpaperService extends WallpaperService {
         private void drawFrame() {
             long now = System.currentTimeMillis();
             reloadCache(false);
-
             SurfaceHolder holder = getSurfaceHolder();
             Canvas canvas = null;
             try {
                 canvas = holder.lockCanvas();
                 if (canvas != null) {
-                    renderer.draw(
-                            canvas,
-                            canvas.getWidth(),
-                            canvas.getHeight(),
-                            now
-                    );
+                    renderer.draw(canvas, canvas.getWidth(), canvas.getHeight(), now);
+                    airHazeRenderer.draw(canvas, canvas.getWidth(), canvas.getHeight());
                 }
             } catch (RuntimeException ignored) {
-                // A transient surface loss should not terminate the wallpaper service.
             } finally {
                 if (canvas != null) {
                     try {
                         holder.unlockCanvasAndPost(canvas);
                     } catch (RuntimeException ignored) {
-                        // Surface may have been destroyed between lock and post.
                     }
                 }
             }
@@ -151,35 +136,37 @@ public final class LiveWeatherWallpaperService extends WallpaperService {
 
         private void reloadCache(boolean force) {
             long now = System.currentTimeMillis();
-            if (!force && now - lastCacheReload < CACHE_RELOAD_MILLIS) {
-                return;
-            }
+            if (!force && now - lastCacheReload < CACHE_RELOAD_MILLIS) return;
             lastCacheReload = now;
 
             options = preferences.load();
             renderer.setOptions(options);
 
-            WeatherCache.CachedWeather cached = weatherCache.load();
-            if (cached == null) {
+            WeatherCache.CachedWeather weather = weatherCache.load();
+            if (weather == null) {
                 renderer.clearWeatherData();
-                loadedSavedAt = Long.MIN_VALUE;
-                return;
+                loadedWeatherSavedAt = Long.MIN_VALUE;
+            } else if (force || weather.getSavedAt() != loadedWeatherSavedAt) {
+                loadedWeatherSavedAt = weather.getSavedAt();
+                renderer.setWeatherData(
+                        weather.getWeather(),
+                        weather.getLatitude(),
+                        weather.getLongitude()
+                );
             }
-            if (!force && cached.getSavedAt() == loadedSavedAt) {
-                return;
+
+            AirQualityCache.CachedAirQuality air = airQualityCache.load();
+            if (air == null) {
+                airHazeRenderer.setAirQuality(null);
+                loadedAirSavedAt = Long.MIN_VALUE;
+            } else if (force || air.getSavedAt() != loadedAirSavedAt) {
+                loadedAirSavedAt = air.getSavedAt();
+                airHazeRenderer.setAirQuality(air.getResponse());
             }
-            loadedSavedAt = cached.getSavedAt();
-            renderer.setWeatherData(
-                    cached.getWeather(),
-                    cached.getLatitude(),
-                    cached.getLongitude()
-            );
         }
 
         private long frameIntervalMillis() {
-            if (!options.isBatteryAdaptive()) {
-                return NORMAL_FRAME_MILLIS;
-            }
+            if (!options.isBatteryAdaptive()) return NORMAL_FRAME_MILLIS;
 
             PowerManager powerManager = (PowerManager) getSystemService(Context.POWER_SERVICE);
             if (powerManager != null && powerManager.isPowerSaveMode()) {
@@ -189,9 +176,7 @@ public final class LiveWeatherWallpaperService extends WallpaperService {
             BatteryManager batteryManager = (BatteryManager) getSystemService(Context.BATTERY_SERVICE);
             if (batteryManager != null) {
                 int capacity = batteryManager.getIntProperty(BatteryManager.BATTERY_PROPERTY_CAPACITY);
-                if (capacity >= 0 && capacity <= 20) {
-                    return ADAPTIVE_FRAME_MILLIS;
-                }
+                if (capacity >= 0 && capacity <= 20) return ADAPTIVE_FRAME_MILLIS;
             }
             return NORMAL_FRAME_MILLIS;
         }
