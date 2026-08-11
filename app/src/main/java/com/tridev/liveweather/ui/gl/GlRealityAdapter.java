@@ -39,23 +39,7 @@ public final class GlRealityAdapter {
                 epochMillis
         );
         SkyRealityState sky = state.getSky();
-
-        float[] top = new float[3];
-        float[] mid = new float[3];
-        float[] horizon = new float[3];
-        skyPalette(sky.getSkyStage(), top, mid, horizon);
-
-        float weatherDarkening = clamp01((float) (
-                state.getCloudCover() * 0.28d
-                        + state.getStormIntensity() * 0.46d
-                        + state.getFogIntensity() * 0.11d
-                        + state.getRainIntensity() * 0.09d
-                        + state.getAirHazeIntensity() * 0.08d
-        ));
-        float lightFactor = Math.max(0.28f, 1f - weatherDarkening);
-        scale(top, lightFactor);
-        scale(mid, Math.min(1f, lightFactor + 0.05f));
-        scale(horizon, Math.min(1f, lightFactor + 0.16f));
+        SkyGradientProfile skyProfile = SkyGradientProfile.resolve(state);
 
         float parallax = clamp(parallaxOffset, 0f, 1f);
         float sunX = celestialX(sky.getSunAzimuth(), parallax);
@@ -64,9 +48,15 @@ public final class GlRealityAdapter {
         float moonY = celestialY(sky.getMoonAltitude());
 
         return new GlSceneSnapshot(
-                top[0], top[1], top[2],
-                mid[0], mid[1], mid[2],
-                horizon[0], horizon[1], horizon[2],
+                skyProfile.topR,
+                skyProfile.topG,
+                skyProfile.topB,
+                skyProfile.midR,
+                skyProfile.midG,
+                skyProfile.midB,
+                skyProfile.horizonR,
+                skyProfile.horizonG,
+                skyProfile.horizonB,
                 sunX,
                 sunY,
                 clamp01((float) state.getSunVisibility()),
@@ -106,52 +96,6 @@ public final class GlRealityAdapter {
         // normalized top-origin coordinates for the fragment shader.
         double normalized = clamp(altitude, -7d, 90d);
         return (float) (0.86d - ((normalized + 7d) / 97d) * 0.77d);
-    }
-
-    private static void skyPalette(
-            @Nullable String stage,
-            float[] top,
-            float[] mid,
-            float[] horizon
-    ) {
-        String value = stage == null ? "" : stage;
-        if (value.contains("Daylight")) {
-            rgb(top, 45, 115, 183);
-            rgb(mid, 91, 157, 207);
-            rgb(horizon, 174, 204, 219);
-        } else if (value.contains("Golden")) {
-            rgb(top, 47, 73, 127);
-            rgb(mid, 150, 100, 105);
-            rgb(horizon, 238, 151, 82);
-        } else if (value.contains("Civil")) {
-            rgb(top, 35, 48, 100);
-            rgb(mid, 91, 66, 121);
-            rgb(horizon, 175, 92, 110);
-        } else if (value.contains("Nautical")) {
-            rgb(top, 17, 31, 70);
-            rgb(mid, 36, 46, 82);
-            rgb(horizon, 69, 64, 100);
-        } else if (value.contains("Astronomical twilight")) {
-            rgb(top, 8, 18, 45);
-            rgb(mid, 19, 29, 59);
-            rgb(horizon, 42, 43, 72);
-        } else {
-            rgb(top, 3, 9, 24);
-            rgb(mid, 8, 17, 37);
-            rgb(horizon, 15, 27, 50);
-        }
-    }
-
-    private static void rgb(float[] target, int r, int g, int b) {
-        target[0] = r / 255f;
-        target[1] = g / 255f;
-        target[2] = b / 255f;
-    }
-
-    private static void scale(float[] color, float factor) {
-        color[0] = clamp01(color[0] * factor);
-        color[1] = clamp01(color[1] * factor);
-        color[2] = clamp01(color[2] * factor);
     }
 
     private static double normalizeDegrees(double degrees) {
