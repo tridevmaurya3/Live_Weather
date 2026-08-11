@@ -1,144 +1,247 @@
 <?xml version="1.0" encoding="utf-8"?>
-<androidx.core.widget.NestedScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:clipToPadding="false"
-    android:fillViewport="true"
-    android:overScrollMode="never">
+    android:orientation="vertical"
+    android:paddingStart="@dimen/space_16"
+    android:paddingTop="@dimen/space_12"
+    android:paddingEnd="@dimen/space_16"
+    android:paddingBottom="@dimen/space_12">
+
+    <TextView
+        style="@style/TextAppearance.LiveWeather.Title"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Live Weather Radar" />
+
+    <TextView
+        style="@style/TextAppearance.LiveWeather.Body"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="@dimen/space_4"
+        android:text="Observed precipitation radar + current cloud, wind and temperature field" />
 
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:orientation="vertical"
-        android:paddingStart="@dimen/space_16"
-        android:paddingTop="@dimen/space_16"
-        android:paddingEnd="@dimen/space_16"
-        android:paddingBottom="@dimen/space_24">
-
-        <TextView
-            style="@style/TextAppearance.LiveWeather.Title"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="@string/radar_title" />
-
-        <TextView
-            style="@style/TextAppearance.LiveWeather.Body"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="@dimen/space_4"
-            android:text="@string/radar_subtitle" />
+        android:layout_marginTop="@dimen/space_10"
+        android:background="@drawable/bg_weather_card_compact"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:padding="@dimen/space_12">
 
         <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="330dp"
-            android:layout_marginTop="@dimen/space_16"
-            android:background="@drawable/bg_weather_radar_preview"
-            android:gravity="center"
-            android:orientation="vertical"
-            android:padding="@dimen/space_20">
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:orientation="vertical">
 
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:letterSpacing="0.12"
-                android:text="@string/radar_map_label"
+                android:letterSpacing="0.10"
+                android:text="ACTIVE MAP LOCATION"
                 android:textColor="@color/weather_aqua"
                 android:textSize="@dimen/text_caption"
                 android:textStyle="bold" />
 
             <TextView
+                android:id="@+id/radarLocationValue"
                 style="@style/TextAppearance.LiveWeather.BodyLarge"
-                android:layout_width="260dp"
+                android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="@dimen/space_12"
-                android:gravity="center"
-                android:text="@string/radar_map_waiting"
-                android:textAlignment="center" />
+                android:layout_marginTop="2dp"
+                android:text="Waiting for location…" />
+
+            <TextView
+                android:id="@+id/radarStatusValue"
+                style="@style/TextAppearance.LiveWeather.Caption"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="2dp"
+                android:text="Waiting for radar sync…" />
         </LinearLayout>
 
-        <HorizontalScrollView
+        <TextView
+            android:id="@+id/radarRefreshButton"
+            android:layout_width="wrap_content"
+            android:layout_height="40dp"
+            android:background="@drawable/bg_weather_chip"
+            android:gravity="center"
+            android:minWidth="72dp"
+            android:paddingStart="@dimen/space_12"
+            android:paddingEnd="@dimen/space_12"
+            android:text="Refresh"
+            android:textColor="@color/weather_text_primary"
+            android:textSize="@dimen/text_body"
+            android:textStyle="bold" />
+    </LinearLayout>
+
+    <FrameLayout
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_marginTop="@dimen/space_10"
+        android:layout_weight="1"
+        android:background="@drawable/bg_weather_radar_preview"
+        android:clipToOutline="true"
+        android:minHeight="260dp">
+
+        <WebView
+            android:id="@+id/radarMapWebView"
             android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:background="@android:color/transparent"
+            android:overScrollMode="never" />
+
+        <TextView
+            android:id="@+id/radarRecenterButton"
+            android:layout_width="wrap_content"
+            android:layout_height="40dp"
+            android:layout_gravity="top|end"
+            android:layout_margin="@dimen/space_10"
+            android:background="@drawable/bg_weather_chip"
+            android:gravity="center"
+            android:minWidth="82dp"
+            android:paddingStart="@dimen/space_12"
+            android:paddingEnd="@dimen/space_12"
+            android:text="Recenter"
+            android:textColor="@color/weather_text_primary"
+            android:textSize="@dimen/text_body"
+            android:textStyle="bold" />
+    </FrameLayout>
+
+    <HorizontalScrollView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="@dimen/space_10"
+        android:overScrollMode="never"
+        android:scrollbars="none">
+
+        <LinearLayout
+            android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginTop="@dimen/space_12"
-            android:overScrollMode="never"
-            android:scrollbars="none">
+            android:orientation="horizontal">
 
-            <LinearLayout
+            <TextView
+                android:id="@+id/radarLayerRain"
                 android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:orientation="horizontal">
+                android:layout_height="40dp"
+                android:background="@drawable/bg_weather_chip"
+                android:gravity="center"
+                android:minWidth="86dp"
+                android:paddingStart="@dimen/space_12"
+                android:paddingEnd="@dimen/space_12"
+                android:text="Radar Rain"
+                android:textColor="@color/weather_text_primary"
+                android:textSize="@dimen/text_body"
+                android:textStyle="bold" />
 
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="40dp"
-                    android:background="@drawable/bg_weather_chip"
-                    android:gravity="center"
-                    android:text="@string/radar_layer_rain"
-                    android:textColor="@color/weather_text_primary"
-                    android:textSize="@dimen/text_body" />
+            <TextView
+                android:id="@+id/radarLayerClouds"
+                android:layout_width="wrap_content"
+                android:layout_height="40dp"
+                android:layout_marginStart="@dimen/space_8"
+                android:background="@drawable/bg_weather_chip"
+                android:gravity="center"
+                android:minWidth="76dp"
+                android:paddingStart="@dimen/space_12"
+                android:paddingEnd="@dimen/space_12"
+                android:text="Clouds"
+                android:textColor="@color/weather_text_primary"
+                android:textSize="@dimen/text_body" />
 
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="40dp"
-                    android:layout_marginStart="@dimen/space_8"
-                    android:background="@drawable/bg_weather_chip"
-                    android:gravity="center"
-                    android:text="@string/radar_layer_clouds"
-                    android:textColor="@color/weather_text_secondary"
-                    android:textSize="@dimen/text_body" />
+            <TextView
+                android:id="@+id/radarLayerWind"
+                android:layout_width="wrap_content"
+                android:layout_height="40dp"
+                android:layout_marginStart="@dimen/space_8"
+                android:background="@drawable/bg_weather_chip"
+                android:gravity="center"
+                android:minWidth="72dp"
+                android:paddingStart="@dimen/space_12"
+                android:paddingEnd="@dimen/space_12"
+                android:text="Wind"
+                android:textColor="@color/weather_text_primary"
+                android:textSize="@dimen/text_body" />
 
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="40dp"
-                    android:layout_marginStart="@dimen/space_8"
-                    android:background="@drawable/bg_weather_chip"
-                    android:gravity="center"
-                    android:text="@string/radar_layer_temp"
-                    android:textColor="@color/weather_text_secondary"
-                    android:textSize="@dimen/text_body" />
+            <TextView
+                android:id="@+id/radarLayerTemp"
+                android:layout_width="wrap_content"
+                android:layout_height="40dp"
+                android:layout_marginStart="@dimen/space_8"
+                android:background="@drawable/bg_weather_chip"
+                android:gravity="center"
+                android:minWidth="104dp"
+                android:paddingStart="@dimen/space_12"
+                android:paddingEnd="@dimen/space_12"
+                android:text="Temperature"
+                android:textColor="@color/weather_text_primary"
+                android:textSize="@dimen/text_body" />
+        </LinearLayout>
+    </HorizontalScrollView>
 
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="40dp"
-                    android:layout_marginStart="@dimen/space_8"
-                    android:background="@drawable/bg_weather_chip"
-                    android:gravity="center"
-                    android:text="@string/radar_layer_wind"
-                    android:textColor="@color/weather_text_secondary"
-                    android:textSize="@dimen/text_body" />
-            </LinearLayout>
-        </HorizontalScrollView>
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="@dimen/space_10"
+        android:background="@drawable/bg_weather_card_compact"
+        android:gravity="center_vertical"
+        android:orientation="vertical"
+        android:padding="@dimen/space_12">
 
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="@dimen/space_12"
-            android:background="@drawable/bg_weather_card_compact"
-            android:orientation="vertical"
-            android:padding="@dimen/space_16">
+            android:gravity="center_vertical"
+            android:orientation="horizontal">
 
             <TextView
-                style="@style/TextAppearance.LiveWeather.Section"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:text="@string/radar_timeline_title" />
+                android:id="@+id/radarPlayButton"
+                android:layout_width="72dp"
+                android:layout_height="38dp"
+                android:background="@drawable/bg_weather_chip"
+                android:gravity="center"
+                android:text="Play"
+                android:textColor="@color/weather_text_primary"
+                android:textSize="@dimen/text_body"
+                android:textStyle="bold" />
 
             <TextView
-                style="@style/TextAppearance.LiveWeather.Body"
-                android:layout_width="match_parent"
+                android:layout_width="0dp"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="@dimen/space_8"
-                android:text="@string/radar_timeline_waiting" />
+                android:layout_marginStart="@dimen/space_10"
+                android:layout_weight="1"
+                android:text="Observed radar timeline · past 2 hours"
+                android:textColor="@color/weather_text_secondary"
+                android:textSize="@dimen/text_caption" />
+
+            <TextView
+                android:id="@+id/radarFrameTimeValue"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="--:-- UTC"
+                android:textColor="@color/weather_aqua"
+                android:textSize="@dimen/text_caption"
+                android:textStyle="bold" />
         </LinearLayout>
 
-        <TextView
-            style="@style/TextAppearance.LiveWeather.Caption"
-            android:layout_width="wrap_content"
+        <SeekBar
+            android:id="@+id/radarTimelineSeek"
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_gravity="center_horizontal"
-            android:layout_marginTop="@dimen/space_16"
-            android:text="@string/status_phase_one"
-            android:textColor="@color/weather_sky_blue" />
-
+            android:layout_marginTop="@dimen/space_4"
+            android:max="0"
+            android:progress="0" />
     </LinearLayout>
-</androidx.core.widget.NestedScrollView>
+
+    <TextView
+        android:id="@+id/radarSourceValue"
+        style="@style/TextAppearance.LiveWeather.Caption"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="@dimen/space_8"
+        android:gravity="center_horizontal"
+        android:text="RainViewer radar • Open-Meteo model overlays • OpenStreetMap base"
+        android:textAlignment="center" />
+
+</LinearLayout>
