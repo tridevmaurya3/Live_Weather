@@ -45,7 +45,11 @@ public final class Phase8Renderer {
         LinearLayout homeRoot = (LinearLayout) hero.getParent();
         homeAlertCard = card(true);
         int heroIndex = homeRoot.indexOfChild(hero);
-        homeRoot.addView(homeAlertCard, Math.min(heroIndex + 1, homeRoot.getChildCount()));
+        homeRoot.addView(
+                homeAlertCard,
+                Math.min(heroIndex + 1, homeRoot.getChildCount()),
+                top(-1, -2, 8)
+        );
         homeAlertCard.setVisibility(View.GONE);
 
         homeAlertBadge = captionAccent("WEATHER ALERT");
@@ -64,7 +68,11 @@ public final class Phase8Renderer {
         LinearLayout moreRoot = (LinearLayout) cityCard.getParent();
         alertsSection = card(true);
         int cityIndex = moreRoot.indexOfChild(cityCard);
-        moreRoot.addView(alertsSection, Math.min(cityIndex + 1, moreRoot.getChildCount()));
+        moreRoot.addView(
+                alertsSection,
+                Math.min(cityIndex + 1, moreRoot.getChildCount()),
+                top(-1, -2, 10)
+        );
 
         alertsSection.addView(section("Weather Alerts Center"));
         alertsSection.addView(caption(
@@ -78,7 +86,7 @@ public final class Phase8Renderer {
 
         LinearLayout actions = new LinearLayout(activity);
         actions.setOrientation(LinearLayout.HORIZONTAL);
-        notificationsAction = actionChip("Enable notifications");
+        notificationsAction = actionChip("Enable alerts");
         TextView refresh = actionChip("Refresh alerts");
         actions.addView(notificationsAction, weight(1f, 0, 4));
         actions.addView(refresh, weight(1f, 4, 0));
@@ -110,13 +118,9 @@ public final class Phase8Renderer {
     }
 
     public void setNotificationsEnabled(boolean enabled, boolean permissionGranted) {
-        if (enabled && permissionGranted) {
-            notificationsAction.setText("Notifications On · tap to disable");
-        } else if (!permissionGranted) {
-            notificationsAction.setText("Enable notifications");
-        } else {
-            notificationsAction.setText("Enable notifications");
-        }
+        notificationsAction.setText(enabled && permissionGranted
+                ? "Alerts: On"
+                : "Enable alerts");
     }
 
     public void render(@NonNull AlertUiState state) {
@@ -277,6 +281,7 @@ public final class Phase8Renderer {
         view.setGravity(Gravity.CENTER);
         view.setBackgroundResource(R.drawable.bg_weather_chip);
         view.setMinHeight(dp(44));
+        view.setMaxLines(1);
         view.setPadding(dp(8), dp(7), dp(8), dp(7));
         view.setClickable(true);
         view.setFocusable(true);
