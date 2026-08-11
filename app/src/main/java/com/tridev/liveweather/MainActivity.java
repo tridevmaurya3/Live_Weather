@@ -28,8 +28,10 @@ import com.tridev.liveweather.core.location.PlaceNameResolver;
 import com.tridev.liveweather.data.local.WallpaperPreferences;
 import com.tridev.liveweather.domain.CityLocation;
 import com.tridev.liveweather.domain.WeatherUiState;
+import com.tridev.liveweather.ui.air.AirQualityViewModel;
 import com.tridev.liveweather.ui.city.CityScreenRenderer;
 import com.tridev.liveweather.ui.city.CityViewModel;
+import com.tridev.liveweather.ui.phase7.Phase7Renderer;
 import com.tridev.liveweather.ui.sky.LiveSkyView;
 import com.tridev.liveweather.ui.weather.Phase6Renderer;
 import com.tridev.liveweather.ui.weather.WeatherFormatter;
@@ -43,8 +45,7 @@ import java.util.Map;
 public class MainActivity extends AppCompatActivity {
 
     private static final String STATE_SELECTED_DESTINATION = "selected_destination";
-    private static final String PREF_LOCATION_PERMISSION_REQUESTED =
-            "location_permission_requested";
+    private static final String PREF_LOCATION_PERMISSION_REQUESTED = "location_permission_requested";
 
     private View pageContainer;
     private View pageHome;
@@ -57,13 +58,17 @@ public class MainActivity extends AppCompatActivity {
     private TextView homeSyncStatus;
     private TextView forecastStatus;
     private LiveSkyView appLiveNatureBackground;
+    private LiveSkyView forecastLiveSkyView;
+    private LiveSkyView wallpaperLiveSkyView;
 
     private DeviceLocationManager deviceLocationManager;
     private PlaceNameResolver placeNameResolver;
     private ActivityResultLauncher<String[]> locationPermissionLauncher;
     private WeatherViewModel weatherViewModel;
+    private AirQualityViewModel airQualityViewModel;
     private WeatherScreenRenderer weatherScreenRenderer;
     private Phase6Renderer phase6Renderer;
+    private Phase7Renderer phase7Renderer;
     private CityViewModel cityViewModel;
     private CityScreenRenderer cityScreenRenderer;
     private WallpaperPreferences wallpaperPreferences;
@@ -86,12 +91,14 @@ public class MainActivity extends AppCompatActivity {
         bindViews();
         weatherScreenRenderer = new WeatherScreenRenderer(this);
         phase6Renderer = new Phase6Renderer(this);
+        phase7Renderer = new Phase7Renderer(this);
         cityScreenRenderer = new CityScreenRenderer(this);
 
         applySystemInsets();
         setupBottomNavigation(savedInstanceState);
         setupQuickActions();
         setupWallpaperEngine();
+        setupAirQualityEngine();
         setupWeatherEngine();
         setupCityEngine();
         setupLocationEngine();
@@ -107,18 +114,10 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void handleLocationPermissionResult(Map<String, Boolean> result) {
-        boolean fineGranted = Boolean.TRUE.equals(
-                result.get(Manifest.permission.ACCESS_FINE_LOCATION)
-        );
-        boolean coarseGranted = Boolean.TRUE.equals(
-                result.get(Manifest.permission.ACCESS_COARSE_LOCATION)
-        );
-
-        if (fineGranted || coarseGranted) {
-            requestCurrentLocation(false);
-        } else {
-            showLocationPermissionNeeded();
-        }
+        boolean fineGranted = Boolean.TRUE.equals(result.get(Manifest.permission.ACCESS_FINE_LOCATION));
+        boolean coarseGranted = Boolean.TRUE.equals(result.get(Manifest.permission.ACCESS_COARSE_LOCATION));
+        if (fineGranted || coarseGranted) requestCurrentLocation(false);
+        else showLocationPermissionNeeded();
     }
 
     private void bindViews() {
@@ -133,27 +132,16 @@ public class MainActivity extends AppCompatActivity {
         homeSyncStatus = findViewById(R.id.homeSyncStatus);
         forecastStatus = findViewById(R.id.forecastStatus);
         appLiveNatureBackground = findViewById(R.id.appLiveNatureBackground);
+        forecastLiveSkyView = findViewById(R.id.forecastLiveSkyView);
+        wallpaperLiveSkyView = findViewById(R.id.wallpaperLiveSkyView);
     }
 
     private void applySystemInsets() {
         View root = findViewById(R.id.main);
         ViewCompat.setOnApplyWindowInsetsListener(root, (view, insets) -> {
             Insets systemBars = insets.getInsets(WindowInsetsCompat.Type.systemBars());
-
-            pageContainer.setPadding(
-                    systemBars.left,
-                    systemBars.top,
-                    systemBars.right,
-                    0
-            );
-
-            bottomNavigation.setPadding(
-                    systemBars.left,
-                    0,
-                    systemBars.right,
-                    systemBars.bottom
-            );
-
+            pageContainer.setPadding(systemBars.left, systemBars.top, systemBars.right, 0);
+            bottomNavigation.setPadding(systemBars.left, 0, systemBars.right, systemBars.bottom);
             return insets;
         });
     }
@@ -163,15 +151,10 @@ public class MainActivity extends AppCompatActivity {
             renderDestination(item.getItemId());
             return true;
         });
-
         int destinationId = R.id.nav_home;
         if (savedInstanceState != null) {
-            destinationId = savedInstanceState.getInt(
-                    STATE_SELECTED_DESTINATION,
-                    R.id.nav_home
-            );
+            destinationId = savedInstanceState.getInt(STATE_SELECTED_DESTINATION, R.id.nav_home);
         }
-
         bottomNavigation.setSelectedItemId(destinationId);
         renderDestination(destinationId);
     }
@@ -179,14 +162,23 @@ public class MainActivity extends AppCompatActivity {
     private void setupQuickActions() {
         bindNavigationAction(R.id.homeForecastAction, R.id.nav_forecast);
         bindNavigationAction(R.id.homeRadarAction, R.id.nav_radar);
-        bindNavigationAction(R.id.homeAirAction, R.id.nav_more);
         bindNavigationAction(R.id.homeWallpaperAction, R.id.nav_wallpaper);
+
+        View airAction = findViewById(R.id.homeAirAction);
+        if (airAction != null) {
+            airAction.setOnClickListener(view -> {
+                performLightHaptic(view);
+                bottomNavigation.setSelectedItemId(R.id.nav_more);
+                phase7Renderer.scrollToAirQuality();
+            });
+        }
 
         View refreshAction = findViewById(R.id.homeRefreshAction);
         if (refreshAction != null) {
             refreshAction.setOnClickListener(view -> {
                 performLightHaptic(view);
                 refreshWeatherManually();
+                refreshAirQualityManually();
             });
         }
     }
@@ -199,7 +191,7 @@ public class MainActivity extends AppCompatActivity {
         SwitchCompat fog = findViewById(R.id.switchFog);
         SwitchCompat stars = findViewById(R.id.switchStars);
         SwitchCompat batteryAdaptive = findViewById(R.id.switchBatteryAdaptive);
-        LiveSkyView preview = findViewById(R.id.wallpaperLiveSkyView);
+        LiveSkyView preview = wallpaperLiveSkyView;
 
         WallpaperPreferences.Options saved = wallpaperPreferences.load();
         rain.setChecked(saved.isRain());
@@ -214,13 +206,8 @@ public class MainActivity extends AppCompatActivity {
 
         android.widget.CompoundButton.OnCheckedChangeListener listener = (button, checked) -> {
             WallpaperPreferences.Options updated = new WallpaperPreferences.Options(
-                    rain.isChecked(),
-                    clouds.isChecked(),
-                    lightning.isChecked(),
-                    snow.isChecked(),
-                    fog.isChecked(),
-                    stars.isChecked(),
-                    batteryAdaptive.isChecked()
+                    rain.isChecked(), clouds.isChecked(), lightning.isChecked(),
+                    snow.isChecked(), fog.isChecked(), stars.isChecked(), batteryAdaptive.isChecked()
             );
             wallpaperPreferences.save(updated);
             preview.setRenderOptions(updated);
@@ -242,17 +229,28 @@ public class MainActivity extends AppCompatActivity {
         });
     }
 
-    private void openLiveWallpaperPreview() {
-        ComponentName component = new ComponentName(
-                this,
-                LiveWeatherWallpaperService.class
-        );
-        Intent previewIntent = new Intent(WallpaperManager.ACTION_CHANGE_LIVE_WALLPAPER);
-        previewIntent.putExtra(
-                WallpaperManager.EXTRA_LIVE_WALLPAPER_COMPONENT,
-                component
-        );
+    private void setupAirQualityEngine() {
+        airQualityViewModel = new ViewModelProvider(this).get(AirQualityViewModel.class);
+        phase7Renderer.setRefreshAirQualityAction(this::refreshAirQualityManually);
+        airQualityViewModel.getState().observe(this, state -> {
+            if (state == null) return;
+            phase7Renderer.renderAirQuality(state);
+            if (state.hasData() && state.getData() != null) {
+                appLiveNatureBackground.setAirQualityData(state.getData());
+                forecastLiveSkyView.setAirQualityData(state.getData());
+                wallpaperLiveSkyView.setAirQualityData(state.getData());
+            } else {
+                appLiveNatureBackground.clearAirQualityData();
+                forecastLiveSkyView.clearAirQualityData();
+                wallpaperLiveSkyView.clearAirQualityData();
+            }
+        });
+    }
 
+    private void openLiveWallpaperPreview() {
+        ComponentName component = new ComponentName(this, LiveWeatherWallpaperService.class);
+        Intent previewIntent = new Intent(WallpaperManager.ACTION_CHANGE_LIVE_WALLPAPER);
+        previewIntent.putExtra(WallpaperManager.EXTRA_LIVE_WALLPAPER_COMPONENT, component);
         try {
             startActivity(previewIntent);
         } catch (ActivityNotFoundException exception) {
@@ -260,16 +258,13 @@ public class MainActivity extends AppCompatActivity {
             try {
                 startActivity(chooserIntent);
             } catch (ActivityNotFoundException ignored) {
-                // Device does not expose a live-wallpaper picker.
             }
         }
     }
 
     private void bindNavigationAction(int viewId, int destinationId) {
         View action = findViewById(viewId);
-        if (action == null) {
-            return;
-        }
+        if (action == null) return;
         action.setOnClickListener(view -> {
             performLightHaptic(view);
             bottomNavigation.setSelectedItemId(destinationId);
@@ -283,22 +278,18 @@ public class MainActivity extends AppCompatActivity {
     private void setupWeatherEngine() {
         weatherViewModel = new ViewModelProvider(this).get(WeatherViewModel.class);
         weatherViewModel.getWeatherState().observe(this, state -> {
-            if (state == null) {
-                return;
-            }
+            if (state == null) return;
 
             weatherScreenRenderer.render(state);
             phase6Renderer.render(state);
+            phase7Renderer.renderCelestial(state);
 
-            if (state.hasWeather()
-                    && state.getWeather() != null
-                    && !Double.isNaN(state.getLatitude())
-                    && !Double.isNaN(state.getLongitude())) {
+            if (state.hasWeather() && state.getWeather() != null
+                    && !Double.isNaN(state.getLatitude()) && !Double.isNaN(state.getLongitude())) {
                 appLiveNatureBackground.setWeatherData(
-                        state.getWeather(),
-                        state.getLatitude(),
-                        state.getLongitude()
+                        state.getWeather(), state.getLatitude(), state.getLongitude()
                 );
+                airQualityViewModel.refresh(state.getLatitude(), state.getLongitude(), false);
             } else {
                 appLiveNatureBackground.clearWeatherData();
             }
@@ -309,10 +300,7 @@ public class MainActivity extends AppCompatActivity {
                     && !Double.isNaN(state.getLatitude())
                     && !Double.isNaN(state.getLongitude())) {
                 homeLocationValue.setText(
-                        WeatherFormatter.savedCoordinates(
-                                state.getLatitude(),
-                                state.getLongitude()
-                        )
+                        WeatherFormatter.savedCoordinates(state.getLatitude(), state.getLongitude())
                 );
             }
         });
@@ -320,34 +308,25 @@ public class MainActivity extends AppCompatActivity {
         homeSyncStatus.setOnClickListener(view -> {
             performLightHaptic(view);
             refreshWeatherManually();
+            refreshAirQualityManually();
         });
         forecastStatus.setOnClickListener(view -> {
             performLightHaptic(view);
             refreshWeatherManually();
+            refreshAirQualityManually();
         });
     }
 
     private void setupCityEngine() {
         cityViewModel = new ViewModelProvider(this).get(CityViewModel.class);
         cityScreenRenderer.setCallbacks(new CityScreenRenderer.Callbacks() {
-            @Override
-            public void onSearch(String query) {
-                cityViewModel.searchCities(query);
-            }
-
-            @Override
-            public void onUseCity(CityLocation city) {
+            @Override public void onSearch(String query) { cityViewModel.searchCities(query); }
+            @Override public void onUseCity(CityLocation city) {
                 cityViewModel.selectCity(city);
                 activateCity(city, true, true);
             }
-
-            @Override
-            public void onSaveCity(CityLocation city) {
-                cityViewModel.saveCity(city);
-            }
-
-            @Override
-            public void onRemoveCity(CityLocation city) {
+            @Override public void onSaveCity(CityLocation city) { cityViewModel.saveCity(city); }
+            @Override public void onRemoveCity(CityLocation city) {
                 boolean wasSelected = cityViewModel.isSelected(city);
                 cityViewModel.removeCity(city);
                 if (wasSelected) {
@@ -355,18 +334,13 @@ public class MainActivity extends AppCompatActivity {
                     activateCurrentLocation();
                 }
             }
-
-            @Override
-            public void onUseCurrentLocation() {
+            @Override public void onUseCurrentLocation() {
                 cityViewModel.useCurrentLocation();
                 activateCurrentLocation();
             }
         });
-
         cityViewModel.getCityState().observe(this, state -> {
-            if (state != null) {
-                cityScreenRenderer.render(state);
-            }
+            if (state != null) cityScreenRenderer.render(state);
         });
     }
 
@@ -374,11 +348,8 @@ public class MainActivity extends AppCompatActivity {
         homeLocationValue.setOnClickListener(view -> {
             performLightHaptic(view);
             CityLocation selectedCity = cityViewModel.getSelectedCity();
-            if (selectedCity != null) {
-                bottomNavigation.setSelectedItemId(R.id.nav_more);
-            } else {
-                requestLocationAccess();
-            }
+            if (selectedCity != null) bottomNavigation.setSelectedItemId(R.id.nav_more);
+            else requestLocationAccess();
         });
 
         CityLocation selectedCity = cityViewModel.getSelectedCity();
@@ -386,7 +357,6 @@ public class MainActivity extends AppCompatActivity {
             activateCity(selectedCity, false, false);
             return;
         }
-
         if (deviceLocationManager.hasLocationPermission()) {
             requestCurrentLocation(false);
             return;
@@ -394,10 +364,8 @@ public class MainActivity extends AppCompatActivity {
 
         boolean permissionRequestedBefore = getPreferences(Context.MODE_PRIVATE)
                 .getBoolean(PREF_LOCATION_PERMISSION_REQUESTED, false);
-
         if (!permissionRequestedBefore) {
-            getPreferences(Context.MODE_PRIVATE)
-                    .edit()
+            getPreferences(Context.MODE_PRIVATE).edit()
                     .putBoolean(PREF_LOCATION_PERMISSION_REQUESTED, true)
                     .apply();
             requestLocationPermission();
@@ -406,19 +374,14 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
-    private void activateCity(
-            CityLocation city,
-            boolean force,
-            boolean navigateHome
-    ) {
+    private void activateCity(CityLocation city, boolean force, boolean navigateHome) {
         latestLatitude = city.getLatitude();
         latestLongitude = city.getLongitude();
         phase6Renderer.clearLocationAccuracy();
         homeLocationValue.setText(city.getDisplayName());
         weatherViewModel.refreshWeather(latestLatitude, latestLongitude, force);
-        if (navigateHome) {
-            bottomNavigation.setSelectedItemId(R.id.nav_home);
-        }
+        airQualityViewModel.refresh(latestLatitude, latestLongitude, force);
+        if (navigateHome) bottomNavigation.setSelectedItemId(R.id.nav_home);
     }
 
     private void activateCurrentLocation() {
@@ -429,11 +392,8 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void requestLocationAccess() {
-        if (deviceLocationManager.hasLocationPermission()) {
-            requestCurrentLocation(false);
-        } else {
-            requestLocationPermission();
-        }
+        if (deviceLocationManager.hasLocationPermission()) requestCurrentLocation(false);
+        else requestLocationPermission();
     }
 
     private void requestLocationPermission() {
@@ -444,75 +404,58 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void requestCurrentLocation(boolean forceWeatherRefresh) {
-        if (cityViewModel.getSelectedCity() != null) {
-            return;
-        }
+        if (cityViewModel.getSelectedCity() != null) return;
 
         homeLocationValue.setText(R.string.home_location_requesting);
-        if (!hasWeatherData()) {
-            homeSyncStatus.setText(R.string.home_sync_location_requesting);
-        }
+        if (!hasWeatherData()) homeSyncStatus.setText(R.string.home_sync_location_requesting);
 
-        deviceLocationManager.requestCurrentLocation(
-                new DeviceLocationManager.LocationCallback() {
-                    @Override
-                    public void onLocation(Location location) {
-                        latestLatitude = location.getLatitude();
-                        latestLongitude = location.getLongitude();
-                        double resolvedLatitude = latestLatitude;
-                        double resolvedLongitude = latestLongitude;
-                        float accuracy = location.hasAccuracy() ? location.getAccuracy() : Float.NaN;
-                        boolean precise = deviceLocationManager.hasFineLocationPermission();
+        deviceLocationManager.requestCurrentLocation(new DeviceLocationManager.LocationCallback() {
+            @Override
+            public void onLocation(Location location) {
+                latestLatitude = location.getLatitude();
+                latestLongitude = location.getLongitude();
+                double resolvedLatitude = latestLatitude;
+                double resolvedLongitude = latestLongitude;
+                float accuracy = location.hasAccuracy() ? location.getAccuracy() : Float.NaN;
+                boolean precise = deviceLocationManager.hasFineLocationPermission();
 
-                        runOnUiThread(() -> {
-                            if (cityViewModel.getSelectedCity() != null) {
-                                return;
-                            }
+                runOnUiThread(() -> {
+                    if (cityViewModel.getSelectedCity() != null) return;
+                    phase6Renderer.setLocationAccuracy(accuracy, precise);
+                    homeLocationValue.setText(
+                            WeatherFormatter.coordinates(resolvedLatitude, resolvedLongitude)
+                    );
+                    homeSyncStatus.setText(R.string.home_sync_location_ready);
+                    weatherViewModel.refreshWeather(
+                            resolvedLatitude, resolvedLongitude, forceWeatherRefresh
+                    );
+                    airQualityViewModel.refresh(
+                            resolvedLatitude, resolvedLongitude, forceWeatherRefresh
+                    );
+                });
 
-                            phase6Renderer.setLocationAccuracy(accuracy, precise);
-                            homeLocationValue.setText(
-                                    WeatherFormatter.coordinates(
-                                            resolvedLatitude,
-                                            resolvedLongitude
-                                    )
-                            );
-                            homeSyncStatus.setText(R.string.home_sync_location_ready);
-                            weatherViewModel.refreshWeather(
-                                    resolvedLatitude,
-                                    resolvedLongitude,
-                                    forceWeatherRefresh
-                            );
-                        });
+                placeNameResolver.resolve(
+                        resolvedLatitude,
+                        resolvedLongitude,
+                        label -> runOnUiThread(() -> {
+                            if (label == null || label.trim().isEmpty()) return;
+                            if (cityViewModel.getSelectedCity() != null) return;
+                            if (Math.abs(latestLatitude - resolvedLatitude) > 0.001d
+                                    || Math.abs(latestLongitude - resolvedLongitude) > 0.001d) return;
+                            homeLocationValue.setText(label);
+                        })
+                );
+            }
 
-                        placeNameResolver.resolve(
-                                resolvedLatitude,
-                                resolvedLongitude,
-                                label -> runOnUiThread(() -> {
-                                    if (label == null || label.trim().isEmpty()) {
-                                        return;
-                                    }
-                                    if (cityViewModel.getSelectedCity() != null) {
-                                        return;
-                                    }
-                                    if (Math.abs(latestLatitude - resolvedLatitude) > 0.001d
-                                            || Math.abs(latestLongitude - resolvedLongitude) > 0.001d) {
-                                        return;
-                                    }
-                                    homeLocationValue.setText(label);
-                                })
-                        );
-                    }
-
-                    @Override
-                    public void onError(
-                            DeviceLocationManager.LocationError error,
-                            String message,
-                            Throwable throwable
-                    ) {
-                        runOnUiThread(() -> renderLocationError(error));
-                    }
-                }
-        );
+            @Override
+            public void onError(
+                    DeviceLocationManager.LocationError error,
+                    String message,
+                    Throwable throwable
+            ) {
+                runOnUiThread(() -> renderLocationError(error));
+            }
+        });
     }
 
     private void refreshWeatherManually() {
@@ -523,57 +466,54 @@ public class MainActivity extends AppCompatActivity {
             weatherViewModel.refreshWeather(latestLatitude, latestLongitude, true);
             return;
         }
-
         if (deviceLocationManager.hasLocationPermission()) {
             requestCurrentLocation(true);
             return;
         }
-
         requestLocationPermission();
     }
 
-    private void renderLocationError(DeviceLocationManager.LocationError error) {
-        if (cityViewModel.getSelectedCity() != null) {
+    private void refreshAirQualityManually() {
+        CityLocation selectedCity = cityViewModel == null ? null : cityViewModel.getSelectedCity();
+        if (selectedCity != null) {
+            airQualityViewModel.refresh(selectedCity.getLatitude(), selectedCity.getLongitude(), true);
             return;
         }
+        if (!Double.isNaN(latestLatitude) && !Double.isNaN(latestLongitude)) {
+            airQualityViewModel.refresh(latestLatitude, latestLongitude, true);
+            return;
+        }
+        if (weatherViewModel != null) {
+            WeatherUiState state = weatherViewModel.getWeatherState().getValue();
+            if (state != null && !Double.isNaN(state.getLatitude()) && !Double.isNaN(state.getLongitude())) {
+                airQualityViewModel.refresh(state.getLatitude(), state.getLongitude(), true);
+            }
+        }
+    }
 
+    private void renderLocationError(DeviceLocationManager.LocationError error) {
+        if (cityViewModel.getSelectedCity() != null) return;
         if (error == DeviceLocationManager.LocationError.PERMISSION_REQUIRED) {
             showLocationPermissionNeeded();
             return;
         }
-
         if (error == DeviceLocationManager.LocationError.PLAY_SERVICES_UNAVAILABLE) {
-            homeLocationValue.setText(
-                    R.string.home_location_play_services_unavailable
-            );
-            if (!hasWeatherData()) {
-                homeSyncStatus.setText(
-                        R.string.home_sync_location_service_unavailable
-                );
-            }
+            homeLocationValue.setText(R.string.home_location_play_services_unavailable);
+            if (!hasWeatherData()) homeSyncStatus.setText(R.string.home_sync_location_service_unavailable);
             return;
         }
-
         homeLocationValue.setText(R.string.home_location_unavailable);
-        if (!hasWeatherData()) {
-            homeSyncStatus.setText(R.string.home_sync_location_unavailable);
-        }
+        if (!hasWeatherData()) homeSyncStatus.setText(R.string.home_sync_location_unavailable);
     }
 
     private void showLocationPermissionNeeded() {
-        if (cityViewModel.getSelectedCity() != null) {
-            return;
-        }
+        if (cityViewModel.getSelectedCity() != null) return;
         homeLocationValue.setText(R.string.home_location_permission_needed);
-        if (!hasWeatherData()) {
-            homeSyncStatus.setText(R.string.home_sync_location_permission_denied);
-        }
+        if (!hasWeatherData()) homeSyncStatus.setText(R.string.home_sync_location_permission_denied);
     }
 
     private boolean hasWeatherData() {
-        if (weatherViewModel == null) {
-            return false;
-        }
+        if (weatherViewModel == null) return false;
         WeatherUiState state = weatherViewModel.getWeatherState().getValue();
         return state != null && state.hasWeather();
     }
@@ -588,10 +528,7 @@ public class MainActivity extends AppCompatActivity {
 
     @Override
     protected void onSaveInstanceState(Bundle outState) {
-        outState.putInt(
-                STATE_SELECTED_DESTINATION,
-                bottomNavigation.getSelectedItemId()
-        );
+        outState.putInt(STATE_SELECTED_DESTINATION, bottomNavigation.getSelectedItemId());
         super.onSaveInstanceState(outState);
     }
 }
