@@ -6,17 +6,15 @@ import androidx.annotation.NonNull;
 import androidx.work.Worker;
 import androidx.work.WorkerParameters;
 
+import com.tridev.liveweather.data.local.AirQualityCache;
 import com.tridev.liveweather.data.local.WeatherCache;
+import com.tridev.liveweather.data.remote.dto.AirQualityResponse;
 import com.tridev.liveweather.data.remote.dto.WeatherResponse;
+import com.tridev.liveweather.repository.AirQualityRepository;
 import com.tridev.liveweather.repository.WeatherRepository;
 
 import java.io.IOException;
 
-/**
- * Refreshes the most recently active weather coordinates for the live wallpaper.
- * It deliberately does not request background GPS; the app updates coordinates
- * when foreground location access is available.
- */
 public final class WallpaperWeatherRefreshWorker extends Worker {
 
     public WallpaperWeatherRefreshWorker(
@@ -29,29 +27,34 @@ public final class WallpaperWeatherRefreshWorker extends Worker {
     @NonNull
     @Override
     public Result doWork() {
-        WeatherCache cache = new WeatherCache(getApplicationContext());
-        WeatherCache.CachedWeather cached = cache.load();
+        WeatherCache weatherCache = new WeatherCache(getApplicationContext());
+        WeatherCache.CachedWeather cached = weatherCache.load();
         if (cached == null) {
             return Result.success();
         }
 
+        double latitude = cached.getLatitude();
+        double longitude = cached.getLongitude();
+        long now = System.currentTimeMillis();
+
         try {
-            WeatherRepository repository = new WeatherRepository();
-            WeatherResponse response = repository.loadWeatherBlocking(
-                    cached.getLatitude(),
-                    cached.getLongitude()
-            );
-            cache.save(
-                    response,
-                    cached.getLatitude(),
-                    cached.getLongitude(),
-                    System.currentTimeMillis()
-            );
-            return Result.success();
+            WeatherResponse weather = new WeatherRepository().loadWeatherBlocking(latitude, longitude);
+            weatherCache.save(weather, latitude, longitude, now);
         } catch (IOException exception) {
             return Result.retry();
         } catch (RuntimeException exception) {
             return Result.failure();
         }
+
+        try {
+            AirQualityResponse airQuality = new AirQualityRepository()
+                    .loadAirQualityBlocking(latitude, longitude);
+            new AirQualityCache(getApplicationContext())
+                    .save(airQuality, latitude, longitude, now);
+        } catch (IOException | RuntimeException ignored) {
+            // Weather remains useful even if the separate CAMS AQI model is unavailable.
+        }
+
+        return Result.success();
     }
 }
