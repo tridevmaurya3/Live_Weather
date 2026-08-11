@@ -63,21 +63,78 @@ public final class SceneState {
         this.sceneLight = sceneLight;
     }
 
-    @NonNull public SkyRealityState getSky() { return sky; }
-    @NonNull public LiveConditionResolver.ResolvedCondition getCondition() { return condition; }
-    public double getCloudCover() { return cloudCover; }
-    public double getRainIntensity() { return rainIntensity; }
-    public double getDrizzleIntensity() { return drizzleIntensity; }
-    public double getSnowIntensity() { return snowIntensity; }
-    public double getFogIntensity() { return fogIntensity; }
-    public double getStormIntensity() { return stormIntensity; }
-    public double getAirHazeIntensity() { return airHazeIntensity; }
-    public double getWindSpeedKmh() { return windSpeedKmh; }
-    public double getWindDirectionDegrees() { return windDirectionDegrees; }
-    public double getWindStrength() { return windStrength; }
-    public double getVisibilityFactor() { return visibilityFactor; }
-    public double getSunVisibility() { return sunVisibility; }
-    public double getMoonVisibility() { return moonVisibility; }
-    public double getStarVisibility() { return starVisibility; }
-    public double getSceneLight() { return sceneLight; }
+    @NonNull
+    public SkyRealityState getSky() {
+        return sky;
+    }
+
+    @NonNull
+    public LiveConditionResolver.ResolvedCondition getCondition() {
+        return condition;
+    }
+
+    public double getCloudCover() {
+        return cloudCover;
+    }
+
+    public double getRainIntensity() {
+        return rainIntensity;
+    }
+
+    public double getDrizzleIntensity() {
+        return drizzleIntensity;
+    }
+
+    public double getSnowIntensity() {
+        return snowIntensity;
+    }
+
+    public double getFogIntensity() {
+        return fogIntensity;
+    }
+
+    public double getStormIntensity() {
+        return stormIntensity;
+    }
+
+    public double getAirHazeIntensity() {
+        return airHazeIntensity;
+    }
+
+    /**
+     * Renderer-facing wind speed is float because Android Canvas motion math is
+     * float-based. The state keeps double precision internally and only narrows
+     * at this presentation boundary.
+     */
+    public float getWindSpeedKmh() {
+        return (float) windSpeedKmh;
+    }
+
+    public double getWindDirectionDegrees() {
+        return windDirectionDegrees;
+    }
+
+    public double getWindStrength() {
+        return windStrength;
+    }
+
+    public double getVisibilityFactor() {
+        return visibilityFactor;
+    }
+
+    public double getSunVisibility() {
+        return sunVisibility;
+    }
+
+    public double getMoonVisibility() {
+        return moonVisibility;
+    }
+
+    public double getStarVisibility() {
+        return starVisibility;
+    }
+
+    public double getSceneLight() {
+        return sceneLight;
+    }
 }
