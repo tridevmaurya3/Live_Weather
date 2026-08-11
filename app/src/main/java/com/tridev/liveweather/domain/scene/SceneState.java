@@ -9,7 +9,7 @@ public final class SceneState {
 
     private final SkyRealityState sky;
     private final LiveConditionResolver.ResolvedCondition condition;
-    private final double cloudCover;
+    private final CloudPresenceState cloudPresence;
     private final double rainIntensity;
     private final double drizzleIntensity;
     private final double snowIntensity;
@@ -28,7 +28,7 @@ public final class SceneState {
     public SceneState(
             @NonNull SkyRealityState sky,
             @NonNull LiveConditionResolver.ResolvedCondition condition,
-            double cloudCover,
+            @NonNull CloudPresenceState cloudPresence,
             double rainIntensity,
             double drizzleIntensity,
             double snowIntensity,
@@ -46,7 +46,7 @@ public final class SceneState {
     ) {
         this.sky = sky;
         this.condition = condition;
-        this.cloudCover = cloudCover;
+        this.cloudPresence = cloudPresence;
         this.rainIntensity = rainIntensity;
         this.drizzleIntensity = drizzleIntensity;
         this.snowIntensity = snowIntensity;
@@ -73,8 +73,16 @@ public final class SceneState {
         return condition;
     }
 
+    @NonNull
+    public CloudPresenceState getCloudPresence() {
+        return cloudPresence;
+    }
+
+    /**
+     * Backward-compatible normalized cloud amount used by existing renderers.
+     */
     public double getCloudCover() {
-        return cloudCover;
+        return cloudPresence.getCloudAmount();
     }
 
     public double getRainIntensity() {
