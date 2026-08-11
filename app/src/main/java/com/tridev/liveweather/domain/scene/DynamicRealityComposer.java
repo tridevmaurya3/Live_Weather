@@ -114,12 +114,38 @@ public final class DynamicRealityComposer {
                 0.025d,
                 1d
         );
+
         double sunVisibility = sky.getSunAltitude() > -4d
                 ? clamp(weatherTransparency * (0.72d + 0.28d * visibilityFactor), 0d, 1d)
                 : 0d;
+
+        /*
+         * A physically dark/new Moon must not appear as a black sticker in a
+         * bright daytime sky. Astronomy still determines the real Moon
+         * position/phase, but visual contrast is reduced by daylight and by the
+         * illuminated fraction. Bright gibbous/full phases can remain visible
+         * in daylight; very thin/new phases naturally disappear.
+         */
+        double moonIllumination = clamp(sky.getMoonIlluminationPercent() / 100d, 0d, 1d);
+        double daylightMoonContrast = 1d;
+        if (sky.getSunAltitude() > -6d) {
+            double daylightStrength = clamp((sky.getSunAltitude() + 6d) / 34d, 0d, 1d);
+            double phaseContrast = clamp((moonIllumination - 0.055d) / 0.42d, 0d, 1d);
+            daylightMoonContrast = phaseContrast * (1d - daylightStrength * 0.48d);
+            if (moonIllumination < 0.035d && sky.getSunAltitude() > -2d) {
+                daylightMoonContrast = 0d;
+            }
+        }
         double moonVisibility = sky.getMoonAltitude() > -4d
-                ? clamp(weatherTransparency * visibilityFactor, 0d, 1d)
+                ? clamp(
+                        weatherTransparency
+                                * visibilityFactor
+                                * daylightMoonContrast,
+                        0d,
+                        1d
+                )
                 : 0d;
+
         double starVisibility = clamp(
                 sky.getStarVisibilityPercent() / 100d
                         * weatherTransparency
