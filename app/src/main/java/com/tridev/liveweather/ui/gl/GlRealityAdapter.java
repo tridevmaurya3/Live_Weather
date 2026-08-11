@@ -13,10 +13,9 @@ import com.tridev.liveweather.domain.scene.SceneState;
 /**
  * Converts the existing shared reality engine into GPU uniforms.
  *
- * Important: Moon phase and star visibility are NOT re-invented here. The same
- * DynamicRealityComposer/SkyRealityEngine used by the app remains the source of
- * truth for astronomical position, lunar illumination and atmospheric
- * obstruction.
+ * Sun/Moon positions, lunar phase and astronomical star visibility remain
+ * authoritative outputs of the shared reality engines. The GPU adapter only
+ * converts them to normalized uniforms.
  */
 public final class GlRealityAdapter {
 
@@ -49,6 +48,19 @@ public final class GlRealityAdapter {
         float moonX = celestialX(sky.getMoonAzimuth(), parallax);
         float moonY = celestialY(sky.getMoonAltitude());
 
+        /*
+         * SkyRealityEngine already accounts for darkness, cloud transparency,
+         * visibility, precipitation and lunar glare. DynamicRealityComposer's
+         * star value applies weather transparency again for legacy scene use,
+         * which made the GPU night sky excessively empty. Use the astronomy
+         * engine's resolved visibility here and add only the AQI haze correction
+         * that SkyRealityEngine itself does not know about.
+         */
+        float gpuStarVisibility = clamp01((float) (
+                (sky.getStarVisibilityPercent() / 100d)
+                        * (1d - state.getAirHazeIntensity() * 0.45d)
+        ));
+
         return new GlSceneSnapshot(
                 skyProfile.topR,
                 skyProfile.topG,
@@ -69,7 +81,7 @@ public final class GlRealityAdapter {
                 clamp01((float) (sky.getMoonIlluminationPercent() / 100d)),
                 (float) Math.toRadians(normalizeDegrees(sky.getMoonPhaseAngleDegrees())),
                 (float) sky.getMoonAltitude(),
-                clamp01((float) state.getStarVisibility()),
+                gpuStarVisibility,
                 clamp01((float) clouds.getCloudAmount()),
                 clamp01((float) clouds.getDensity()),
                 clamp01((float) clouds.getFarLayer()),
@@ -100,8 +112,6 @@ public final class GlRealityAdapter {
     }
 
     private static float celestialY(double altitude) {
-        // Matches the existing Canvas renderer's horizon mapping, converted to
-        // normalized top-origin coordinates for the fragment shader.
         double normalized = clamp(altitude, -7d, 90d);
         return (float) (0.86d - ((normalized + 7d) / 97d) * 0.77d);
     }
