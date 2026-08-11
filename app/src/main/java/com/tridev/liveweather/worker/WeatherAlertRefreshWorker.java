@@ -15,7 +15,6 @@ import com.tridev.liveweather.domain.alert.SmartAlertEngine;
 import com.tridev.liveweather.domain.alert.WeatherAlert;
 import com.tridev.liveweather.notification.AlertNotificationManager;
 import com.tridev.liveweather.repository.CapAlertRepository;
-import com.tridev.liveweather.repository.WeatherRepository;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -33,26 +32,14 @@ public final class WeatherAlertRefreshWorker extends Worker {
     @Override
     public Result doWork() {
         Context context = getApplicationContext();
-        WeatherCache weatherCache = new WeatherCache(context);
-        WeatherCache.CachedWeather cachedWeather = weatherCache.load();
-        if (cachedWeather == null) return Result.success();
+        WeatherCache.CachedWeather cachedWeather = new WeatherCache(context).load();
+        if (cachedWeather == null || cachedWeather.getWeather() == null) {
+            return Result.success();
+        }
 
         try {
-            WeatherRepository weatherRepository = new WeatherRepository();
-            com.tridev.liveweather.data.remote.dto.WeatherResponse weather =
-                    weatherRepository.loadWeatherBlocking(
-                            cachedWeather.getLatitude(),
-                            cachedWeather.getLongitude()
-                    );
             long now = System.currentTimeMillis();
-            weatherCache.save(
-                    weather,
-                    cachedWeather.getLatitude(),
-                    cachedWeather.getLongitude(),
-                    now
-            );
-
-            List<WeatherAlert> smart = SmartAlertEngine.build(weather);
+            List<WeatherAlert> smart = SmartAlertEngine.build(cachedWeather.getWeather());
             AlertPreferences preferences = new AlertPreferences(context);
             AlertLocation alertLocation = preferences.loadLocation();
             List<WeatherAlert> official = new ArrayList<>();
@@ -89,8 +76,6 @@ public final class WeatherAlertRefreshWorker extends Worker {
             List<WeatherAlert> merged = AlertMerger.merge(official, smart, now);
             new AlertNotificationManager(context).notifyNewAlerts(merged);
             return Result.success();
-        } catch (java.io.IOException exception) {
-            return Result.retry();
         } catch (RuntimeException exception) {
             return Result.failure();
         }
