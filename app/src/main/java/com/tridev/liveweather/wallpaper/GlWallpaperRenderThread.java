@@ -1,0 +1,280 @@
+package com.tridev.liveweather.wallpaper;
+
+import android.opengl.EGL14;
+import android.opengl.EGLConfig;
+import android.opengl.EGLContext;
+import android.opengl.EGLDisplay;
+import android.opengl.EGLSurface;
+import android.os.Handler;
+import android.os.HandlerThread;
+import android.os.Process;
+import android.view.Surface;
+
+import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
+
+import com.tridev.liveweather.data.remote.dto.AirQualityResponse;
+import com.tridev.liveweather.data.remote.dto.WeatherResponse;
+import com.tridev.liveweather.ui.gl.GlRealityAdapter;
+import com.tridev.liveweather.ui.gl.HeroGlSceneRenderer;
+
+/**
+ * Dedicated EGL14 render thread for the system Live Wallpaper.
+ *
+ * Network/cache work never happens inside the frame loop. The UI/service thread
+ * only publishes immutable weather/AQI inputs; this GL thread refreshes the
+ * astronomy/reality snapshot periodically and animates continuously while the
+ * wallpaper is visible.
+ */
+public final class GlWallpaperRenderThread {
+
+    private static final long REALITY_REFRESH_MILLIS = 30_000L;
+
+    private final HandlerThread thread;
+    private final Handler handler;
+    private final HeroGlSceneRenderer renderer = new HeroGlSceneRenderer();
+
+    private EGLDisplay display = EGL14.EGL_NO_DISPLAY;
+    private EGLContext context = EGL14.EGL_NO_CONTEXT;
+    private EGLSurface eglSurface = EGL14.EGL_NO_SURFACE;
+    private EGLConfig config;
+
+    @Nullable private Surface windowSurface;
+    @Nullable private WeatherResponse weather;
+    @Nullable private AirQualityResponse airQuality;
+    private double latitude = Double.NaN;
+    private double longitude = Double.NaN;
+    private float parallax = 0.5f;
+    private int width = 1;
+    private int height = 1;
+    private long frameIntervalMillis = 33L;
+    private long lastRealityRefresh;
+    private boolean visible;
+    private boolean released;
+
+    private final Runnable renderRunnable = new Runnable() {
+        @Override
+        public void run() {
+            if (released || !visible || eglSurface == EGL14.EGL_NO_SURFACE) return;
+            try {
+                refreshRealityIfNeeded();
+                renderer.drawFrame();
+                if (!EGL14.eglSwapBuffers(display, eglSurface)) {
+                    detachEglSurface();
+                    return;
+                }
+            } catch (RuntimeException ignored) {
+                detachEglSurface();
+                return;
+            }
+            if (!released && visible && eglSurface != EGL14.EGL_NO_SURFACE) {
+                handler.postDelayed(this, frameIntervalMillis);
+            }
+        }
+    };
+
+    public GlWallpaperRenderThread() {
+        thread = new HandlerThread("LiveWeather-OpenGL", Process.THREAD_PRIORITY_DISPLAY);
+        thread.start();
+        handler = new Handler(thread.getLooper());
+        handler.post(this::initializeEgl);
+    }
+
+    public void attachSurface(@NonNull Surface surface, int width, int height) {
+        handler.post(() -> {
+            if (released) return;
+            this.windowSurface = surface;
+            this.width = Math.max(1, width);
+            this.height = Math.max(1, height);
+            createEglSurface();
+            restartLoop();
+        });
+    }
+
+    public void detachSurface() {
+        handler.post(() -> {
+            windowSurface = null;
+            handler.removeCallbacks(renderRunnable);
+            detachEglSurface();
+        });
+    }
+
+    public void setVisible(boolean visible) {
+        handler.post(() -> {
+            this.visible = visible;
+            restartLoop();
+        });
+    }
+
+    public void setFrameIntervalMillis(long frameIntervalMillis) {
+        handler.post(() -> this.frameIntervalMillis = Math.max(16L, frameIntervalMillis));
+    }
+
+    public void setWeatherData(
+            @NonNull WeatherResponse weather,
+            @Nullable AirQualityResponse airQuality,
+            double latitude,
+            double longitude
+    ) {
+        handler.post(() -> {
+            this.weather = weather;
+            this.airQuality = airQuality;
+            this.latitude = latitude;
+            this.longitude = longitude;
+            lastRealityRefresh = 0L;
+        });
+    }
+
+    public void clearWeatherData() {
+        handler.post(() -> {
+            weather = null;
+            airQuality = null;
+            latitude = Double.NaN;
+            longitude = Double.NaN;
+            lastRealityRefresh = 0L;
+            renderer.setSnapshot(null);
+        });
+    }
+
+    public void setParallax(float offset) {
+        handler.post(() -> {
+            parallax = Math.max(0f, Math.min(1f, offset));
+            lastRealityRefresh = 0L;
+        });
+    }
+
+    public void release() {
+        handler.post(() -> {
+            if (released) return;
+            released = true;
+            visible = false;
+            handler.removeCallbacksAndMessages(null);
+            renderer.release();
+            detachEglSurface();
+            if (display != EGL14.EGL_NO_DISPLAY && context != EGL14.EGL_NO_CONTEXT) {
+                EGL14.eglDestroyContext(display, context);
+            }
+            if (display != EGL14.EGL_NO_DISPLAY) {
+                EGL14.eglTerminate(display);
+            }
+            context = EGL14.EGL_NO_CONTEXT;
+            display = EGL14.EGL_NO_DISPLAY;
+            thread.quitSafely();
+        });
+    }
+
+    private void initializeEgl() {
+        if (released || display != EGL14.EGL_NO_DISPLAY) return;
+
+        display = EGL14.eglGetDisplay(EGL14.EGL_DEFAULT_DISPLAY);
+        if (display == EGL14.EGL_NO_DISPLAY) {
+            throw new IllegalStateException("Unable to obtain EGL display");
+        }
+        int[] versions = new int[2];
+        if (!EGL14.eglInitialize(display, versions, 0, versions, 1)) {
+            throw new IllegalStateException("Unable to initialize EGL");
+        }
+
+        int[] configAttributes = {
+                EGL14.EGL_RENDERABLE_TYPE, EGL14.EGL_OPENGL_ES2_BIT,
+                EGL14.EGL_RED_SIZE, 8,
+                EGL14.EGL_GREEN_SIZE, 8,
+                EGL14.EGL_BLUE_SIZE, 8,
+                EGL14.EGL_ALPHA_SIZE, 8,
+                EGL14.EGL_DEPTH_SIZE, 0,
+                EGL14.EGL_STENCIL_SIZE, 0,
+                EGL14.EGL_NONE
+        };
+        EGLConfig[] configs = new EGLConfig[1];
+        int[] count = new int[1];
+        if (!EGL14.eglChooseConfig(display, configAttributes, 0, configs, 0, 1, count, 0)
+                || count[0] <= 0) {
+            throw new IllegalStateException("No compatible OpenGL ES 2 EGL config");
+        }
+        config = configs[0];
+
+        int[] contextAttributes = {
+                EGL14.EGL_CONTEXT_CLIENT_VERSION, 2,
+                EGL14.EGL_NONE
+        };
+        context = EGL14.eglCreateContext(
+                display,
+                config,
+                EGL14.EGL_NO_CONTEXT,
+                contextAttributes,
+                0
+        );
+        if (context == null || context == EGL14.EGL_NO_CONTEXT) {
+            throw new IllegalStateException("Unable to create OpenGL ES 2 context");
+        }
+    }
+
+    private void createEglSurface() {
+        if (released || windowSurface == null || !windowSurface.isValid()) return;
+        if (display == EGL14.EGL_NO_DISPLAY || context == EGL14.EGL_NO_CONTEXT || config == null) {
+            initializeEgl();
+        }
+        detachEglSurface();
+
+        int[] surfaceAttributes = {EGL14.EGL_NONE};
+        eglSurface = EGL14.eglCreateWindowSurface(
+                display,
+                config,
+                windowSurface,
+                surfaceAttributes,
+                0
+        );
+        if (eglSurface == null || eglSurface == EGL14.EGL_NO_SURFACE) {
+            eglSurface = EGL14.EGL_NO_SURFACE;
+            return;
+        }
+        if (!EGL14.eglMakeCurrent(display, eglSurface, eglSurface, context)) {
+            detachEglSurface();
+            return;
+        }
+        renderer.onSurfaceCreated();
+        renderer.onSurfaceChanged(width, height);
+        lastRealityRefresh = 0L;
+    }
+
+    private void detachEglSurface() {
+        if (display == EGL14.EGL_NO_DISPLAY) return;
+        EGL14.eglMakeCurrent(
+                display,
+                EGL14.EGL_NO_SURFACE,
+                EGL14.EGL_NO_SURFACE,
+                EGL14.EGL_NO_CONTEXT
+        );
+        if (eglSurface != null && eglSurface != EGL14.EGL_NO_SURFACE) {
+            EGL14.eglDestroySurface(display, eglSurface);
+        }
+        eglSurface = EGL14.EGL_NO_SURFACE;
+    }
+
+    private void refreshRealityIfNeeded() {
+        long now = System.currentTimeMillis();
+        if (lastRealityRefresh > 0L && now - lastRealityRefresh < REALITY_REFRESH_MILLIS) return;
+        lastRealityRefresh = now;
+
+        WeatherResponse currentWeather = weather;
+        if (currentWeather == null || Double.isNaN(latitude) || Double.isNaN(longitude)) {
+            renderer.setSnapshot(null);
+            return;
+        }
+        renderer.setSnapshot(GlRealityAdapter.compose(
+                currentWeather,
+                airQuality,
+                latitude,
+                longitude,
+                now,
+                parallax
+        ));
+    }
+
+    private void restartLoop() {
+        handler.removeCallbacks(renderRunnable);
+        if (!released && visible && eglSurface != EGL14.EGL_NO_SURFACE) {
+            handler.post(renderRunnable);
+        }
+    }
+}
