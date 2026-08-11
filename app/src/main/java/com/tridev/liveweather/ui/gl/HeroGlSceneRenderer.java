@@ -12,10 +12,9 @@ import java.nio.FloatBuffer;
 /**
  * OpenGL ES 2.0 full-screen Hero weather renderer.
  *
- * Stage-1 migration intentionally uses original procedural shader content rather
- * than copying assets from another application. The shader owns sky scattering,
- * irregular volumetric cloud fields, continuous rain/wet-glass, storm flashes,
- * stars and a physically-shaped lunar phase mask.
+ * The renderer is original procedural GPU work. It preserves the shared
+ * weather/astronomy reality contract while using the GPU for atmospheric depth,
+ * continuous precipitation, lunar phases, stars and electrical storms.
  */
 public final class HeroGlSceneRenderer {
 
@@ -60,80 +59,157 @@ public final class HeroGlSceneRenderer {
             "uniform float uSceneLight;\n" +
             "uniform float uVisibility;\n" +
             "uniform float uParallax;\n" +
+
             "float hash21(vec2 p){ p=fract(p*vec2(123.34,456.21)); p+=dot(p,p+45.32); return fract(p.x*p.y); }\n" +
             "float hash11(float p){ return fract(sin(p*127.1)*43758.5453); }\n" +
             "float noise(vec2 p){\n" +
-            "  vec2 i=floor(p), f=fract(p); f=f*f*(3.0-2.0*f);\n" +
-            "  float a=hash21(i), b=hash21(i+vec2(1.0,0.0)), c=hash21(i+vec2(0.0,1.0)), d=hash21(i+vec2(1.0,1.0));\n" +
+            "  vec2 i=floor(p); vec2 f=fract(p); f=f*f*(3.0-2.0*f);\n" +
+            "  float a=hash21(i); float b=hash21(i+vec2(1.0,0.0));\n" +
+            "  float c=hash21(i+vec2(0.0,1.0)); float d=hash21(i+vec2(1.0,1.0));\n" +
             "  return mix(mix(a,b,f.x),mix(c,d,f.x),f.y);\n" +
             "}\n" +
-            "float fbm(vec2 p){ float v=0.0; float a=0.5; for(int i=0;i<5;i++){v+=a*noise(p);p=p*2.03+vec2(13.1,7.7);a*=0.5;} return v; }\n" +
-            "float circle(vec2 p, vec2 c, float r, float softness){ return 1.0-smoothstep(r-softness,r+softness,length(p-c)); }\n" +
+            "float fbm(vec2 p){\n" +
+            "  float v=0.0; float a=0.52;\n" +
+            "  for(int i=0;i<4;i++){ v+=a*noise(p); p=p*2.02+vec2(13.1,7.7); a*=0.5; }\n" +
+            "  return v;\n" +
+            "}\n" +
+
             "float rainLayer(vec2 p,float scale,float speed,float seed,float slope){\n" +
-            "  vec2 q=p; q.x += q.y*slope; q*=vec2(34.0,18.0)*scale;\n" +
+            "  vec2 q=p; q.x += q.y*slope; q*=vec2(31.0,16.0)*scale;\n" +
             "  vec2 id=floor(q); float rnd=hash21(id+seed);\n" +
-            "  float x=fract(q.x)-0.5+(rnd-0.5)*0.45;\n" +
-            "  float y=fract(q.y+uTime*speed*(0.82+rnd*0.42)+rnd*7.0);\n" +
-            "  float core=1.0-smoothstep(0.018,0.065,abs(x));\n" +
-            "  float tail=smoothstep(0.02,0.34,y)*(1.0-smoothstep(0.58,0.96,y));\n" +
-            "  return core*tail*step(0.30,rnd);\n" +
+            "  float x=fract(q.x)-0.5+(rnd-0.5)*0.42;\n" +
+            "  float y=fract(q.y+uTime*speed*(0.80+rnd*0.46)+rnd*7.0);\n" +
+            "  float core=1.0-smoothstep(0.020,0.070,abs(x));\n" +
+            "  float tail=smoothstep(0.01,0.24,y)*(1.0-smoothstep(0.66,0.98,y));\n" +
+            "  return core*tail*step(0.28,rnd);\n" +
             "}\n" +
+
             "float wetDrop(vec2 p,float seed){\n" +
-            "  vec2 grid=vec2(8.0,13.0); vec2 g=p*grid; vec2 id=floor(g); float rnd=hash21(id+seed);\n" +
-            "  vec2 f=fract(g)-0.5; float slide=fract(uTime*(0.018+0.045*rnd)+rnd*8.0); f.y += slide-0.5;\n" +
-            "  f.x += (rnd-0.5)*0.38; f.y*=0.72; float d=length(f);\n" +
-            "  float rim=smoothstep(0.31,0.22,d)-smoothstep(0.21,0.14,d);\n" +
-            "  float body=(1.0-smoothstep(0.26,0.30,d))*0.13; return (rim*0.75+body)*step(0.64,rnd);\n" +
+            "  vec2 grid=vec2(7.0,11.0); vec2 g=p*grid; vec2 id=floor(g); float rnd=hash21(id+seed);\n" +
+            "  vec2 f=fract(g)-0.5; float slide=fract(uTime*(0.014+0.040*rnd)+rnd*8.0);\n" +
+            "  f.y += slide-0.5; f.x += (rnd-0.5)*0.34; f.y*=0.70;\n" +
+            "  float d=length(f); float rim=smoothstep(0.33,0.235,d)-smoothstep(0.215,0.145,d);\n" +
+            "  float body=(1.0-smoothstep(0.27,0.31,d))*0.12;\n" +
+            "  return (rim*0.78+body)*step(0.63,rnd);\n" +
             "}\n" +
+
+            "float boltCenter(float y,float anchor,float seed,float y0,float y1,float drift){\n" +
+            "  float t=clamp((y-y0)/max(0.001,y1-y0),0.0,1.0);\n" +
+            "  float seg=t*12.0; float idx=floor(seg); float f=fract(seg); f=f*f*(3.0-2.0*f);\n" +
+            "  float a=(hash11(seed+idx*1.73)-0.5)*0.115;\n" +
+            "  float b=(hash11(seed+(idx+1.0)*1.73)-0.5)*0.115;\n" +
+            "  float micro=(noise(vec2(t*31.0,seed*0.19))-0.5)*0.025;\n" +
+            "  return anchor+mix(a,b,f)+micro+drift*t;\n" +
+            "}\n" +
+
+            "float boltLine(vec2 p,float anchor,float seed,float y0,float y1,float width,float drift){\n" +
+            "  float inside=step(y0,p.y)*step(p.y,y1);\n" +
+            "  float x=boltCenter(p.y,anchor,seed,y0,y1,drift);\n" +
+            "  float aspect=uResolution.x/max(1.0,uResolution.y);\n" +
+            "  float d=abs((p.x-x)*aspect);\n" +
+            "  float core=exp(-d/max(0.0006,width));\n" +
+            "  float glow=exp(-d/max(0.0022,width*5.0))*0.34;\n" +
+            "  return (core+glow)*inside;\n" +
+            "}\n" +
+
             "void main(){\n" +
             "  vec2 p=vec2(vUv.x,1.0-vUv.y);\n" +
             "  float aspect=uResolution.x/max(1.0,uResolution.y);\n" +
-            "  float skyT=clamp(p.y,0.0,1.0);\n" +
-            "  vec3 sky=mix(uHorizon,uMid,smoothstep(0.22,0.66,1.0-skyT));\n" +
-            "  sky=mix(sky,uTop,smoothstep(0.42,1.0,1.0-skyT));\n" +
-            "  float horizonHaze=(uFog*0.52+uHaze*0.34)*(1.0-smoothstep(0.48,0.90,p.y));\n" +
-            "  sky=mix(sky,vec3(0.61,0.68,0.72),clamp(horizonHaze,0.0,0.58));\n" +
+
+            "  vec3 sky=mix(uHorizon,uMid,smoothstep(0.22,0.66,1.0-p.y));\n" +
+            "  sky=mix(sky,uTop,smoothstep(0.42,1.0,1.0-p.y));\n" +
+            "  float horizonHaze=(uFog*0.50+uHaze*0.32)*(1.0-smoothstep(0.46,0.91,p.y));\n" +
+            "  sky=mix(sky,vec3(0.60,0.67,0.71),clamp(horizonHaze,0.0,0.54));\n" +
             "  vec3 color=sky;\n" +
+
             "  vec2 starGrid=p*vec2(92.0,148.0); vec2 sid=floor(starGrid); vec2 sf=fract(starGrid)-0.5;\n" +
-            "  float sr=hash21(sid+vec2(31.7,9.2)); float tw=0.72+0.28*sin(uTime*(0.8+sr*2.1)+sr*40.0);\n" +
+            "  float sr=hash21(sid+vec2(31.7,9.2));\n" +
+            "  float tw=0.74+0.26*sin(uTime*(0.8+sr*2.1)+sr*40.0);\n" +
             "  float star=(1.0-smoothstep(0.015,0.055,length(sf)))*step(0.985-uStarVis*0.045,sr)*uStarVis*tw;\n" +
-            "  color += vec3(0.82,0.90,1.0)*star;\n" +
+            "  color+=vec3(0.82,0.90,1.0)*star;\n" +
+
             "  vec2 windVec=vec2(sin(uWindDir),-cos(uWindDir));\n" +
-            "  vec2 cp=p*vec2(2.2,3.5)+windVec*uTime*(0.012+uWind*0.038);\n" +
-            "  float c1=fbm(cp); float c2=fbm(cp*1.73+vec2(4.1,9.7)); float density=c1*0.72+c2*0.28;\n" +
-            "  float cloudThreshold=0.74-uCloud*0.34; float cloud=smoothstep(cloudThreshold,cloudThreshold+0.18,density);\n" +
-            "  float verticalMask=smoothstep(0.015,0.10,p.y)*(1.0-smoothstep(0.72,0.96,p.y)); cloud*=verticalMask*uCloud;\n" +
-            "  float stormShade=clamp(uStorm*0.82+uRain*0.22,0.0,1.0);\n" +
-            "  vec3 cloudLight=mix(vec3(0.84,0.87,0.90),vec3(0.16,0.20,0.27),stormShade);\n" +
-            "  vec3 cloudDark=mix(vec3(0.54,0.59,0.65),vec3(0.055,0.075,0.11),stormShade);\n" +
-            "  vec3 cloudColor=mix(cloudDark,cloudLight,clamp(density*1.25-0.22,0.0,1.0));\n" +
-            "  color=mix(color,cloudColor,clamp(cloud*0.88,0.0,0.94));\n" +
-            "  float sunAspect=aspect; vec2 sp=(p-uSunPos)*vec2(sunAspect,1.0); float sd=length(sp);\n" +
-            "  float sunGlow=exp(-sd*22.0)*uSunVis*(1.0-cloud*0.72); float sunDisc=1.0-smoothstep(0.028,0.033,sd);\n" +
-            "  color+=vec3(1.0,0.72,0.25)*sunGlow*0.82; color=mix(color,vec3(1.0,0.91,0.48),sunDisc*uSunVis*(1.0-cloud*0.82));\n" +
+            "  vec2 cp=p*vec2(2.05,3.15)+windVec*uTime*(0.010+uWind*0.030);\n" +
+            "  float large=fbm(cp*0.78+vec2(1.7,4.3));\n" +
+            "  float medium=fbm(cp*1.47+vec2(8.1,2.2));\n" +
+            "  float detail=noise(cp*4.1+vec2(3.4,7.9));\n" +
+            "  float density=large*0.69+medium*0.24+detail*0.07;\n" +
+            "  float cloudThreshold=0.70-uCloud*0.27-uStorm*0.055;\n" +
+            "  float cloud=smoothstep(cloudThreshold,cloudThreshold+0.105,density);\n" +
+            "  float upperMask=smoothstep(0.015,0.07,p.y)*(1.0-smoothstep(0.67,0.92,p.y));\n" +
+            "  float stormDeck=smoothstep(0.43,0.60,large+medium*0.16)*uStorm*(1.0-smoothstep(0.54,0.82,p.y));\n" +
+            "  cloud=clamp(cloud*upperMask*uCloud+stormDeck*0.72,0.0,1.0);\n" +
+            "  float stormShade=clamp(uStorm*0.88+uRain*0.18,0.0,1.0);\n" +
+            "  float cloudLightness=clamp(density*1.55-0.34-p.y*0.10,0.0,1.0);\n" +
+            "  vec3 cloudTop=mix(vec3(0.92,0.94,0.95),vec3(0.31,0.35,0.42),stormShade);\n" +
+            "  vec3 cloudBottom=mix(vec3(0.55,0.61,0.67),vec3(0.045,0.060,0.090),stormShade);\n" +
+            "  vec3 cloudColor=mix(cloudBottom,cloudTop,cloudLightness);\n" +
+            "  float cloudAlpha=clamp(cloud*(0.60+uCloud*0.34)+stormDeck*0.20,0.0,0.96);\n" +
+            "  color=mix(color,cloudColor,cloudAlpha);\n" +
+
+            "  vec2 sp=(p-uSunPos)*vec2(aspect,1.0); float sd=length(sp);\n" +
+            "  float sunObscure=1.0-cloud*0.86;\n" +
+            "  float sunGlow=exp(-sd*22.0)*uSunVis*sunObscure;\n" +
+            "  float sunDisc=1.0-smoothstep(0.028,0.033,sd);\n" +
+            "  color+=vec3(1.0,0.72,0.25)*sunGlow*0.82;\n" +
+            "  color=mix(color,vec3(1.0,0.91,0.48),sunDisc*uSunVis*sunObscure);\n" +
+
             "  vec2 mp=(p-uMoonPos)*vec2(aspect,1.0); float mr=0.031; vec2 ml=mp/mr; float m2=dot(ml,ml);\n" +
             "  if(m2<1.0 && uMoonVis>0.001){\n" +
-            "    float mz=sqrt(max(0.0,1.0-m2)); float inc=ml.x*sin(uMoonPhase)+mz*(-cos(uMoonPhase));\n" +
-            "    float lit=smoothstep(-0.035,0.055,inc); float earth=0.018+0.035*(1.0-uSceneLight);\n" +
-            "    float lunar=earth+lit*(0.98-earth)*(0.58+0.42*max(0.0,inc));\n" +
-            "    float limb=smoothstep(1.0,0.88,sqrt(m2)); float crater=0.88+0.12*noise(ml*5.8+vec2(3.7,1.9));\n" +
-            "    float ma=uMoonVis*(1.0-cloud*0.78)*limb; vec3 moonCol=vec3(0.86,0.89,0.94)*lunar*crater; color=mix(color,moonCol,ma);\n" +
+            "    float mz=sqrt(max(0.0,1.0-m2));\n" +
+            "    float incident=ml.x*sin(uMoonPhase)+mz*(-cos(uMoonPhase));\n" +
+            "    float lit=smoothstep(-0.035,0.055,incident);\n" +
+            "    float earth=0.016+0.030*(1.0-uSceneLight);\n" +
+            "    float lunar=earth+lit*(0.98-earth)*(0.58+0.42*max(0.0,incident));\n" +
+            "    float limb=smoothstep(1.0,0.88,sqrt(m2));\n" +
+            "    float crater=0.88+0.12*noise(ml*5.8+vec2(3.7,1.9));\n" +
+            "    float ma=uMoonVis*(1.0-cloud*0.84)*limb;\n" +
+            "    vec3 moonCol=vec3(0.86,0.89,0.94)*lunar*crater;\n" +
+            "    color=mix(color,moonCol,ma);\n" +
             "  }\n" +
-            "  float moonGlow=exp(-length(mp)*16.0)*uMoonVis*(0.15+uMoonIllum*0.42)*(1.0-cloud*0.72); color+=vec3(0.32,0.42,0.58)*moonGlow;\n" +
-            "  float effectiveRain=max(uRain,uDrizzle*0.62); float slope=sin(uWindDir)*(0.10+uWind*0.46);\n" +
-            "  float r1=rainLayer(p,0.72,0.48,3.1,slope); float r2=rainLayer(p+vec2(0.13,0.07),1.05,0.78,8.4,slope); float r3=rainLayer(p+vec2(0.27,0.19),1.48,1.18,14.7,slope);\n" +
-            "  float rain=(r1*0.30+r2*0.52+r3*0.82)*effectiveRain; color=mix(color,vec3(0.76,0.87,0.95),clamp(rain,0.0,0.88));\n" +
-            "  float wet=(wetDrop(p,2.4)+wetDrop(p+vec2(0.07,0.11),9.7))*smoothstep(0.16,0.82,effectiveRain); color+=vec3(0.28,0.42,0.54)*wet;\n" +
-            "  float window=max(4.2,7.2-uStorm*2.6); float cycle=floor(uTime/window); float phase=mod(uTime,window); float chance=hash11(cycle+3.7);\n" +
-            "  float eventStart=0.45+hash11(cycle+11.9)*1.65; float local=phase-eventStart; float active=step(chance,0.20+uStorm*0.64);\n" +
-            "  float pulse=0.0; if(local>=0.0 && local<0.11) pulse=1.0-local/0.11; else if(local>=0.18 && local<0.30) pulse=(1.0-(local-0.18)/0.12)*0.58;\n" +
-            "  pulse*=active*uStorm; float anchor=0.18+hash11(cycle+21.3)*0.64; float jag=(noise(vec2(p.y*23.0,cycle*0.37))-0.5)*0.11;\n" +
-            "  float boltX=anchor+jag+(p.y-0.18)*0.055; float bolt=exp(-abs(p.x-boltX)*520.0)*step(0.05,p.y)*step(p.y,0.80)*step(0.0,local)*step(local,0.22)*active*uStorm;\n" +
-            "  float branch1=exp(-abs(p.x-(boltX+0.095*(p.y-0.34)))*430.0)*step(0.28,p.y)*step(p.y,0.56)*bolt;\n" +
-            "  float branch2=exp(-abs(p.x-(boltX-0.12*(p.y-0.52)))*390.0)*step(0.46,p.y)*step(p.y,0.70)*bolt;\n" +
-            "  float electrical=clamp(bolt+branch1+branch2,0.0,1.0); color+=vec3(0.82,0.91,1.0)*electrical*1.7;\n" +
-            "  color=mix(color,vec3(0.89,0.94,1.0),clamp(pulse*0.74,0.0,0.86));\n" +
-            "  float groundMist=(uFog*0.42+effectiveRain*0.15)*(1.0-smoothstep(0.64,1.0,p.y)); color=mix(color,vec3(0.48,0.54,0.57),clamp(groundMist,0.0,0.44));\n" +
+            "  float moonGlow=exp(-length(mp)*16.0)*uMoonVis*(0.14+uMoonIllum*0.40)*(1.0-cloud*0.80);\n" +
+            "  color+=vec3(0.32,0.42,0.58)*moonGlow;\n" +
+
+            "  float effectiveRain=max(uRain,uDrizzle*0.62);\n" +
+            "  float slope=sin(uWindDir)*(0.08+uWind*0.42);\n" +
+            "  float rFar=rainLayer(p,1.52,0.62,3.1,slope);\n" +
+            "  float rMid=rainLayer(p+vec2(0.13,0.07),1.02,0.90,8.4,slope);\n" +
+            "  float rNear=rainLayer(p+vec2(0.27,0.19),0.52,1.42,14.7,slope);\n" +
+            "  float rain=(rFar*0.32+rMid*0.56+rNear*0.94)*effectiveRain;\n" +
+            "  color=mix(color,vec3(0.77,0.87,0.95),clamp(rain,0.0,0.90));\n" +
+            "  float rainVeil=smoothstep(0.38,0.95,effectiveRain)*(0.035+noise(p*vec2(8.0,19.0)+uTime*vec2(0.0,2.3))*0.055);\n" +
+            "  color=mix(color,vec3(0.47,0.56,0.63),rainVeil);\n" +
+            "  float wet=(wetDrop(p,2.4)+wetDrop(p+vec2(0.07,0.11),9.7))*smoothstep(0.15,0.82,effectiveRain);\n" +
+            "  color+=vec3(0.28,0.42,0.54)*wet;\n" +
+
+            "  float flashWindow=max(4.3,7.4-uStorm*2.7);\n" +
+            "  float cycle=floor(uTime/flashWindow); float phase=mod(uTime,flashWindow);\n" +
+            "  float chance=hash11(cycle+3.7); float eventStart=0.42+hash11(cycle+11.9)*1.55;\n" +
+            "  float local=phase-eventStart; float active=step(chance,0.22+uStorm*0.62);\n" +
+            "  float pulse=0.0;\n" +
+            "  if(local>=0.0 && local<0.085) pulse=1.0-local/0.085;\n" +
+            "  else if(local>=0.16 && local<0.255) pulse=(1.0-(local-0.16)/0.095)*0.54;\n" +
+            "  pulse*=active*uStorm;\n" +
+            "  float anchor=0.16+hash11(cycle+21.3)*0.68;\n" +
+            "  float y0=0.055+hash11(cycle+30.4)*0.090;\n" +
+            "  float y1=0.48+hash11(cycle+41.8)*0.22;\n" +
+            "  float visibleBolt=step(0.0,local)*step(local,0.19)*active*uStorm;\n" +
+            "  float mainBolt=boltLine(p,anchor,cycle+6.3,y0,y1,0.0014,(hash11(cycle+52.1)-0.5)*0.08)*visibleBolt;\n" +
+            "  float b1Start=mix(y0,y1,0.34);\n" +
+            "  float b1Anchor=boltCenter(b1Start,anchor,cycle+6.3,y0,y1,(hash11(cycle+52.1)-0.5)*0.08);\n" +
+            "  float branch1=boltLine(p,b1Anchor,cycle+71.4,b1Start,min(y1,b1Start+0.18),0.0011,(hash11(cycle+73.0)>0.5?0.15:-0.15))*visibleBolt*0.78;\n" +
+            "  float b2Start=mix(y0,y1,0.58);\n" +
+            "  float b2Anchor=boltCenter(b2Start,anchor,cycle+6.3,y0,y1,(hash11(cycle+52.1)-0.5)*0.08);\n" +
+            "  float branch2=boltLine(p,b2Anchor,cycle+93.6,b2Start,min(y1,b2Start+0.14),0.0009,(hash11(cycle+96.0)>0.5?0.12:-0.12))*visibleBolt*0.60;\n" +
+            "  float electrical=clamp(mainBolt+branch1+branch2,0.0,1.25);\n" +
+            "  float cloudFlash=pulse*(0.28+0.72*exp(-abs(p.x-anchor)*3.1))*(1.0-smoothstep(0.62,0.88,p.y));\n" +
+            "  color=mix(color,vec3(0.73,0.82,0.96),clamp(cloudFlash*cloud*0.88,0.0,0.78));\n" +
+            "  color+=vec3(0.86,0.93,1.0)*electrical*1.45;\n" +
+            "  float wholeFlash=clamp(pulse*(0.58+uStorm*0.24),0.0,0.86);\n" +
+            "  color=mix(color,vec3(0.90,0.95,1.0),wholeFlash);\n" +
+
+            "  float groundMist=(uFog*0.40+effectiveRain*0.16)*(1.0-smoothstep(0.64,1.0,p.y));\n" +
+            "  color=mix(color,vec3(0.47,0.53,0.57),clamp(groundMist,0.0,0.44));\n" +
             "  gl_FragColor=vec4(clamp(color,0.0,1.0),1.0);\n" +
             "}\n";
 
