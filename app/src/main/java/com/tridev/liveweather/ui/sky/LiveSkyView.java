@@ -13,6 +13,7 @@ import android.os.Process;
 import android.util.AttributeSet;
 import android.view.TextureView;
 import android.view.View;
+import android.widget.FrameLayout;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
@@ -29,11 +30,15 @@ import com.tridev.liveweather.ui.gl.HeroGlPipeline;
 /**
  * ODM-5 in-app live weather surface.
  *
- * The old Canvas Hero stack has been replaced by the same OpenGL/EGL pipeline
- * used by Android system Live Wallpaper. TextureView keeps normal Android view
- * composition semantics, including the existing alpha/background/card usage.
+ * LiveSkyView intentionally remains a normal Android container so layouts can
+ * safely apply backgrounds, alpha, rounded outlines and card styling. The
+ * actual OpenGL output is rendered into a private child TextureView.
+ *
+ * This avoids Android's TextureView restriction that throws when a background
+ * drawable is applied directly to a TextureView while still keeping the same
+ * public LiveSkyView API used by MainActivity, Forecast and Wallpaper preview.
  */
-public final class LiveSkyView extends TextureView implements TextureView.SurfaceTextureListener {
+public final class LiveSkyView extends FrameLayout implements TextureView.SurfaceTextureListener {
 
     private static final long REALITY_REFRESH_MILLIS = 30_000L;
     private static final long FRAME_MILLIS = 33L;
@@ -51,6 +56,7 @@ public final class LiveSkyView extends TextureView implements TextureView.Surfac
     private static double sharedLongitude = Double.NaN;
     private static long sharedVersion = 1L;
 
+    private final TextureView textureView;
     private final HeroGlPipeline pipeline = new HeroGlPipeline();
     private final HandlerThread renderThread;
     private final Handler renderHandler;
@@ -60,7 +66,6 @@ public final class LiveSkyView extends TextureView implements TextureView.Surfac
     private EGLSurface eglSurface = EGL14.EGL_NO_SURFACE;
     private EGLConfig eglConfig;
 
-    @Nullable private SurfaceTexture activeSurfaceTexture;
     private int surfaceWidth = 1;
     private int surfaceHeight = 1;
     private boolean attached;
@@ -113,9 +118,21 @@ public final class LiveSkyView extends TextureView implements TextureView.Surfac
             }
         }
 
-        setOpaque(true);
+        /*
+         * The wrapper can legally own XML backgrounds and outlines. The child
+         * TextureView deliberately has no background drawable.
+         */
         setClipToOutline(true);
-        setSurfaceTextureListener(this);
+        setClipChildren(true);
+
+        textureView = new TextureView(context);
+        textureView.setOpaque(true);
+        textureView.setSurfaceTextureListener(this);
+        textureView.setImportantForAccessibility(IMPORTANT_FOR_ACCESSIBILITY_NO);
+        addView(textureView, new LayoutParams(
+                LayoutParams.MATCH_PARENT,
+                LayoutParams.MATCH_PARENT
+        ));
 
         renderThread = new HandlerThread("LiveWeather-AppGL", Process.THREAD_PRIORITY_DISPLAY);
         renderThread.start();
@@ -202,7 +219,6 @@ public final class LiveSkyView extends TextureView implements TextureView.Surfac
     @Override
     public void onSurfaceTextureAvailable(@NonNull SurfaceTexture surface, int width, int height) {
         if (released) return;
-        activeSurfaceTexture = surface;
         surfaceWidth = Math.max(1, width);
         surfaceHeight = Math.max(1, height);
         renderHandler.post(() -> {
@@ -227,7 +243,6 @@ public final class LiveSkyView extends TextureView implements TextureView.Surfac
 
     @Override
     public boolean onSurfaceTextureDestroyed(@NonNull SurfaceTexture surface) {
-        activeSurfaceTexture = null;
         if (!released) {
             renderHandler.post(() -> {
                 renderHandler.removeCallbacks(renderRunnable);
