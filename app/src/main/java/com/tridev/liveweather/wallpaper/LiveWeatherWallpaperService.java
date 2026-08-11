@@ -1,7 +1,6 @@
 package com.tridev.liveweather.wallpaper;
 
 import android.content.Context;
-import android.graphics.Canvas;
 import android.os.BatteryManager;
 import android.os.Handler;
 import android.os.Looper;
@@ -14,13 +13,15 @@ import androidx.annotation.NonNull;
 import com.tridev.liveweather.data.local.AirQualityCache;
 import com.tridev.liveweather.data.local.WallpaperPreferences;
 import com.tridev.liveweather.data.local.WeatherCache;
-import com.tridev.liveweather.ui.scene.AirHazeOverlayRenderer;
-import com.tridev.liveweather.ui.scene.HeroCloudRenderer;
-import com.tridev.liveweather.ui.scene.HeroRainRenderer;
-import com.tridev.liveweather.ui.scene.HeroStormRenderer;
-import com.tridev.liveweather.ui.scene.NatureSceneRenderer;
+import com.tridev.liveweather.data.remote.dto.AirQualityResponse;
 import com.tridev.liveweather.worker.WallpaperWeatherScheduler;
 
+/**
+ * Android system Live Wallpaper backed by the Hero OpenGL weather engine.
+ *
+ * The WallpaperService main thread owns lifecycle/cache refresh only. EGL and
+ * all animation frames run on GlWallpaperRenderThread.
+ */
 public final class LiveWeatherWallpaperService extends WallpaperService {
 
     @Override
@@ -36,31 +37,20 @@ public final class LiveWeatherWallpaperService extends WallpaperService {
         private static final long POWER_SAVE_FRAME_MILLIS = 66L;
 
         private final Handler handler = new Handler(Looper.getMainLooper());
-        private final NatureSceneRenderer renderer = new NatureSceneRenderer();
-        private final HeroCloudRenderer heroCloudRenderer = new HeroCloudRenderer();
-        private final HeroRainRenderer heroRainRenderer = new HeroRainRenderer();
-        private final HeroStormRenderer heroStormRenderer = new HeroStormRenderer();
-        private final AirHazeOverlayRenderer airHazeRenderer = new AirHazeOverlayRenderer();
-
+        private final GlWallpaperRenderThread glRenderer = new GlWallpaperRenderThread();
         private final WeatherCache weatherCache = new WeatherCache(LiveWeatherWallpaperService.this);
         private final AirQualityCache airQualityCache = new AirQualityCache(LiveWeatherWallpaperService.this);
         private final WallpaperPreferences preferences = new WallpaperPreferences(LiveWeatherWallpaperService.this);
 
         private boolean visible;
-        private boolean surfaceReady;
-        private long lastCacheReload;
-        private long loadedWeatherSavedAt = Long.MIN_VALUE;
-        private long loadedAirSavedAt = Long.MIN_VALUE;
         private WallpaperPreferences.Options options = preferences.load();
 
-        private final Runnable drawRunnable = new Runnable() {
+        private final Runnable cacheRefreshRunnable = new Runnable() {
             @Override
             public void run() {
-                if (!visible || !surfaceReady) return;
-                drawFrame();
-                // Rain/cloud/storm animations are clock-driven and recycle forever.
-                // The loop only pauses when Android reports the wallpaper hidden.
-                handler.postDelayed(this, frameIntervalMillis());
+                if (!visible) return;
+                reloadCache();
+                handler.postDelayed(this, CACHE_RELOAD_MILLIS);
             }
         };
 
@@ -68,37 +58,34 @@ public final class LiveWeatherWallpaperService extends WallpaperService {
         public void onCreate(@NonNull SurfaceHolder surfaceHolder) {
             super.onCreate(surfaceHolder);
             setTouchEventsEnabled(false);
-            applyOptions(options);
-            reloadCache(true);
+            applyOptions(preferences.load());
+            reloadCache();
             WallpaperWeatherScheduler.schedule(LiveWeatherWallpaperService.this);
         }
 
         @Override
         public void onVisibilityChanged(boolean visible) {
             this.visible = visible;
-            handler.removeCallbacks(drawRunnable);
+            handler.removeCallbacks(cacheRefreshRunnable);
+            glRenderer.setVisible(visible);
+
             if (visible) {
-                options = preferences.load();
-                applyOptions(options);
-                reloadCache(true);
-                handler.post(drawRunnable);
+                applyOptions(preferences.load());
+                reloadCache();
+                handler.postDelayed(cacheRefreshRunnable, CACHE_RELOAD_MILLIS);
             }
         }
 
         @Override
         public void onSurfaceChanged(@NonNull SurfaceHolder holder, int format, int width, int height) {
             super.onSurfaceChanged(holder, format, width, height);
-            surfaceReady = true;
-            if (visible) {
-                handler.removeCallbacks(drawRunnable);
-                handler.post(drawRunnable);
-            }
+            glRenderer.attachSurface(holder.getSurface(), width, height);
+            glRenderer.setVisible(visible);
         }
 
         @Override
         public void onSurfaceDestroyed(@NonNull SurfaceHolder holder) {
-            surfaceReady = false;
-            handler.removeCallbacks(drawRunnable);
+            glRenderer.detachSurface();
             super.onSurfaceDestroyed(holder);
         }
 
@@ -111,109 +98,46 @@ public final class LiveWeatherWallpaperService extends WallpaperService {
                 int xPixelOffset,
                 int yPixelOffset
         ) {
-            renderer.setParallaxOffset(xOffset);
-            if (visible) drawFrame();
+            glRenderer.setParallax(xOffset);
         }
 
         @Override
         public void onDestroy() {
-            handler.removeCallbacks(drawRunnable);
+            visible = false;
+            handler.removeCallbacksAndMessages(null);
+            glRenderer.setVisible(false);
+            glRenderer.release();
             super.onDestroy();
         }
 
-        private void drawFrame() {
-            long now = System.currentTimeMillis();
-            reloadCache(false);
-
-            SurfaceHolder holder = getSurfaceHolder();
-            Canvas canvas = null;
-            try {
-                canvas = holder.lockCanvas();
-                if (canvas != null) {
-                    int width = canvas.getWidth();
-                    int height = canvas.getHeight();
-
-                    renderer.draw(canvas, width, height, now);
-                    heroCloudRenderer.draw(canvas, width, height, now);
-                    heroStormRenderer.drawAtmosphere(canvas, width, height, now);
-                    airHazeRenderer.draw(canvas, width, height);
-
-                    float flash = heroStormRenderer.flashStrength(now);
-                    heroRainRenderer.draw(canvas, width, height, now, flash);
-                    heroStormRenderer.drawForeground(canvas, width, height, now);
-                }
-            } catch (RuntimeException ignored) {
-                // Keep the wallpaper engine alive; the next frame will retry.
-            } finally {
-                if (canvas != null) {
-                    try {
-                        holder.unlockCanvasAndPost(canvas);
-                    } catch (RuntimeException ignored) {
-                    }
-                }
-            }
-        }
-
-        private void reloadCache(boolean force) {
-            long now = System.currentTimeMillis();
-            if (!force && now - lastCacheReload < CACHE_RELOAD_MILLIS) return;
-            lastCacheReload = now;
-
+        private void reloadCache() {
             options = preferences.load();
             applyOptions(options);
 
             WeatherCache.CachedWeather weather = weatherCache.load();
             if (weather == null) {
-                renderer.clearWeatherData();
-                heroCloudRenderer.clearWeatherData();
-                heroRainRenderer.clearWeatherData();
-                heroStormRenderer.clearWeatherData();
-                airHazeRenderer.setAirQuality(null);
-                loadedWeatherSavedAt = Long.MIN_VALUE;
-                loadedAirSavedAt = Long.MIN_VALUE;
+                glRenderer.clearWeatherData();
                 return;
-            }
-
-            if (force || weather.getSavedAt() != loadedWeatherSavedAt) {
-                loadedWeatherSavedAt = weather.getSavedAt();
-                renderer.setWeatherData(
-                        weather.getWeather(),
-                        weather.getLatitude(),
-                        weather.getLongitude()
-                );
-                heroCloudRenderer.setWeatherData(weather.getWeather());
-                heroRainRenderer.setWeatherData(weather.getWeather());
-                heroStormRenderer.setWeatherData(weather.getWeather());
             }
 
             AirQualityCache.CachedAirQuality air = airQualityCache.load(
                     weather.getLatitude(),
                     weather.getLongitude()
             );
-            if (air == null) {
-                airHazeRenderer.setAirQuality(null);
-                loadedAirSavedAt = Long.MIN_VALUE;
-            } else if (force || air.getSavedAt() != loadedAirSavedAt) {
-                loadedAirSavedAt = air.getSavedAt();
-                airHazeRenderer.setAirQuality(air.getResponse());
-            }
+            AirQualityResponse airResponse = air == null ? null : air.getResponse();
+
+            glRenderer.setWeatherData(
+                    weather.getWeather(),
+                    airResponse,
+                    weather.getLatitude(),
+                    weather.getLongitude()
+            );
         }
 
-        private void applyOptions(@NonNull WallpaperPreferences.Options options) {
-            // Hero pipeline owns cloud/rain/lightning. NatureSceneRenderer keeps
-            // sky, celestial bodies, stars, snow and fog only.
-            renderer.setOptions(new WallpaperPreferences.Options(
-                    false,
-                    false,
-                    false,
-                    options.isSnow(),
-                    options.isFog(),
-                    options.isStars(),
-                    options.isBatteryAdaptive()
-            ));
-            heroCloudRenderer.setEnabled(options.isClouds());
-            heroRainRenderer.setEnabled(options.isRain());
-            heroStormRenderer.setEnabled(options.isLightning());
+        private void applyOptions(@NonNull WallpaperPreferences.Options newOptions) {
+            options = newOptions;
+            glRenderer.setVisualOptions(newOptions);
+            glRenderer.setFrameIntervalMillis(frameIntervalMillis());
         }
 
         private long frameIntervalMillis() {
