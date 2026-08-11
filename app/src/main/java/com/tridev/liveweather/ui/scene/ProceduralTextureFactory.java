@@ -266,16 +266,26 @@ public final class ProceduralTextureFactory {
                     target[index] = Color.TRANSPARENT;
                     continue;
                 }
+
                 double z = Math.sqrt(z2);
                 double incidence = x * lightX + z * lightZ;
-                double lit = smoothstep(-0.035d, 0.055d, incidence);
-                double earthshine = 0.028d;
-                double brightness = earthshine + lit * (0.97d - earthshine)
-                        * (0.48d + 0.52d * Math.max(0.0d, incidence));
-                int r = clampInt((int) Math.round(Color.red(base) * brightness), 3, 255);
-                int g = clampInt((int) Math.round(Color.green(base) * brightness), 4, 255);
-                int b = clampInt((int) Math.round(Color.blue(base) * brightness), 7, 255);
-                target[index] = Color.argb(255, r, g, b);
+
+                // The illuminated limb gets a soft terminator; the night side is
+                // mostly transparent so a crescent never becomes a grey/black
+                // full-disc sticker in daylight. A tiny alpha floor preserves
+                // restrained earthshine at night after the renderer applies its
+                // global Moon visibility.
+                double lit = smoothstep(-0.028d, 0.050d, incidence);
+                double earthshine = 0.020d;
+                double brightness = earthshine + lit * (0.98d - earthshine)
+                        * (0.56d + 0.44d * Math.max(0.0d, incidence));
+
+                int r = clampInt((int) Math.round(Color.red(base) * brightness), 2, 255);
+                int g = clampInt((int) Math.round(Color.green(base) * brightness), 3, 255);
+                int b = clampInt((int) Math.round(Color.blue(base) * brightness), 5, 255);
+
+                int pixelAlpha = clampInt((int) Math.round(9.0d + lit * 246.0d), 0, 255);
+                target[index] = Color.argb(pixelAlpha, r, g, b);
             }
         }
 
