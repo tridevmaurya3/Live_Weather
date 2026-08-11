@@ -15,7 +15,7 @@ import com.tridev.liveweather.domain.scene.SceneState;
  *
  * Sun/Moon positions, lunar phase and astronomical star visibility remain
  * authoritative outputs of the shared reality engines. The GPU adapter only
- * converts them to normalized uniforms.
+ * converts them to normalized/perceptual display uniforms.
  */
 public final class GlRealityAdapter {
 
@@ -51,15 +51,19 @@ public final class GlRealityAdapter {
         /*
          * SkyRealityEngine already accounts for darkness, cloud transparency,
          * visibility, precipitation and lunar glare. DynamicRealityComposer's
-         * star value applies weather transparency again for legacy scene use,
-         * which made the GPU night sky excessively empty. Use the astronomy
-         * engine's resolved visibility here and add only the AQI haze correction
-         * that SkyRealityEngine itself does not know about.
+         * legacy scene-star value applies weather transparency again, which made
+         * the GPU night sky excessively empty. Use the astronomy engine result,
+         * add only AQI haze correction, then apply a sqrt display curve so valid
+         * low star visibility survives launcher/wallpaper dimming. A resolved
+         * zero remains exactly zero, so stars are never invented in daylight.
          */
-        float gpuStarVisibility = clamp01((float) (
+        double resolvedStarVisibility = clamp(
                 (sky.getStarVisibilityPercent() / 100d)
-                        * (1d - state.getAirHazeIntensity() * 0.45d)
-        ));
+                        * (1d - state.getAirHazeIntensity() * 0.45d),
+                0d,
+                1d
+        );
+        float gpuStarVisibility = clamp01((float) Math.sqrt(resolvedStarVisibility));
 
         return new GlSceneSnapshot(
                 skyProfile.topR,
