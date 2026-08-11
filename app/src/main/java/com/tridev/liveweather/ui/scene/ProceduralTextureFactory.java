@@ -2,16 +2,24 @@ package com.tridev.liveweather.ui.scene;
 
 import android.graphics.Bitmap;
 import android.graphics.Color;
+import android.os.Process;
 
 import androidx.annotation.NonNull;
 
-import java.util.HashMap;
 import java.util.Map;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 /**
  * Builds reusable procedural textures for the cinematic weather renderer.
- * Expensive pixel synthesis happens only when a texture is first requested;
- * animation frames only scale/tint cached bitmaps.
+ *
+ * Performance contract:
+ * expensive cloud/fog pixel synthesis never blocks the UI/render thread. A
+ * shared background cache is used by all in-app NatureSceneRenderer instances;
+ * animation frames only scale/tint completed bitmaps. Until a requested texture
+ * finishes, a transparent placeholder is returned for that frame.
  */
 public final class ProceduralTextureFactory {
 
@@ -22,14 +30,33 @@ public final class ProceduralTextureFactory {
         STORM
     }
 
-    private static final int CLOUD_WIDTH = 256;
-    private static final int CLOUD_HEIGHT = 128;
-    private static final int FOG_WIDTH = 320;
-    private static final int FOG_HEIGHT = 96;
-    private static final int MOON_SIZE = 192;
+    // Reduced source resolution still scales cleanly with FILTER_BITMAP while
+    // cutting first-build CPU/memory cost substantially on emulator/low-end GPUs.
+    private static final int CLOUD_WIDTH = 160;
+    private static final int CLOUD_HEIGHT = 80;
+    private static final int CLOUD_VARIANTS = 4;
+    private static final int FOG_WIDTH = 192;
+    private static final int FOG_HEIGHT = 64;
+    private static final int FOG_VARIANTS = 4;
+    private static final int MOON_SIZE = 128;
 
-    private final Map<String, Bitmap> cloudCache = new HashMap<>();
-    private final Map<Integer, Bitmap> fogCache = new HashMap<>();
+    private static final Bitmap TRANSPARENT_PLACEHOLDER =
+            Bitmap.createBitmap(2, 2, Bitmap.Config.ARGB_8888);
+
+    private static final Map<String, Bitmap> SHARED_CLOUD_CACHE = new ConcurrentHashMap<>();
+    private static final Map<Integer, Bitmap> SHARED_FOG_CACHE = new ConcurrentHashMap<>();
+    private static final Set<String> PENDING_CLOUDS = ConcurrentHashMap.newKeySet();
+    private static final Set<Integer> PENDING_FOGS = ConcurrentHashMap.newKeySet();
+
+    private static final ExecutorService TEXTURE_EXECUTOR =
+            Executors.newSingleThreadExecutor(runnable -> {
+                Thread thread = new Thread(() -> {
+                    Process.setThreadPriority(Process.THREAD_PRIORITY_BACKGROUND);
+                    runnable.run();
+                }, "LiveWeather-TextureBuilder");
+                thread.setDaemon(true);
+                return thread;
+            });
 
     private Bitmap moonAlbedo;
     private Bitmap moonPhase;
@@ -37,27 +64,47 @@ public final class ProceduralTextureFactory {
 
     @NonNull
     public Bitmap cloud(@NonNull CloudKind kind, int variant) {
-        int safeVariant = Math.floorMod(variant, 8);
+        int safeVariant = Math.floorMod(variant, CLOUD_VARIANTS);
         String key = kind.name() + ':' + safeVariant;
-        Bitmap cached = cloudCache.get(key);
+        Bitmap cached = SHARED_CLOUD_CACHE.get(key);
         if (cached != null && !cached.isRecycled()) {
             return cached;
         }
-        Bitmap created = buildCloud(kind, safeVariant);
-        cloudCache.put(key, created);
-        return created;
+
+        if (PENDING_CLOUDS.add(key)) {
+            TEXTURE_EXECUTOR.execute(() -> {
+                try {
+                    Bitmap created = buildCloud(kind, safeVariant);
+                    SHARED_CLOUD_CACHE.put(key, created);
+                } catch (RuntimeException ignored) {
+                } finally {
+                    PENDING_CLOUDS.remove(key);
+                }
+            });
+        }
+        return TRANSPARENT_PLACEHOLDER;
     }
 
     @NonNull
     public Bitmap fog(int variant) {
-        int safeVariant = Math.floorMod(variant, 5);
-        Bitmap cached = fogCache.get(safeVariant);
+        int safeVariant = Math.floorMod(variant, FOG_VARIANTS);
+        Bitmap cached = SHARED_FOG_CACHE.get(safeVariant);
         if (cached != null && !cached.isRecycled()) {
             return cached;
         }
-        Bitmap created = buildFog(safeVariant);
-        fogCache.put(safeVariant, created);
-        return created;
+
+        if (PENDING_FOGS.add(safeVariant)) {
+            TEXTURE_EXECUTOR.execute(() -> {
+                try {
+                    Bitmap created = buildFog(safeVariant);
+                    SHARED_FOG_CACHE.put(safeVariant, created);
+                } catch (RuntimeException ignored) {
+                } finally {
+                    PENDING_FOGS.remove(safeVariant);
+                }
+            });
+        }
+        return TRANSPARENT_PLACEHOLDER;
     }
 
     /**
@@ -269,12 +316,6 @@ public final class ProceduralTextureFactory {
 
                 double z = Math.sqrt(z2);
                 double incidence = x * lightX + z * lightZ;
-
-                // The illuminated limb gets a soft terminator; the night side is
-                // mostly transparent so a crescent never becomes a grey/black
-                // full-disc sticker in daylight. A tiny alpha floor preserves
-                // restrained earthshine at night after the renderer applies its
-                // global Moon visibility.
                 double lit = smoothstep(-0.028d, 0.050d, incidence);
                 double earthshine = 0.020d;
                 double brightness = earthshine + lit * (0.98d - earthshine)
@@ -283,7 +324,6 @@ public final class ProceduralTextureFactory {
                 int r = clampInt((int) Math.round(Color.red(base) * brightness), 2, 255);
                 int g = clampInt((int) Math.round(Color.green(base) * brightness), 3, 255);
                 int b = clampInt((int) Math.round(Color.blue(base) * brightness), 5, 255);
-
                 int pixelAlpha = clampInt((int) Math.round(9.0d + lit * 246.0d), 0, 255);
                 target[index] = Color.argb(pixelAlpha, r, g, b);
             }
