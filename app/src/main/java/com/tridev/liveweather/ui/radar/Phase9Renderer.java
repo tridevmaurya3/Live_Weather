@@ -1,6 +1,8 @@
 package com.tridev.liveweather.ui.radar;
 
 import android.app.Activity;
+import android.content.Intent;
+import android.net.Uri;
 import android.os.Handler;
 import android.os.Looper;
 import android.view.HapticFeedbackConstants;
@@ -31,7 +33,7 @@ import java.util.Map;
 
 public final class Phase9Renderer {
 
-    private static final long PLAY_INTERVAL_MILLIS = 850L;
+    private static final long PLAY_INTERVAL_MILLIS = 1_100L;
     private static final DateTimeFormatter FRAME_TIME_FORMATTER =
             DateTimeFormatter.ofPattern("HH:mm 'UTC'", Locale.US).withZone(ZoneOffset.UTC);
 
@@ -65,11 +67,22 @@ public final class Phase9Renderer {
         public void run() {
             if (!playing || latestState == null || !latestState.hasRadarFrames()) return;
             int count = latestState.getRadar().getPastFrames().size();
-            if (count <= 0) return;
-            frameIndex = (frameIndex + 1) % count;
+            if (count <= 1) {
+                stopPlayback();
+                return;
+            }
+            if (frameIndex >= count - 1) {
+                stopPlayback();
+                return;
+            }
+            frameIndex++;
             timelineSeek.setProgress(frameIndex);
             applyFrame();
-            handler.postDelayed(this, PLAY_INTERVAL_MILLIS);
+            if (frameIndex >= count - 1) {
+                stopPlayback();
+            } else {
+                handler.postDelayed(this, PLAY_INTERVAL_MILLIS);
+            }
         }
     };
 
@@ -139,6 +152,10 @@ public final class Phase9Renderer {
         settings.setDisplayZoomControls(false);
         settings.setSupportZoom(false);
         settings.setLoadsImagesAutomatically(true);
+        String userAgent = settings.getUserAgentString();
+        if (userAgent != null && !userAgent.contains("LiveWeather/1.0")) {
+            settings.setUserAgentString(userAgent + " LiveWeather/1.0");
+        }
 
         mapWebView.setBackgroundColor(0xFF0B1F36);
         mapWebView.setWebViewClient(new WebViewClient() {
@@ -150,12 +167,34 @@ public final class Phase9Renderer {
 
             @Override
             public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) {
-                // Keep the radar surface inside the controlled local page. Resource
-                // requests for Leaflet/map tiles are not navigation requests.
+                Uri uri = request.getUrl();
+                String url = uri == null ? "" : uri.toString();
+                if (url.startsWith("file:///android_asset/radar/")) {
+                    return false;
+                }
+
+                String host = uri == null ? null : uri.getHost();
+                if (isAttributionHost(host)) {
+                    try {
+                        activity.startActivity(new Intent(Intent.ACTION_VIEW, uri));
+                    } catch (RuntimeException ignored) {
+                    }
+                }
                 return true;
             }
         });
         mapWebView.loadUrl("file:///android_asset/radar/radar_map.html");
+    }
+
+    private boolean isAttributionHost(@Nullable String host) {
+        if (host == null) return false;
+        String normalized = host.toLowerCase(Locale.US);
+        return normalized.equals("rainviewer.com")
+                || normalized.equals("www.rainviewer.com")
+                || normalized.equals("open-meteo.com")
+                || normalized.equals("www.open-meteo.com")
+                || normalized.equals("openstreetmap.org")
+                || normalized.equals("www.openstreetmap.org");
     }
 
     private void setupControls() {
@@ -273,7 +312,15 @@ public final class Phase9Renderer {
 
     private void startPlayback() {
         if (latestState == null || !latestState.hasRadarFrames()) return;
+        int count = latestState.getRadar().getPastFrames().size();
+        if (count <= 1) return;
+
         selectLayer("rain");
+        if (frameIndex < 0 || frameIndex >= count - 1) {
+            frameIndex = 0;
+            timelineSeek.setProgress(frameIndex);
+            applyFrame();
+        }
         playing = true;
         playButton.setText("Pause");
         handler.removeCallbacks(playTicker);
