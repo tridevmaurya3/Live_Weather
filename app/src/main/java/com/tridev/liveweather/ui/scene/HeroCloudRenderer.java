@@ -39,6 +39,7 @@ public final class HeroCloudRenderer {
     private WeatherResponse weather;
     private boolean enabled = true;
     private long lastStateRefresh;
+    private long animationOriginMillis;
 
     private float cloudCover;
     private float rainIntensity;
@@ -61,11 +62,13 @@ public final class HeroCloudRenderer {
     public void setWeatherData(@Nullable WeatherResponse weather) {
         this.weather = weather;
         lastStateRefresh = 0L;
+        if (weather == null) clearWeatherData();
     }
 
     public void clearWeatherData() {
         weather = null;
         lastStateRefresh = 0L;
+        animationOriginMillis = 0L;
         cloudCover = 0f;
         rainIntensity = 0f;
         stormIntensity = 0f;
@@ -81,11 +84,13 @@ public final class HeroCloudRenderer {
         float cover = clamp01(cloudCover);
         if (cover < 0.025f) return;
 
+        if (animationOriginMillis == 0L) animationOriginMillis = nowMillis;
+        float seconds = Math.max(0L, nowMillis - animationOriginMillis) / 1000f;
+
         int layerCount = cover >= 0.82f ? 4 : cover >= 0.58f ? 3 : cover >= 0.24f ? 2 : 1;
-        float seconds = nowMillis / 1000f;
         float direction = (float) Math.toRadians(windDirectionDegrees + 180f);
         float flowX = (float) Math.sin(direction);
-        float flowY = -(float) Math.cos(direction) * 0.065f;
+        float flowY = -(float) Math.cos(direction);
 
         for (int layer = 0; layer < layerCount; layer++) {
             float depth = layerCount == 1
@@ -104,7 +109,16 @@ public final class HeroCloudRenderer {
                 float origin = hash01(seed * 17 + 3) * track - cloudWidth * 1.15f;
                 float travel = seconds * baseSpeed * (0.78f + hash01(seed * 29 + 11) * 0.44f);
                 float x = positiveMod(origin + flowX * travel, track) - cloudWidth * 1.15f;
-                float y = cloudY(height, style, depth, seed) + flowY * travel;
+
+                // Vertical wind response must remain bounded. The previous
+                // epoch-time multiplication could push clouds off-screen after
+                // long runtimes. A slow oscillation keeps atmospheric motion alive.
+                float verticalWave = (float) Math.sin(
+                        seconds * (0.018f + depth * 0.011f) + seed * 0.013f
+                );
+                float yDrift = verticalWave * height * (0.006f + depth * 0.010f)
+                        + flowY * height * 0.004f * depth;
+                float y = cloudY(height, style, depth, seed) + yDrift;
 
                 float alpha = cloudAlpha(style, cover, depth);
                 drawCloudMass(
@@ -148,8 +162,6 @@ public final class HeroCloudRenderer {
                 1d
         );
 
-        // Condition floors stop "partly cloudy" or active rain from becoming an
-        // empty blue screen when one model cloud-cover sample briefly dips low.
         double floor = 0d;
         if (code == 1) floor = 0.10d;
         if (code == 2) floor = 0.38d;
@@ -161,7 +173,9 @@ public final class HeroCloudRenderer {
 
         cloudCover = (float) clamp(Math.max(blended, floor), 0d, 1d);
         rainIntensity = (float) rainSignal;
-        stormIntensity = code >= 95 ? (float) clamp(0.68d + rainSignal * 0.32d, 0.68d, 1d) : 0f;
+        stormIntensity = code >= 95
+                ? (float) clamp(0.68d + rainSignal * 0.32d, 0.68d, 1d)
+                : 0f;
         windSpeedKmh = (float) Math.max(0d, value(current == null ? null : current.getWindSpeed10m()));
         windDirectionDegrees = (float) value(current == null ? null : current.getWindDirection10m());
         daylight = current == null || current.getIsDay() == null || current.getIsDay() == 1;
@@ -303,8 +317,6 @@ public final class HeroCloudRenderer {
         int middle = withAlpha(tones[1], Math.round(alpha * 242f));
         int bottom = withAlpha(tones[2], Math.round(alpha * 255f));
 
-        // Soft-looking depth without a bitmap: a translated low-alpha path forms
-        // the underside shadow, then a vertical atmospheric gradient fills the mass.
         canvas.save();
         canvas.translate(0f, height * 0.055f);
         fillPaint.setShader(null);
@@ -324,7 +336,6 @@ public final class HeroCloudRenderer {
         canvas.drawPath(cloudPath, fillPaint);
         fillPaint.setShader(null);
 
-        // Internal soft shade band creates volume without exposing lobe/circle shapes.
         detailPath.reset();
         float bandY = y + height * (style == CloudStyle.STORM ? 0.62f : 0.58f);
         detailPath.moveTo(x + width * 0.12f, bandY);
@@ -463,7 +474,6 @@ public final class HeroCloudRenderer {
                 rightBottom
         );
 
-        // Soft irregular underside returning from right to left.
         int bottomSegments = 5;
         for (int i = bottomSegments - 1; i >= 0; i--) {
             float t = i / (float) bottomSegments;
