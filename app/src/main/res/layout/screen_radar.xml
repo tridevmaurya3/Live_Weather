@@ -59,7 +59,7 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="2dp"
-                android:text="Waiting for radar sync…" />
+                android:text="Radar loads when this tab becomes visible." />
         </LinearLayout>
 
         <TextView
@@ -78,6 +78,7 @@
     </LinearLayout>
 
     <FrameLayout
+        android:id="@+id/radarMapHost"
         android:layout_width="match_parent"
         android:layout_height="0dp"
         android:layout_marginTop="@dimen/space_10"
@@ -85,13 +86,6 @@
         android:background="@drawable/bg_weather_radar_preview"
         android:clipToOutline="true"
         android:minHeight="260dp">
-
-        <WebView
-            android:id="@+id/radarMapWebView"
-            android:layout_width="match_parent"
-            android:layout_height="match_parent"
-            android:background="@android:color/transparent"
-            android:overScrollMode="never" />
 
         <TextView
             android:id="@+id/radarRecenterButton"
