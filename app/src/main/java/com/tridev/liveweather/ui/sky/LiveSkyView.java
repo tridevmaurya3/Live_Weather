@@ -114,6 +114,7 @@ public final class LiveSkyView extends TextureView implements TextureView.Surfac
         }
 
         setOpaque(true);
+        setClipToOutline(true);
         setSurfaceTextureListener(this);
 
         renderThread = new HandlerThread("LiveWeather-AppGL", Process.THREAD_PRIORITY_DISPLAY);
