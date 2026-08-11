@@ -109,4 +109,35 @@ public final class GlSceneSnapshot {
         this.visibilityFactor = visibilityFactor;
         this.parallax = parallax;
     }
+
+    public GlSceneSnapshot withVisualOptions(
+            boolean clouds,
+            boolean rain,
+            boolean lightning,
+            boolean snow,
+            boolean fog,
+            boolean stars
+    ) {
+        return new GlSceneSnapshot(
+                topR, topG, topB,
+                midR, midG, midB,
+                horizonR, horizonG, horizonB,
+                sunX, sunY, sunVisibility, sunAltitude,
+                moonX, moonY, moonVisibility, moonIllumination,
+                moonPhaseAngleRadians, moonAltitude,
+                stars ? starVisibility : 0f,
+                clouds ? cloudCover : 0f,
+                rain ? rainIntensity : 0f,
+                rain ? drizzleIntensity : 0f,
+                snow ? snowIntensity : 0f,
+                fog ? fogIntensity : 0f,
+                lightning ? stormIntensity : 0f,
+                airHazeIntensity,
+                windStrength,
+                windDirectionRadians,
+                sceneLight,
+                visibilityFactor,
+                parallax
+        );
+    }
 }
