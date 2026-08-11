@@ -19,6 +19,7 @@ import com.tridev.liveweather.data.remote.dto.WeatherResponse;
 import com.tridev.liveweather.ui.gl.GlRealityAdapter;
 import com.tridev.liveweather.ui.gl.GlSceneSnapshot;
 import com.tridev.liveweather.ui.gl.HeroGlCloudSceneRenderer;
+import com.tridev.liveweather.ui.gl.HeroGlRainOverlayRenderer;
 
 /**
  * Dedicated EGL14 render thread for the system Live Wallpaper.
@@ -27,6 +28,11 @@ import com.tridev.liveweather.ui.gl.HeroGlCloudSceneRenderer;
  * only publishes immutable weather/AQI inputs; this GL thread refreshes the
  * astronomy/reality snapshot periodically and animates continuously while the
  * wallpaper is visible.
+ *
+ * ODM-2 render order:
+ * 1) sky/cloud/celestial/storm base pass with legacy rain disabled,
+ * 2) dedicated transparent rain + wet-screen pass,
+ * 3) one EGL buffer swap.
  */
 public final class GlWallpaperRenderThread {
 
@@ -34,7 +40,8 @@ public final class GlWallpaperRenderThread {
 
     private final HandlerThread thread;
     private final Handler handler;
-    private final HeroGlCloudSceneRenderer renderer = new HeroGlCloudSceneRenderer();
+    private final HeroGlCloudSceneRenderer sceneRenderer = new HeroGlCloudSceneRenderer();
+    private final HeroGlRainOverlayRenderer rainRenderer = new HeroGlRainOverlayRenderer();
 
     private EGLDisplay display = EGL14.EGL_NO_DISPLAY;
     private EGLContext context = EGL14.EGL_NO_CONTEXT;
@@ -67,7 +74,8 @@ public final class GlWallpaperRenderThread {
             if (released || !visible || eglSurface == EGL14.EGL_NO_SURFACE) return;
             try {
                 refreshRealityIfNeeded();
-                renderer.drawFrame();
+                sceneRenderer.drawFrame();
+                rainRenderer.drawFrame();
                 if (!EGL14.eglSwapBuffers(display, eglSurface)) {
                     detachEglSurface();
                     return;
@@ -153,7 +161,8 @@ public final class GlWallpaperRenderThread {
             latitude = Double.NaN;
             longitude = Double.NaN;
             lastRealityRefresh = 0L;
-            renderer.setSnapshot(null);
+            sceneRenderer.setSnapshot(null);
+            rainRenderer.setSnapshot(null);
         });
     }
 
@@ -170,7 +179,8 @@ public final class GlWallpaperRenderThread {
             released = true;
             visible = false;
             handler.removeCallbacksAndMessages(null);
-            renderer.release();
+            sceneRenderer.release();
+            rainRenderer.release();
             detachEglSurface();
             if (display != EGL14.EGL_NO_DISPLAY && context != EGL14.EGL_NO_CONTEXT) {
                 EGL14.eglDestroyContext(display, context);
@@ -253,8 +263,11 @@ public final class GlWallpaperRenderThread {
             detachEglSurface();
             return;
         }
-        renderer.onSurfaceCreated();
-        renderer.onSurfaceChanged(width, height);
+
+        sceneRenderer.onSurfaceCreated();
+        rainRenderer.onSurfaceCreated();
+        sceneRenderer.onSurfaceChanged(width, height);
+        rainRenderer.onSurfaceChanged(width, height);
         lastRealityRefresh = 0L;
     }
 
@@ -279,25 +292,45 @@ public final class GlWallpaperRenderThread {
 
         WeatherResponse currentWeather = weather;
         if (currentWeather == null || Double.isNaN(latitude) || Double.isNaN(longitude)) {
-            renderer.setSnapshot(null);
+            sceneRenderer.setSnapshot(null);
+            rainRenderer.setSnapshot(null);
             return;
         }
-        GlSceneSnapshot snapshot = GlRealityAdapter.compose(
+
+        GlSceneSnapshot fullSnapshot = GlRealityAdapter.compose(
                 currentWeather,
                 airQuality,
                 latitude,
                 longitude,
                 now,
                 parallax
-        ).withVisualOptions(
+        );
+
+        // The base pass keeps all atmospheric reality but disables its legacy
+        // rain/drizzle strokes. Rain is owned exclusively by ODM-2's overlay.
+        GlSceneSnapshot sceneSnapshot = fullSnapshot.withVisualOptions(
                 cloudsEnabled,
-                rainEnabled,
+                false,
                 lightningEnabled,
                 snowEnabled,
                 fogEnabled,
                 starsEnabled
         );
-        renderer.setSnapshot(snapshot);
+
+        // Rain overlay receives the resolved rain/drizzle state. Storm intensity
+        // is present only when the user keeps Lightning enabled, so rain will not
+        // flash when electrical effects are explicitly disabled.
+        GlSceneSnapshot rainSnapshot = fullSnapshot.withVisualOptions(
+                true,
+                rainEnabled,
+                lightningEnabled,
+                true,
+                true,
+                true
+        );
+
+        sceneRenderer.setSnapshot(sceneSnapshot);
+        rainRenderer.setSnapshot(rainSnapshot);
     }
 
     private void restartLoop() {
