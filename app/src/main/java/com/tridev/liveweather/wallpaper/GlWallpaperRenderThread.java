@@ -18,23 +18,13 @@ import com.tridev.liveweather.data.remote.dto.AirQualityResponse;
 import com.tridev.liveweather.data.remote.dto.WeatherResponse;
 import com.tridev.liveweather.ui.gl.GlRealityAdapter;
 import com.tridev.liveweather.ui.gl.GlSceneSnapshot;
-import com.tridev.liveweather.ui.gl.HeroGlCloudSceneRenderer;
-import com.tridev.liveweather.ui.gl.HeroGlRainOverlayRenderer;
-import com.tridev.liveweather.ui.gl.HeroGlStormOverlayRenderer;
+import com.tridev.liveweather.ui.gl.HeroGlPipeline;
 
 /**
- * Dedicated EGL14 render thread for the system Live Wallpaper.
+ * Dedicated EGL14 render thread for Android system Live Wallpaper.
  *
- * Network/cache work never happens inside the frame loop. The service thread
- * only publishes immutable weather/AQI inputs; this GL thread refreshes the
- * astronomy/reality snapshot periodically and animates continuously while the
- * wallpaper is visible.
- *
- * ODM-3 render order:
- * 1) sky/cloud/celestial base pass with legacy rain and lightning disabled,
- * 2) dedicated storm atmosphere + electrical pass,
- * 3) dedicated rain + wet-screen pass,
- * 4) one EGL buffer swap.
+ * ODM-5 uses the same HeroGlPipeline as the in-app live scene so both surfaces
+ * share exactly the same renderer ownership and composition order.
  */
 public final class GlWallpaperRenderThread {
 
@@ -42,9 +32,7 @@ public final class GlWallpaperRenderThread {
 
     private final HandlerThread thread;
     private final Handler handler;
-    private final HeroGlCloudSceneRenderer sceneRenderer = new HeroGlCloudSceneRenderer();
-    private final HeroGlStormOverlayRenderer stormRenderer = new HeroGlStormOverlayRenderer();
-    private final HeroGlRainOverlayRenderer rainRenderer = new HeroGlRainOverlayRenderer();
+    private final HeroGlPipeline pipeline = new HeroGlPipeline();
 
     private EGLDisplay display = EGL14.EGL_NO_DISPLAY;
     private EGLContext context = EGL14.EGL_NO_CONTEXT;
@@ -54,6 +42,12 @@ public final class GlWallpaperRenderThread {
     @Nullable private Surface windowSurface;
     @Nullable private WeatherResponse weather;
     @Nullable private AirQualityResponse airQuality;
+
+    @NonNull
+    private WallpaperPreferences.Options options = new WallpaperPreferences.Options(
+            true, true, true, true, true, true, true
+    );
+
     private double latitude = Double.NaN;
     private double longitude = Double.NaN;
     private float parallax = 0.5f;
@@ -64,22 +58,13 @@ public final class GlWallpaperRenderThread {
     private boolean visible;
     private boolean released;
 
-    private boolean cloudsEnabled = true;
-    private boolean rainEnabled = true;
-    private boolean lightningEnabled = true;
-    private boolean snowEnabled = true;
-    private boolean fogEnabled = true;
-    private boolean starsEnabled = true;
-
     private final Runnable renderRunnable = new Runnable() {
         @Override
         public void run() {
             if (released || !visible || eglSurface == EGL14.EGL_NO_SURFACE) return;
             try {
                 refreshRealityIfNeeded();
-                sceneRenderer.drawFrame();
-                stormRenderer.drawFrame();
-                rainRenderer.drawFrame();
+                pipeline.drawFrame();
                 if (!EGL14.eglSwapBuffers(display, eglSurface)) {
                     detachEglSurface();
                     return;
@@ -88,6 +73,7 @@ public final class GlWallpaperRenderThread {
                 detachEglSurface();
                 return;
             }
+
             if (!released && visible && eglSurface != EGL14.EGL_NO_SURFACE) {
                 handler.postDelayed(this, frameIntervalMillis);
             }
@@ -104,7 +90,7 @@ public final class GlWallpaperRenderThread {
     public void attachSurface(@NonNull Surface surface, int width, int height) {
         handler.post(() -> {
             if (released) return;
-            this.windowSurface = surface;
+            windowSurface = surface;
             this.width = Math.max(1, width);
             this.height = Math.max(1, height);
             createEglSurface();
@@ -133,13 +119,8 @@ public final class GlWallpaperRenderThread {
 
     public void setVisualOptions(@NonNull WallpaperPreferences.Options options) {
         handler.post(() -> {
-            cloudsEnabled = options.isClouds();
-            rainEnabled = options.isRain();
-            lightningEnabled = options.isLightning();
-            snowEnabled = options.isSnow();
-            fogEnabled = options.isFog();
-            starsEnabled = options.isStars();
-            stormRenderer.setElectricalEnabled(lightningEnabled);
+            this.options = options;
+            pipeline.setOptions(options);
             lastRealityRefresh = 0L;
         });
     }
@@ -166,9 +147,7 @@ public final class GlWallpaperRenderThread {
             latitude = Double.NaN;
             longitude = Double.NaN;
             lastRealityRefresh = 0L;
-            sceneRenderer.setSnapshot(null);
-            stormRenderer.setSnapshot(null);
-            rainRenderer.setSnapshot(null);
+            pipeline.setSnapshot(null);
         });
     }
 
@@ -185,16 +164,17 @@ public final class GlWallpaperRenderThread {
             released = true;
             visible = false;
             handler.removeCallbacksAndMessages(null);
-            sceneRenderer.release();
-            stormRenderer.release();
-            rainRenderer.release();
+
+            pipeline.release();
             detachEglSurface();
+
             if (display != EGL14.EGL_NO_DISPLAY && context != EGL14.EGL_NO_CONTEXT) {
                 EGL14.eglDestroyContext(display, context);
             }
             if (display != EGL14.EGL_NO_DISPLAY) {
                 EGL14.eglTerminate(display);
             }
+
             context = EGL14.EGL_NO_CONTEXT;
             display = EGL14.EGL_NO_DISPLAY;
             thread.quitSafely();
@@ -208,6 +188,7 @@ public final class GlWallpaperRenderThread {
         if (display == EGL14.EGL_NO_DISPLAY) {
             throw new IllegalStateException("Unable to obtain EGL display");
         }
+
         int[] versions = new int[2];
         if (!EGL14.eglInitialize(display, versions, 0, versions, 1)) {
             throw new IllegalStateException("Unable to initialize EGL");
@@ -223,6 +204,7 @@ public final class GlWallpaperRenderThread {
                 EGL14.EGL_STENCIL_SIZE, 0,
                 EGL14.EGL_NONE
         };
+
         EGLConfig[] configs = new EGLConfig[1];
         int[] count = new int[1];
         if (!EGL14.eglChooseConfig(display, configAttributes, 0, configs, 0, 1, count, 0)
@@ -235,6 +217,7 @@ public final class GlWallpaperRenderThread {
                 EGL14.EGL_CONTEXT_CLIENT_VERSION, 2,
                 EGL14.EGL_NONE
         };
+
         context = EGL14.eglCreateContext(
                 display,
                 config,
@@ -242,6 +225,7 @@ public final class GlWallpaperRenderThread {
                 contextAttributes,
                 0
         );
+
         if (context == null || context == EGL14.EGL_NO_CONTEXT) {
             throw new IllegalStateException("Unable to create OpenGL ES 2 context");
         }
@@ -249,9 +233,11 @@ public final class GlWallpaperRenderThread {
 
     private void createEglSurface() {
         if (released || windowSurface == null || !windowSurface.isValid()) return;
+
         if (display == EGL14.EGL_NO_DISPLAY || context == EGL14.EGL_NO_CONTEXT || config == null) {
             initializeEgl();
         }
+
         detachEglSurface();
 
         int[] surfaceAttributes = {EGL14.EGL_NONE};
@@ -262,33 +248,33 @@ public final class GlWallpaperRenderThread {
                 surfaceAttributes,
                 0
         );
+
         if (eglSurface == null || eglSurface == EGL14.EGL_NO_SURFACE) {
             eglSurface = EGL14.EGL_NO_SURFACE;
             return;
         }
+
         if (!EGL14.eglMakeCurrent(display, eglSurface, eglSurface, context)) {
             detachEglSurface();
             return;
         }
 
-        sceneRenderer.onSurfaceCreated();
-        stormRenderer.onSurfaceCreated();
-        rainRenderer.onSurfaceCreated();
-        sceneRenderer.onSurfaceChanged(width, height);
-        stormRenderer.onSurfaceChanged(width, height);
-        rainRenderer.onSurfaceChanged(width, height);
-        stormRenderer.setElectricalEnabled(lightningEnabled);
+        pipeline.onSurfaceCreated();
+        pipeline.onSurfaceChanged(width, height);
+        pipeline.setOptions(options);
         lastRealityRefresh = 0L;
     }
 
     private void detachEglSurface() {
         if (display == EGL14.EGL_NO_DISPLAY) return;
+
         EGL14.eglMakeCurrent(
                 display,
                 EGL14.EGL_NO_SURFACE,
                 EGL14.EGL_NO_SURFACE,
                 EGL14.EGL_NO_CONTEXT
         );
+
         if (eglSurface != null && eglSurface != EGL14.EGL_NO_SURFACE) {
             EGL14.eglDestroySurface(display, eglSurface);
         }
@@ -302,13 +288,11 @@ public final class GlWallpaperRenderThread {
 
         WeatherResponse currentWeather = weather;
         if (currentWeather == null || Double.isNaN(latitude) || Double.isNaN(longitude)) {
-            sceneRenderer.setSnapshot(null);
-            stormRenderer.setSnapshot(null);
-            rainRenderer.setSnapshot(null);
+            pipeline.setSnapshot(null);
             return;
         }
 
-        GlSceneSnapshot fullSnapshot = GlRealityAdapter.compose(
+        GlSceneSnapshot snapshot = GlRealityAdapter.compose(
                 currentWeather,
                 airQuality,
                 latitude,
@@ -316,53 +300,7 @@ public final class GlWallpaperRenderThread {
                 now,
                 parallax
         );
-
-        /*
-         * ODM-3 ownership contract:
-         * The base renderer keeps sky/cloud/celestial structure but receives zero
-         * storm electrical intensity, permanently disabling its legacy lightning.
-         * Storm atmosphere/electrical effects are owned by stormRenderer.
-         */
-        GlSceneSnapshot sceneSnapshot = fullSnapshot.withVisualOptions(
-                cloudsEnabled,
-                false,
-                false,
-                snowEnabled,
-                fogEnabled,
-                starsEnabled
-        );
-
-        /*
-         * Storm overlay always receives the real storm state so cloud darkness
-         * remains weather-correct even if the user disables electrical effects.
-         * setElectricalEnabled() gates only flashes and bolts.
-         */
-        GlSceneSnapshot stormSnapshot = fullSnapshot.withVisualOptions(
-                cloudsEnabled,
-                false,
-                true,
-                snowEnabled,
-                fogEnabled,
-                starsEnabled
-        );
-
-        /*
-         * Rain overlay receives electrical storm intensity only while Lightning
-         * is enabled. This keeps rain exposure flashes synchronized with the
-         * storm layer and prevents flashes when the user disables lightning.
-         */
-        GlSceneSnapshot rainSnapshot = fullSnapshot.withVisualOptions(
-                true,
-                rainEnabled,
-                lightningEnabled,
-                true,
-                true,
-                true
-        );
-
-        sceneRenderer.setSnapshot(sceneSnapshot);
-        stormRenderer.setSnapshot(stormSnapshot);
-        rainRenderer.setSnapshot(rainSnapshot);
+        pipeline.setSnapshot(snapshot);
     }
 
     private void restartLoop() {
