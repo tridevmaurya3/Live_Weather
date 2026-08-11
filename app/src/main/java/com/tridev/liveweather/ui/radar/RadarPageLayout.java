@@ -21,11 +21,9 @@ import com.tridev.liveweather.ui.weather.WeatherViewModel;
 /**
  * Phase 9 Radar coordinator.
  *
- * Radar follows the activity-scoped WeatherViewModel directly. WeatherViewModel
- * publishes the requested coordinates immediately when current GPS or a saved
- * city becomes active, before the weather network response completes. This
- * prevents Radar from temporarily following an unrelated last-successful cache
- * location.
+ * Important performance rule: Radar's WebView/Chromium renderer is not created
+ * while this page is hidden. Initialization happens only after the user opens
+ * the Radar destination for the first time.
  */
 public final class RadarPageLayout extends LinearLayout {
 
@@ -34,12 +32,13 @@ public final class RadarPageLayout extends LinearLayout {
     private Phase9Renderer renderer;
     private AppCompatActivity activity;
     private boolean initialized;
+    private boolean attached;
 
     private double lastLatitude = Double.NaN;
     private double lastLongitude = Double.NaN;
 
     private final Observer<WeatherUiState> weatherObserver = state -> {
-        if (state == null) return;
+        if (state == null || !initialized) return;
         double latitude = state.getLatitude();
         double longitude = state.getLongitude();
         if (Double.isNaN(latitude) || Double.isNaN(longitude)) return;
@@ -67,33 +66,36 @@ public final class RadarPageLayout extends LinearLayout {
     @Override
     protected void onAttachedToWindow() {
         super.onAttachedToWindow();
-        if (initialized) return;
-
+        attached = true;
         activity = findActivity(getContext());
         if (activity == null) return;
 
-        initialized = true;
-        weatherViewModel = new ViewModelProvider(activity).get(WeatherViewModel.class);
-        radarViewModel = new ViewModelProvider(activity).get(RadarViewModel.class);
-        renderer = new Phase9Renderer(activity);
-        renderer.setRefreshAction(() -> refreshRadar(true));
-
-        weatherViewModel.getWeatherState().observe(activity, weatherObserver);
-        radarViewModel.getState().observe(activity, radarObserver);
-
-        refreshRadar(false);
+        // isShown() is false for the initial GONE Radar include. This prevents
+        // WebViewFactory/Chromium initialization during MainActivity startup.
+        if (isShown() && getVisibility() == VISIBLE) {
+            ensureInitialized();
+            refreshRadar(false);
+            if (renderer != null) renderer.onVisible();
+        }
     }
 
     @Override
     protected void onVisibilityChanged(@NonNull View changedView, int visibility) {
         super.onVisibilityChanged(changedView, visibility);
-        if (initialized && visibility == VISIBLE) {
+        if (!attached) return;
+
+        if (visibility == VISIBLE && isShown()) {
+            ensureInitialized();
             refreshRadar(false);
+            if (renderer != null) renderer.onVisible();
+        } else if (renderer != null) {
+            renderer.onHidden();
         }
     }
 
     @Override
     protected void onDetachedFromWindow() {
+        attached = false;
         if (weatherViewModel != null) {
             weatherViewModel.getWeatherState().removeObserver(weatherObserver);
         }
@@ -114,8 +116,23 @@ public final class RadarPageLayout extends LinearLayout {
         super.onDetachedFromWindow();
     }
 
+    private void ensureInitialized() {
+        if (initialized) return;
+        if (activity == null) activity = findActivity(getContext());
+        if (activity == null) return;
+
+        initialized = true;
+        weatherViewModel = new ViewModelProvider(activity).get(WeatherViewModel.class);
+        radarViewModel = new ViewModelProvider(activity).get(RadarViewModel.class);
+        renderer = new Phase9Renderer(activity);
+        renderer.setRefreshAction(() -> refreshRadar(true));
+
+        weatherViewModel.getWeatherState().observe(activity, weatherObserver);
+        radarViewModel.getState().observe(activity, radarObserver);
+    }
+
     private void refreshRadar(boolean force) {
-        if (weatherViewModel == null || radarViewModel == null) return;
+        if (!initialized || weatherViewModel == null || radarViewModel == null) return;
 
         WeatherUiState state = weatherViewModel.getWeatherState().getValue();
         if (state == null
@@ -132,7 +149,7 @@ public final class RadarPageLayout extends LinearLayout {
     }
 
     private void syncRadarLocation(double latitude, double longitude, boolean force) {
-        if (radarViewModel == null) return;
+        if (!initialized || radarViewModel == null) return;
 
         boolean changed = Double.isNaN(lastLatitude)
                 || Double.isNaN(lastLongitude)
