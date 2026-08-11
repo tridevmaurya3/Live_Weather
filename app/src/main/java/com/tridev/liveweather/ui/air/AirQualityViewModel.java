@@ -27,22 +27,19 @@ public final class AirQualityViewModel extends AndroidViewModel {
     public AirQualityViewModel(@NonNull Application application) {
         super(application);
         cache = new AirQualityCache(application);
-        AirQualityCache.CachedAirQuality cached = cache.load();
-        if (cached != null) {
-            state.setValue(new AirQualityUiState(
-                    false,
-                    cached.getResponse(),
-                    true,
-                    "Showing saved air quality.",
-                    cached.getSavedAt(),
-                    cached.getLatitude(),
-                    cached.getLongitude()
-            ));
-        } else {
-            state.setValue(new AirQualityUiState(
-                    false, null, false, null, 0L, Double.NaN, Double.NaN
-            ));
-        }
+
+        // Do not publish a generic "last AQI" before the active weather location
+        // is known. refresh(latitude, longitude) resolves the exact per-location
+        // cache first, preventing a saved city's AQI from appearing on another city.
+        state.setValue(new AirQualityUiState(
+                false,
+                null,
+                false,
+                "Waiting for active weather location.",
+                0L,
+                Double.NaN,
+                Double.NaN
+        ));
     }
 
     @NonNull
@@ -62,6 +59,7 @@ public final class AirQualityViewModel extends AndroidViewModel {
         AirQualityResponse existing = null;
         long existingTime = 0L;
         boolean fromCache = false;
+
         AirQualityCache.CachedAirQuality local = cache.load(latitude, longitude);
         if (local != null) {
             existing = local.getResponse();
@@ -83,46 +81,72 @@ public final class AirQualityViewModel extends AndroidViewModel {
                 longitude
         ));
 
-        activeCall = repository.loadAirQuality(latitude, longitude, new AirQualityRepository.CallbackResult() {
-            @Override
-            public void onSuccess(@NonNull AirQualityResponse response) {
-                activeCall = null;
-                long now = System.currentTimeMillis();
-                cache.save(response, latitude, longitude, now);
-                state.setValue(new AirQualityUiState(
-                        false, response, false, null, now, latitude, longitude
-                ));
-            }
+        activeCall = repository.loadAirQuality(
+                latitude,
+                longitude,
+                new AirQualityRepository.CallbackResult() {
+                    @Override
+                    public void onSuccess(@NonNull AirQualityResponse response) {
+                        activeCall = null;
+                        long now = System.currentTimeMillis();
+                        cache.save(response, latitude, longitude, now);
+                        state.setValue(new AirQualityUiState(
+                                false,
+                                response,
+                                false,
+                                null,
+                                now,
+                                latitude,
+                                longitude
+                        ));
+                    }
 
-            @Override
-            public void onError(@NonNull String message, Throwable throwable) {
-                activeCall = null;
-                AirQualityUiState latest = state.getValue();
-                AirQualityResponse fallback = latest == null ? null : latest.getData();
-                long fallbackTime = latest == null ? 0L : latest.getUpdatedAt();
-                state.setValue(new AirQualityUiState(
-                        false,
-                        fallback,
-                        fallback != null,
-                        message,
-                        fallbackTime,
-                        latitude,
-                        longitude
-                ));
-            }
-        });
+                    @Override
+                    public void onError(@NonNull String message, Throwable throwable) {
+                        activeCall = null;
+                        AirQualityUiState latest = state.getValue();
+                        AirQualityResponse fallback = latest != null
+                                && sameArea(latest, latitude, longitude)
+                                ? latest.getData()
+                                : null;
+                        long fallbackTime = latest != null
+                                && sameArea(latest, latitude, longitude)
+                                ? latest.getUpdatedAt()
+                                : 0L;
+
+                        state.setValue(new AirQualityUiState(
+                                false,
+                                fallback,
+                                fallback != null,
+                                message,
+                                fallbackTime,
+                                latitude,
+                                longitude
+                        ));
+                    }
+                }
+        );
     }
 
-    private boolean canReuse(AirQualityUiState current, double latitude, double longitude) {
+    private boolean canReuse(
+            AirQualityUiState current,
+            double latitude,
+            double longitude
+    ) {
         return current != null
                 && current.hasData()
                 && !current.isLoading()
                 && !current.isFromCache()
                 && sameArea(current, latitude, longitude)
-                && System.currentTimeMillis() - current.getUpdatedAt() <= REUSE_WINDOW_MILLIS;
+                && System.currentTimeMillis() - current.getUpdatedAt()
+                <= REUSE_WINDOW_MILLIS;
     }
 
-    private boolean sameArea(AirQualityUiState current, double latitude, double longitude) {
+    private boolean sameArea(
+            AirQualityUiState current,
+            double latitude,
+            double longitude
+    ) {
         return current != null
                 && !Double.isNaN(current.getLatitude())
                 && !Double.isNaN(current.getLongitude())
