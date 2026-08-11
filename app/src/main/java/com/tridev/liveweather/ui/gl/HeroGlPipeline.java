@@ -15,7 +15,7 @@ import com.tridev.liveweather.data.local.WallpaperPreferences;
 public final class HeroGlPipeline {
 
     private final HeroGlCloudSceneRenderer sceneRenderer = new HeroGlCloudSceneRenderer();
-    private final HeroGlWorldLayerRenderer worldRenderer = new HeroGlWorldLayerRenderer();
+    private final HeroGlWorldLayerRendererV2 worldRenderer = new HeroGlWorldLayerRendererV2();
     private final HeroGlAtmosphereOverlayRenderer atmosphereRenderer = new HeroGlAtmosphereOverlayRenderer();
     private final HeroGlStormOverlayRenderer stormRenderer = new HeroGlStormOverlayRenderer();
     private final HeroGlRainOverlayRenderer rainRenderer = new HeroGlRainOverlayRenderer();
@@ -92,7 +92,7 @@ public final class HeroGlPipeline {
         );
 
         /*
-         * The world layer uses the real scene intensities only to choose how its
+         * The world layer uses real scene intensities only to choose how its
          * artistic environment is lit and whether rain/storm should reveal the
          * restrained urban/wet-ground treatment. It never changes weather data.
          */
