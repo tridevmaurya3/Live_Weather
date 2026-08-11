@@ -30,15 +30,16 @@ public final class ProceduralTextureFactory {
         STORM
     }
 
-    // Reduced source resolution still scales cleanly with FILTER_BITMAP while
-    // cutting first-build CPU/memory cost substantially on emulator/low-end GPUs.
+    // Cloud/fog textures stay lightweight and background-built. Moon returns to
+    // the stable 192px source used before the performance regression so thin
+    // phases remain readable without bringing cloud generation back to UI thread.
     private static final int CLOUD_WIDTH = 160;
     private static final int CLOUD_HEIGHT = 80;
     private static final int CLOUD_VARIANTS = 4;
     private static final int FOG_WIDTH = 192;
     private static final int FOG_HEIGHT = 64;
     private static final int FOG_VARIANTS = 4;
-    private static final int MOON_SIZE = 128;
+    private static final int MOON_SIZE = 192;
 
     private static final Bitmap TRANSPARENT_PLACEHOLDER =
             Bitmap.createBitmap(2, 2, Bitmap.Config.ARGB_8888);
@@ -137,29 +138,29 @@ public final class ProceduralTextureFactory {
 
         switch (kind) {
             case CIRRUS:
-                threshold = 0.36d;
-                feather = 0.26d;
-                verticalBias = 0.25d;
-                maximumAlpha = 0.72d;
-                break;
-            case STRATUS:
                 threshold = 0.34d;
                 feather = 0.22d;
+                verticalBias = 0.25d;
+                maximumAlpha = 0.78d;
+                break;
+            case STRATUS:
+                threshold = 0.31d;
+                feather = 0.19d;
                 verticalBias = 0.48d;
-                maximumAlpha = 0.90d;
+                maximumAlpha = 0.92d;
                 break;
             case STORM:
-                threshold = 0.30d;
-                feather = 0.20d;
+                threshold = 0.28d;
+                feather = 0.18d;
                 verticalBias = 0.62d;
                 maximumAlpha = 0.98d;
                 break;
             case CUMULUS:
             default:
-                threshold = 0.33d;
-                feather = 0.22d;
+                threshold = 0.30d;
+                feather = 0.19d;
                 verticalBias = 0.52d;
-                maximumAlpha = 0.94d;
+                maximumAlpha = 0.96d;
                 break;
         }
 
@@ -182,32 +183,50 @@ public final class ProceduralTextureFactory {
                         ny * 2.6d - variant * 1.9d, 4);
                 double detailNoise = fbm(nx * 6.4d - variant * 2.1d,
                         ny * 7.1d + variant * 1.3d, 3);
-                double edgeNoise = (broadNoise - 0.5d) * 0.34d
-                        + (detailNoise - 0.5d) * 0.16d;
 
+                /*
+                 * IMPORTANT: noise may deform a cloud but must never create
+                 * opacity outside the actual cloud body. The older additive
+                 * edgeNoise could lift background pixels above the feather
+                 * threshold, exposing the rectangular bitmap bounds as moving
+                 * blue/grey sheets. Density is now strictly body-gated.
+                 */
                 double density;
                 if (kind == CloudKind.CIRRUS) {
                     double wave = 0.5d + 0.5d * Math.sin(nx * 7.0d + broadNoise * 4.2d);
-                    density = body * (0.68d + wave * 0.20d) + edgeNoise;
+                    double modulation = 0.70d
+                            + wave * 0.22d
+                            + (broadNoise - 0.5d) * 0.18d
+                            + (detailNoise - 0.5d) * 0.08d;
+                    density = body * clamp(modulation, 0.42d, 1.10d);
                 } else {
-                    density = body + edgeNoise;
+                    double modulation = 0.92d
+                            + (broadNoise - 0.5d) * 0.30d
+                            + (detailNoise - 0.5d) * 0.12d;
+                    density = body * clamp(modulation, 0.58d, 1.22d);
                 }
 
                 double edgeFade = smoothstep(0.02d, 0.12d, x)
                         * (1.0d - smoothstep(0.88d, 0.98d, x))
                         * smoothstep(0.02d, 0.16d, y)
                         * (1.0d - smoothstep(0.90d, 0.99d, y));
-                double alpha = smoothstep(threshold - feather, threshold + feather, density)
-                        * edgeFade * maximumAlpha;
 
-                if (alpha <= 0.002d) {
+                // Body gate guarantees the rectangle itself remains transparent.
+                double bodyGate = smoothstep(0.055d, 0.22d, body);
+                double alpha = smoothstep(threshold - feather, threshold + feather, density)
+                        * edgeFade
+                        * bodyGate
+                        * maximumAlpha;
+
+                if (alpha <= 0.018d) {
                     pixels[py * CLOUD_WIDTH + px] = Color.TRANSPARENT;
                     continue;
                 }
 
                 double topLight = 1.0d - y;
                 double bottomShadow = Math.pow(y, 1.35d) * verticalBias;
-                double texture = (broadNoise - 0.5d) * 0.14d + (detailNoise - 0.5d) * 0.07d;
+                double texture = (broadNoise - 0.5d) * 0.14d
+                        + (detailNoise - 0.5d) * 0.07d;
                 int luminance = clampInt((int) Math.round(
                         205.0d + topLight * 35.0d - bottomShadow * 74.0d + texture * 255.0d
                 ), 92, 246);
@@ -279,8 +298,15 @@ public final class ProceduralTextureFactory {
                     }
                 }
                 double limb = Math.pow(Math.max(0.0d, 1.0d - r2), 0.12d);
-                int tone = clampInt((int) Math.round((0.50d + albedo * 0.50d) * limb * 245.0d), 70, 238);
-                pixels[py * MOON_SIZE + px] = Color.argb(255, tone, tone, clampInt(tone + 7, 0, 255));
+                int tone = clampInt((int) Math.round(
+                        (0.50d + albedo * 0.50d) * limb * 245.0d
+                ), 70, 238);
+                pixels[py * MOON_SIZE + px] = Color.argb(
+                        255,
+                        tone,
+                        tone,
+                        clampInt(tone + 7, 0, 255)
+                );
             }
         }
         Bitmap bitmap = Bitmap.createBitmap(MOON_SIZE, MOON_SIZE, Bitmap.Config.ARGB_8888);
@@ -386,9 +412,13 @@ public final class ProceduralTextureFactory {
         Lobe[] result = new Lobe[count];
         for (int i = 0; i < count; i++) {
             double t = count <= 1 ? 0.5d : i / (double) (count - 1);
-            double x = -0.75d + t * 1.50d + (hash(variant * 101 + i * 31) - 0.5d) * 0.22d;
+            double x = -0.75d + t * 1.50d
+                    + (hash(variant * 101 + i * 31) - 0.5d) * 0.22d;
             double arch = 1.0d - Math.pow((t - 0.5d) * 2.0d, 2.0d);
-            double y = verticalCenter - arch * (kind == CloudKind.CUMULUS ? 0.30d : kind == CloudKind.STORM ? 0.22d : 0.08d)
+            double y = verticalCenter
+                    - arch * (kind == CloudKind.CUMULUS
+                    ? 0.30d
+                    : kind == CloudKind.STORM ? 0.22d : 0.08d)
                     + (hash(variant * 211 + i * 47) - 0.5d) * verticalSpread;
             double rx = rxMin + hash(variant * 307 + i * 61) * rxRange;
             double ry = ryMin + hash(variant * 401 + i * 73) * ryRange;
