@@ -130,14 +130,15 @@ public final class Phase9Renderer {
         pushStateToMap();
     }
 
+    /**
+     * Stop renderer-owned callbacks when the page leaves the window. The WebView
+     * belongs to the Activity layout and is intentionally not destroy()ed here,
+     * because the same view can be detached and re-attached by the window/layout
+     * lifecycle. Android will release it with the Activity view hierarchy.
+     */
     public void onDestroy() {
         stopPlayback();
-        if (mapWebView != null) {
-            mapWebView.stopLoading();
-            mapWebView.setWebViewClient(null);
-            mapWebView.loadUrl("about:blank");
-            mapWebView.destroy();
-        }
+        refreshAction = null;
     }
 
     private void setupWebView() {
