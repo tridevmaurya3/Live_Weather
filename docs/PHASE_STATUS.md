@@ -84,7 +84,6 @@ Status: COMPLETE — FUNCTIONAL PROCEDURAL ENGINE
 ### A. Animated Sky Engine
 Status: COMPLETE
 
-- Main atmosphere no longer relies on Sun/Moon/star icons as the animation itself
 - Procedural glowing Sun disc and rays
 - Real Sun altitude/azimuth from active location + clock
 - Procedural Moon disc with phase-dependent shadow
@@ -92,8 +91,8 @@ Status: COMPLETE
 - Below-horizon Sun/Moon are hidden
 - Animated twinkling star field
 - Star visibility reacts to astronomical darkness, clouds, fog, precipitation and Moon glare
-- Daylight, golden hour, civil twilight, nautical twilight, astronomical twilight and night gradients
-- App-wide live animated nature background added
+- Daylight/golden-hour/twilight/night gradients
+- App-wide live animated nature background
 - Forecast and Wallpaper preview use the same renderer
 
 ### B. Animated Weather Engine
@@ -102,60 +101,127 @@ Status: COMPLETE
 - Multi-depth moving cloud layers
 - Cloud density follows cloud cover
 - Cloud speed and direction respond to live wind
-- Animated rain streaks
-- Lighter drizzle particles
-- Wind-driven rain angle
+- Animated rain and drizzle
+- Wind-driven precipitation angle
 - Animated snow drift
 - Moving fog/mist bands
-- Irregular thunderstorm flash and procedural lightning bolt animation
-- Weather animation intensity follows the precipitation-first resolved live condition
+- Irregular thunderstorm flash and procedural lightning
+- Weather animation intensity follows the shared live condition
 
 ### C. Dynamic Reality Composer
 Status: COMPLETE
 
-- Shared SceneState added
-- DynamicRealityComposer added
-- Weather + astronomy are combined before rendering
-- Scene state includes cloud/rain/drizzle/snow/fog/storm/wind/visibility intensities
-- Sun/Moon visibility is reduced by real weather obstruction
-- Star visibility and scene light are shared renderer inputs
-- Clear/rain/storm/fog/snow/day/night scenes are composed from one reality source instead of independent presets
+- Shared SceneState
+- DynamicRealityComposer
+- Weather + astronomy combined before rendering
+- Cloud/rain/drizzle/snow/fog/storm/wind/visibility intensities
+- Weather obstruction controls Sun/Moon/star visibility
+- Shared scene-light state
 
 ### D. Android Live Wallpaper Engine
 Status: COMPLETE
 
-- Real `WallpaperService` implementation added
-- Android manifest service registration added with `BIND_WALLPAPER`
-- Wallpaper metadata XML added
-- App Apply button opens Android live-wallpaper preview/confirmation for the real service
-- System wallpaper and app preview use the same NatureSceneRenderer
-- Render loop runs only while WallpaperService.Engine is visible
-- Surface destroy/hidden states stop frame callbacks
-- Normal rendering targets about 30 FPS
-- Adaptive FPS lowers render frequency in Power Saver / low battery
-- Home-screen horizontal offsets create subtle parallax
-- Weather network refresh is separate from animation frames
-- WorkManager refreshes the latest active cached coordinates on a connected network
-- Wallpaper service reloads newer cache snapshots without per-frame networking
-- Background GPS permission is not requested by the wallpaper engine
+- Real WallpaperService
+- BIND_WALLPAPER manifest registration and metadata
+- Android live-wallpaper preview/confirmation launch
+- Shared NatureSceneRenderer across app and system wallpaper
+- Visible-only render loop
+- Adaptive FPS for Power Saver/low battery
+- Horizontal parallax
+- Network refresh separated from rendering
+- WorkManager weather refresh
+- No background GPS permission
 
-## Real Live Nature Engine Result
+## Phase 7 — AQI + Sun / Moon Intelligence
+Status: COMPLETE
 
-The project now has one shared procedural environment architecture across:
+### Step 7.1 — Real Air Quality Data Engine
+Status: COMPLETE
 
-1. App animated background.
-2. Forecast animated sky.
-3. In-app Wallpaper preview.
-4. Android home-screen Live WallpaperService.
+- Open-Meteo Air Quality API client added
+- CAMS-based current and hourly air-quality data
+- United States AQI and European AQI
+- Pollutant-specific U.S. AQI components
+- PM2.5 and PM10
+- Ozone, nitrogen dioxide, sulphur dioxide and carbon monoxide
+- Aerosol optical depth and dust
+- UV index and clear-sky UV index
+- Three-day AQI request window with 24-hour intelligence presentation
 
-The scene includes animated Sun, Moon phase, stars, moving clouds, wind-driven precipitation, snow, fog and lightning, all derived from the shared Weather + Astronomy reality state.
+### Step 7.2 — Per-Location AQI State & Cache
+Status: COMPLETE
 
-This is a functional procedural live engine. It is intentionally not described as a camera feed or guaranteed photorealistic video; later visual polish can improve textures and cinematic realism without changing the core architecture.
+- Shared AirQualityViewModel
+- Per-location persistent AQI cache
+- Saved-city/current-location synchronization
+- Cached fallback while refreshing
+- Manual AQI refresh action
+- Background wallpaper worker refreshes weather and AQI independently on connected network
 
-See `docs/REAL_LIVE_NATURE_ENGINE.md` for the complete implementation contract.
+### Step 7.3 — Professional AQI Intelligence Surface
+Status: COMPLETE
+
+- More screen receives a full Air Quality Intelligence card
+- Large current US AQI value and category
+- EU AQI comparison
+- Dominant pollutant derived from pollutant-specific AQI components
+- PM2.5/PM10 and gas pollutant detail
+- Aerosol/dust haze detail
+- Actual UV versus clear-sky UV comparison
+- Next-24-hour AQI range and peak period
+- Horizontal three-hour AQI outlook cards
+- Home Air Quality quick action opens the AQI intelligence surface
+- CAMS/Open-Meteo model-estimate wording is surfaced instead of pretending to be a local sensor
+
+### Step 7.4 — AQI-Aware Reality Engine
+Status: COMPLETE
+
+- Domain AirQualityReality haze rule added
+- Aerosol optical depth, PM2.5 and dust feed a normalized haze estimate
+- Live app background receives AQI haze
+- Forecast Live Sky receives AQI haze
+- Wallpaper preview receives AQI haze
+- Android system Live Wallpaper receives matching-location AQI haze from cache
+- City switching cannot intentionally mix an unrelated AQI cache with another weather-location cache
+- AQI network refresh remains separate from animation frames
+
+### Step 7.5 — Advanced Sun & Moon Intelligence
+Status: COMPLETE
+
+- Real current Sun altitude and azimuth
+- Sun above/below-horizon state
+- Real current Moon altitude and azimuth
+- Current Moon phase and illuminated percentage
+- Daylight progress through today's sunrise/sunset window
+- Solar midpoint estimate
+- Current sky-stage/star-visibility/scene-light summary
+- Dedicated Sun & Moon Intelligence surface below the Forecast Live Sky
+
+### Step 7.6 — Upcoming Lunar Events
+Status: COMPLETE
+
+- Astronomy Engine searchMoonQuarter / nextMoonQuarter flow integrated
+- Next New Moon, First Quarter, Full Moon and Third Quarter events are calculated rather than hard-coded
+- Event date/time is converted to the active weather-location timezone
+- Existing daily Moon phase progression and moonrise/moonset timeline remain synchronized
+
+### Step 7.7 — Air Quality Accuracy Contract
+Status: COMPLETE
+
+- docs/AIR_QUALITY_ENGINE.md added
+- AQI is explicitly treated as CAMS model data, not a street-level physical sensor
+- Primary AQI is explicitly United States AQI; it is not mislabeled as India CPCB AQI
+- CAMS/Open-Meteo attribution requirement documented
+- Weather visibility, fog, AQI haze and astronomy remain separate inputs to one coherent visual reality
+
+## Phase 7 Result
+
+Live Weather now synchronizes weather, astronomy and atmospheric-composition intelligence for the active location.
+
+The user can inspect current and near-term AQI/pollutants, aerosol/dust haze, Sun/Moon position, daylight progress and upcoming major lunar events. AQI haze also participates in the animated app and Live Wallpaper atmosphere without creating network calls in the render loop.
 
 ## Next
 
-Phase 7 — AQI + Sun / Moon Intelligence
+Phase 8 — Weather Alerts
 
-Planned scope: real AQI/pollutant integration, richer Sun/Moon details, next lunar events, UV/daylight intelligence and deeper visibility information while preserving the completed Real Live Nature Engine.
+Planned scope: location-aware severe-weather alert ingestion where authoritative provider coverage is available, alert severity/urgency intelligence, compact dashboard alerts, detail view, notification policy, deduplication and safe background refresh while preserving the shared Reality State.
