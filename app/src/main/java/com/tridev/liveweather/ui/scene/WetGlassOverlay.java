@@ -23,6 +23,8 @@ public final class WetGlassOverlay {
     private final RectF oval = new RectF();
     private final Path trailPath = new Path();
 
+    private long animationOriginMillis;
+
     public WetGlassOverlay() {
         fillPaint.setStyle(Paint.Style.FILL);
         rimPaint.setStyle(Paint.Style.STROKE);
@@ -43,7 +45,8 @@ public final class WetGlassOverlay {
         float amount = clamp01(wetness);
         if (amount < 0.035f) return;
 
-        float seconds = nowMillis / 1000f;
+        if (animationOriginMillis == 0L) animationOriginMillis = nowMillis;
+        float seconds = Math.max(0L, nowMillis - animationOriginMillis) / 1000f;
         int count = 10 + Math.round(amount * 24f);
 
         for (int i = 0; i < count; i++) {
@@ -71,7 +74,6 @@ public final class WetGlassOverlay {
             fillPaint.setColor(Color.argb(bodyAlpha, 205, 231, 245));
             canvas.drawOval(oval, fillPaint);
 
-            // Lower/dark refractive rim.
             rimPaint.setStrokeWidth(Math.max(0.75f, radius * 0.11f));
             rimPaint.setColor(Color.argb(
                     clampInt(Math.round(20f + amount * 34f), 14, 62),
@@ -81,7 +83,6 @@ public final class WetGlassOverlay {
             ));
             canvas.drawArc(oval, 8f, 164f, false, rimPaint);
 
-            // Upper specular rim. Lightning makes this catch more light.
             rimPaint.setStrokeWidth(Math.max(0.65f, radius * 0.10f));
             rimPaint.setColor(Color.argb(
                     clampInt(Math.round(52f + amount * 68f + stormFlash * 95f), 40, 210),
@@ -104,8 +105,6 @@ public final class WetGlassOverlay {
                     fillPaint
             );
 
-            // Larger drops leave curved water trails. The trail itself recycles
-            // with the drop and never expires while rain is active.
             if (amount > 0.28f && radius > 7.2f && hash01(seed * 67 + 41) > 0.38f) {
                 float trailLength = radius * (2.8f + amount * 5.8f);
                 float sway = (hash01(seed * 71 + 19) - 0.5f) * radius * 0.85f;
