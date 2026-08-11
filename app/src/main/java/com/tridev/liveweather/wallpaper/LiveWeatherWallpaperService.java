@@ -145,8 +145,13 @@ public final class LiveWeatherWallpaperService extends WallpaperService {
             WeatherCache.CachedWeather weather = weatherCache.load();
             if (weather == null) {
                 renderer.clearWeatherData();
+                airHazeRenderer.setAirQuality(null);
                 loadedWeatherSavedAt = Long.MIN_VALUE;
-            } else if (force || weather.getSavedAt() != loadedWeatherSavedAt) {
+                loadedAirSavedAt = Long.MIN_VALUE;
+                return;
+            }
+
+            if (force || weather.getSavedAt() != loadedWeatherSavedAt) {
                 loadedWeatherSavedAt = weather.getSavedAt();
                 renderer.setWeatherData(
                         weather.getWeather(),
@@ -155,7 +160,10 @@ public final class LiveWeatherWallpaperService extends WallpaperService {
                 );
             }
 
-            AirQualityCache.CachedAirQuality air = airQualityCache.load();
+            AirQualityCache.CachedAirQuality air = airQualityCache.load(
+                    weather.getLatitude(),
+                    weather.getLongitude()
+            );
             if (air == null) {
                 airHazeRenderer.setAirQuality(null);
                 loadedAirSavedAt = Long.MIN_VALUE;
