@@ -4,6 +4,7 @@ import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
 import com.tridev.liveweather.data.remote.dto.AirQualityResponse;
+import com.tridev.liveweather.domain.AirQualityReality;
 import com.tridev.liveweather.ui.weather.WeatherFormatter;
 
 import java.time.LocalDateTime;
@@ -52,12 +53,7 @@ public final class AirQualityIntelligence {
     }
 
     public static double hazeIntensity(@Nullable AirQualityResponse response) {
-        if (response == null || response.getCurrent() == null) return 0d;
-        AirQualityResponse.CurrentAirQuality c = response.getCurrent();
-        double aod = clamp(value(c.getAerosolOpticalDepth()) / 1.2d, 0d, 1d);
-        double pm = clamp(value(c.getPm25()) / 120d, 0d, 1d);
-        double dust = clamp(value(c.getDust()) / 180d, 0d, 1d);
-        return clamp(Math.max(aod * 0.85d, Math.max(pm * 0.72d, dust * 0.78d)), 0d, 1d);
+        return AirQualityReality.hazeIntensity(response);
     }
 
     @NonNull
