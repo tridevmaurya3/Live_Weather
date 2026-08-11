@@ -15,6 +15,7 @@ import com.tridev.liveweather.data.local.AirQualityCache;
 import com.tridev.liveweather.data.local.WallpaperPreferences;
 import com.tridev.liveweather.data.local.WeatherCache;
 import com.tridev.liveweather.ui.scene.AirHazeOverlayRenderer;
+import com.tridev.liveweather.ui.scene.HeroRainRenderer;
 import com.tridev.liveweather.ui.scene.NatureSceneRenderer;
 import com.tridev.liveweather.worker.WallpaperWeatherScheduler;
 
@@ -34,6 +35,7 @@ public final class LiveWeatherWallpaperService extends WallpaperService {
 
         private final Handler handler = new Handler(Looper.getMainLooper());
         private final NatureSceneRenderer renderer = new NatureSceneRenderer();
+        private final HeroRainRenderer heroRainRenderer = new HeroRainRenderer();
         private final AirHazeOverlayRenderer airHazeRenderer = new AirHazeOverlayRenderer();
         private final WeatherCache weatherCache = new WeatherCache(LiveWeatherWallpaperService.this);
         private final AirQualityCache airQualityCache = new AirQualityCache(LiveWeatherWallpaperService.this);
@@ -59,7 +61,7 @@ public final class LiveWeatherWallpaperService extends WallpaperService {
         public void onCreate(@NonNull SurfaceHolder surfaceHolder) {
             super.onCreate(surfaceHolder);
             setTouchEventsEnabled(false);
-            renderer.setOptions(options);
+            applyOptions(options);
             reloadCache(true);
             WallpaperWeatherScheduler.schedule(LiveWeatherWallpaperService.this);
         }
@@ -70,7 +72,7 @@ public final class LiveWeatherWallpaperService extends WallpaperService {
             handler.removeCallbacks(drawRunnable);
             if (visible) {
                 options = preferences.load();
-                renderer.setOptions(options);
+                applyOptions(options);
                 reloadCache(true);
                 handler.post(drawRunnable);
             }
@@ -122,6 +124,7 @@ public final class LiveWeatherWallpaperService extends WallpaperService {
                 if (canvas != null) {
                     renderer.draw(canvas, canvas.getWidth(), canvas.getHeight(), now);
                     airHazeRenderer.draw(canvas, canvas.getWidth(), canvas.getHeight());
+                    heroRainRenderer.draw(canvas, canvas.getWidth(), canvas.getHeight(), now);
                 }
             } catch (RuntimeException ignored) {
             } finally {
@@ -140,11 +143,12 @@ public final class LiveWeatherWallpaperService extends WallpaperService {
             lastCacheReload = now;
 
             options = preferences.load();
-            renderer.setOptions(options);
+            applyOptions(options);
 
             WeatherCache.CachedWeather weather = weatherCache.load();
             if (weather == null) {
                 renderer.clearWeatherData();
+                heroRainRenderer.clearWeatherData();
                 airHazeRenderer.setAirQuality(null);
                 loadedWeatherSavedAt = Long.MIN_VALUE;
                 loadedAirSavedAt = Long.MIN_VALUE;
@@ -158,6 +162,7 @@ public final class LiveWeatherWallpaperService extends WallpaperService {
                         weather.getLatitude(),
                         weather.getLongitude()
                 );
+                heroRainRenderer.setWeatherData(weather.getWeather());
             }
 
             AirQualityCache.CachedAirQuality air = airQualityCache.load(
@@ -171,6 +176,20 @@ public final class LiveWeatherWallpaperService extends WallpaperService {
                 loadedAirSavedAt = air.getSavedAt();
                 airHazeRenderer.setAirQuality(air.getResponse());
             }
+        }
+
+        private void applyOptions(@NonNull WallpaperPreferences.Options options) {
+            // HRS-1A: preserve every NatureScene layer except legacy rain lines.
+            renderer.setOptions(new WallpaperPreferences.Options(
+                    false,
+                    options.isClouds(),
+                    options.isLightning(),
+                    options.isSnow(),
+                    options.isFog(),
+                    options.isStars(),
+                    options.isBatteryAdaptive()
+            ));
+            heroRainRenderer.setEnabled(options.isRain());
         }
 
         private long frameIntervalMillis() {
