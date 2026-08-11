@@ -13,15 +13,17 @@ import android.view.Surface;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
+import com.tridev.liveweather.data.local.WallpaperPreferences;
 import com.tridev.liveweather.data.remote.dto.AirQualityResponse;
 import com.tridev.liveweather.data.remote.dto.WeatherResponse;
 import com.tridev.liveweather.ui.gl.GlRealityAdapter;
+import com.tridev.liveweather.ui.gl.GlSceneSnapshot;
 import com.tridev.liveweather.ui.gl.HeroGlSceneRenderer;
 
 /**
  * Dedicated EGL14 render thread for the system Live Wallpaper.
  *
- * Network/cache work never happens inside the frame loop. The UI/service thread
+ * Network/cache work never happens inside the frame loop. The service thread
  * only publishes immutable weather/AQI inputs; this GL thread refreshes the
  * astronomy/reality snapshot periodically and animates continuously while the
  * wallpaper is visible.
@@ -51,6 +53,13 @@ public final class GlWallpaperRenderThread {
     private long lastRealityRefresh;
     private boolean visible;
     private boolean released;
+
+    private boolean cloudsEnabled = true;
+    private boolean rainEnabled = true;
+    private boolean lightningEnabled = true;
+    private boolean snowEnabled = true;
+    private boolean fogEnabled = true;
+    private boolean starsEnabled = true;
 
     private final Runnable renderRunnable = new Runnable() {
         @Override
@@ -108,6 +117,18 @@ public final class GlWallpaperRenderThread {
 
     public void setFrameIntervalMillis(long frameIntervalMillis) {
         handler.post(() -> this.frameIntervalMillis = Math.max(16L, frameIntervalMillis));
+    }
+
+    public void setVisualOptions(@NonNull WallpaperPreferences.Options options) {
+        handler.post(() -> {
+            cloudsEnabled = options.isClouds();
+            rainEnabled = options.isRain();
+            lightningEnabled = options.isLightning();
+            snowEnabled = options.isSnow();
+            fogEnabled = options.isFog();
+            starsEnabled = options.isStars();
+            lastRealityRefresh = 0L;
+        });
     }
 
     public void setWeatherData(
@@ -261,14 +282,22 @@ public final class GlWallpaperRenderThread {
             renderer.setSnapshot(null);
             return;
         }
-        renderer.setSnapshot(GlRealityAdapter.compose(
+        GlSceneSnapshot snapshot = GlRealityAdapter.compose(
                 currentWeather,
                 airQuality,
                 latitude,
                 longitude,
                 now,
                 parallax
-        ));
+        ).withVisualOptions(
+                cloudsEnabled,
+                rainEnabled,
+                lightningEnabled,
+                snowEnabled,
+                fogEnabled,
+                starsEnabled
+        );
+        renderer.setSnapshot(snapshot);
     }
 
     private void restartLoop() {
