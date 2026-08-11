@@ -30,6 +30,12 @@ public final class GlSceneSnapshot {
 
     public final float starVisibility;
     public final float cloudCover;
+    public final float cloudDensity;
+    public final float cloudFarLayer;
+    public final float cloudMidLayer;
+    public final float cloudNearLayer;
+    public final float cloudStormCeiling;
+    public final float cloudBrightness;
     public final float rainIntensity;
     public final float drizzleIntensity;
     public final float snowIntensity;
@@ -64,6 +70,12 @@ public final class GlSceneSnapshot {
             float moonAltitude,
             float starVisibility,
             float cloudCover,
+            float cloudDensity,
+            float cloudFarLayer,
+            float cloudMidLayer,
+            float cloudNearLayer,
+            float cloudStormCeiling,
+            float cloudBrightness,
             float rainIntensity,
             float drizzleIntensity,
             float snowIntensity,
@@ -97,6 +109,12 @@ public final class GlSceneSnapshot {
         this.moonAltitude = moonAltitude;
         this.starVisibility = starVisibility;
         this.cloudCover = cloudCover;
+        this.cloudDensity = cloudDensity;
+        this.cloudFarLayer = cloudFarLayer;
+        this.cloudMidLayer = cloudMidLayer;
+        this.cloudNearLayer = cloudNearLayer;
+        this.cloudStormCeiling = cloudStormCeiling;
+        this.cloudBrightness = cloudBrightness;
         this.rainIntensity = rainIntensity;
         this.drizzleIntensity = drizzleIntensity;
         this.snowIntensity = snowIntensity;
@@ -118,6 +136,13 @@ public final class GlSceneSnapshot {
             boolean fog,
             boolean stars
     ) {
+        float cloudAmount = clouds ? cloudCover : 0f;
+        float cloudLayerDensity = clouds ? cloudDensity : 0f;
+        float far = clouds ? cloudFarLayer : 0f;
+        float mid = clouds ? cloudMidLayer : 0f;
+        float near = clouds ? cloudNearLayer : 0f;
+        float ceiling = clouds ? cloudStormCeiling : 0f;
+
         return new GlSceneSnapshot(
                 topR, topG, topB,
                 midR, midG, midB,
@@ -126,7 +151,13 @@ public final class GlSceneSnapshot {
                 moonX, moonY, moonVisibility, moonIllumination,
                 moonPhaseAngleRadians, moonAltitude,
                 stars ? starVisibility : 0f,
-                clouds ? cloudCover : 0f,
+                cloudAmount,
+                cloudLayerDensity,
+                far,
+                mid,
+                near,
+                ceiling,
+                cloudBrightness,
                 rain ? rainIntensity : 0f,
                 rain ? drizzleIntensity : 0f,
                 snow ? snowIntensity : 0f,
