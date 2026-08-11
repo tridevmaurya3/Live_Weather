@@ -9,13 +9,25 @@ import com.tridev.liveweather.data.remote.dto.RadarFieldPointResponse;
 import com.tridev.liveweather.data.remote.dto.RainViewerResponse;
 import com.tridev.liveweather.data.repository.RadarRepository;
 
+import java.util.Collections;
 import java.util.List;
 
 public final class RadarViewModel extends ViewModel {
 
     private final MutableLiveData<RadarUiState> state = new MutableLiveData<>();
     private final RadarRepository repository = new RadarRepository();
+
     private long requestGeneration;
+    private double latitude = Double.NaN;
+    private double longitude = Double.NaN;
+    private boolean loadingRadar;
+    private boolean loadingField;
+    private RainViewerResponse radar;
+    private List<RadarFieldPointResponse> field = Collections.emptyList();
+    private String radarError;
+    private String fieldError;
+    private boolean radarFromCache;
+    private boolean fieldFromCache;
 
     public LiveData<RadarUiState> getState() {
         return state;
@@ -24,42 +36,43 @@ public final class RadarViewModel extends ViewModel {
     public void refresh(double latitude, double longitude, boolean force) {
         if (Double.isNaN(latitude) || Double.isNaN(longitude)) return;
 
+        boolean sameLocation = !Double.isNaN(this.latitude)
+                && Math.abs(this.latitude - latitude) < 0.02d
+                && Math.abs(this.longitude - longitude) < 0.02d;
+
         long generation = ++requestGeneration;
-        RadarUiState previous = state.getValue();
-        RadarUiState loading = RadarUiState.loading(latitude, longitude);
-        if (!force && previous != null
-                && Math.abs(previous.getLatitude() - latitude) < 0.02d
-                && Math.abs(previous.getLongitude() - longitude) < 0.02d) {
-            loading = new RadarUiState(
-                    latitude,
-                    longitude,
-                    true,
-                    true,
-                    previous.getRadar(),
-                    previous.getField(),
-                    null,
-                    null,
-                    previous.isRadarFromCache(),
-                    previous.isFieldFromCache()
-            );
+        this.latitude = latitude;
+        this.longitude = longitude;
+        loadingRadar = true;
+        loadingField = true;
+        radarError = null;
+        fieldError = null;
+
+        if (force || !sameLocation) {
+            radar = null;
+            field = Collections.emptyList();
+            radarFromCache = false;
+            fieldFromCache = false;
         }
-        state.setValue(loading);
+        publish();
 
         repository.loadRadar(force, new RadarRepository.ResultCallback<RainViewerResponse>() {
             @Override
             public void onSuccess(@NonNull RainViewerResponse value, boolean fromCache) {
                 if (generation != requestGeneration) return;
-                RadarUiState current = state.getValue();
-                if (current == null) current = RadarUiState.loading(latitude, longitude);
-                state.postValue(current.withRadar(value, null, fromCache));
+                radar = value;
+                radarFromCache = fromCache;
+                radarError = null;
+                loadingRadar = false;
+                publish();
             }
 
             @Override
             public void onError(@NonNull String message, Throwable throwable) {
                 if (generation != requestGeneration) return;
-                RadarUiState current = state.getValue();
-                if (current == null) current = RadarUiState.loading(latitude, longitude);
-                state.postValue(current.withRadar(current.getRadar(), message, current.isRadarFromCache()));
+                radarError = message;
+                loadingRadar = false;
+                publish();
             }
         });
 
@@ -71,22 +84,36 @@ public final class RadarViewModel extends ViewModel {
                             boolean fromCache
                     ) {
                         if (generation != requestGeneration) return;
-                        RadarUiState current = state.getValue();
-                        if (current == null) current = RadarUiState.loading(latitude, longitude);
-                        state.postValue(current.withField(value, null, fromCache));
+                        field = value;
+                        fieldFromCache = fromCache;
+                        fieldError = null;
+                        loadingField = false;
+                        publish();
                     }
 
                     @Override
                     public void onError(@NonNull String message, Throwable throwable) {
                         if (generation != requestGeneration) return;
-                        RadarUiState current = state.getValue();
-                        if (current == null) current = RadarUiState.loading(latitude, longitude);
-                        state.postValue(current.withField(
-                                current.getField(),
-                                message,
-                                current.isFieldFromCache()
-                        ));
+                        fieldError = message;
+                        loadingField = false;
+                        publish();
                     }
                 });
+    }
+
+    private void publish() {
+        RadarUiState snapshot = new RadarUiState(
+                latitude,
+                longitude,
+                loadingRadar,
+                loadingField,
+                radar,
+                field,
+                radarError,
+                fieldError,
+                radarFromCache,
+                fieldFromCache
+        );
+        state.postValue(snapshot);
     }
 }
