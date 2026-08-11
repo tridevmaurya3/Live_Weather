@@ -3,8 +3,8 @@ package com.tridev.liveweather.domain;
 /**
  * Shared astronomical/environment state for the app, widgets and live wallpaper.
  *
- * The renderer-facing values are normalized so UI and wallpaper code do not need
- * to repeat astronomy or weather visibility calculations.
+ * Renderer-facing values are normalized so the UI and wallpaper use one
+ * astronomy/weather reality source.
  */
 public final class SkyRealityState {
 
@@ -14,6 +14,7 @@ public final class SkyRealityState {
     private final double moonAltitude;
     private final double moonAzimuth;
     private final double moonIlluminationPercent;
+    private final double moonPhaseAngleDegrees;
     private final String moonPhaseName;
     private final int starVisibilityPercent;
     private final int ambientLightPercent;
@@ -25,6 +26,7 @@ public final class SkyRealityState {
             double moonAltitude,
             double moonAzimuth,
             double moonIlluminationPercent,
+            double moonPhaseAngleDegrees,
             String moonPhaseName,
             int starVisibilityPercent,
             int ambientLightPercent
@@ -35,6 +37,7 @@ public final class SkyRealityState {
         this.moonAltitude = moonAltitude;
         this.moonAzimuth = moonAzimuth;
         this.moonIlluminationPercent = moonIlluminationPercent;
+        this.moonPhaseAngleDegrees = moonPhaseAngleDegrees;
         this.moonPhaseName = moonPhaseName;
         this.starVisibilityPercent = starVisibilityPercent;
         this.ambientLightPercent = ambientLightPercent;
@@ -62,6 +65,10 @@ public final class SkyRealityState {
 
     public double getMoonIlluminationPercent() {
         return moonIlluminationPercent;
+    }
+
+    public double getMoonPhaseAngleDegrees() {
+        return moonPhaseAngleDegrees;
     }
 
     public String getMoonPhaseName() {
