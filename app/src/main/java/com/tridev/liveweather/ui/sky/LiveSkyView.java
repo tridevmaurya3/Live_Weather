@@ -1,10 +1,17 @@
 package com.tridev.liveweather.ui.sky;
 
 import android.content.Context;
-import android.graphics.Canvas;
+import android.graphics.SurfaceTexture;
+import android.opengl.EGL14;
+import android.opengl.EGLConfig;
+import android.opengl.EGLContext;
+import android.opengl.EGLDisplay;
+import android.opengl.EGLSurface;
 import android.os.Handler;
-import android.os.Looper;
+import android.os.HandlerThread;
+import android.os.Process;
 import android.util.AttributeSet;
+import android.view.TextureView;
 import android.view.View;
 
 import androidx.annotation.NonNull;
@@ -13,183 +20,435 @@ import androidx.annotation.Nullable;
 import com.tridev.liveweather.data.local.WallpaperPreferences;
 import com.tridev.liveweather.data.remote.dto.AirQualityResponse;
 import com.tridev.liveweather.data.remote.dto.WeatherResponse;
+import com.tridev.liveweather.domain.SkyRealityEngine;
 import com.tridev.liveweather.domain.SkyRealityState;
-import com.tridev.liveweather.ui.scene.AirHazeOverlayRenderer;
-import com.tridev.liveweather.ui.scene.HeroCloudRenderer;
-import com.tridev.liveweather.ui.scene.HeroRainRenderer;
-import com.tridev.liveweather.ui.scene.HeroStormRenderer;
-import com.tridev.liveweather.ui.scene.NatureSceneRenderer;
+import com.tridev.liveweather.ui.gl.GlRealityAdapter;
+import com.tridev.liveweather.ui.gl.GlSceneSnapshot;
+import com.tridev.liveweather.ui.gl.HeroGlPipeline;
 
-public final class LiveSkyView extends View {
+/**
+ * ODM-5 in-app live weather surface.
+ *
+ * The old Canvas Hero stack has been replaced by the same OpenGL/EGL pipeline
+ * used by Android system Live Wallpaper. TextureView keeps normal Android view
+ * composition semantics, including the existing alpha/background/card usage.
+ */
+public final class LiveSkyView extends TextureView implements TextureView.SurfaceTextureListener {
 
+    private static final long REALITY_REFRESH_MILLIS = 30_000L;
     private static final long FRAME_MILLIS = 33L;
 
-    private final Handler handler = new Handler(Looper.getMainLooper());
-    private final NatureSceneRenderer renderer = new NatureSceneRenderer();
-    private final HeroCloudRenderer heroCloudRenderer = new HeroCloudRenderer();
-    private final HeroRainRenderer heroRainRenderer = new HeroRainRenderer();
-    private final HeroStormRenderer heroStormRenderer = new HeroStormRenderer();
-    private final AirHazeOverlayRenderer airHazeRenderer = new AirHazeOverlayRenderer();
+    /*
+     * MainActivity owns several LiveSkyView instances (global background,
+     * Forecast live-sky card, Wallpaper preview). Weather is shared so all
+     * visible instances render the same current reality without duplicate wiring.
+     */
+    private static final Object SHARED_LOCK = new Object();
+    @Nullable private static WeatherResponse sharedWeather;
+    @Nullable private static AirQualityResponse sharedAirQuality;
+    @Nullable private static WallpaperPreferences.Options sharedOptions;
+    private static double sharedLatitude = Double.NaN;
+    private static double sharedLongitude = Double.NaN;
+    private static long sharedVersion = 1L;
 
-    private WallpaperPreferences.Options options;
+    private final HeroGlPipeline pipeline = new HeroGlPipeline();
+    private final HandlerThread renderThread;
+    private final Handler renderHandler;
+
+    private EGLDisplay display = EGL14.EGL_NO_DISPLAY;
+    private EGLContext eglContext = EGL14.EGL_NO_CONTEXT;
+    private EGLSurface eglSurface = EGL14.EGL_NO_SURFACE;
+    private EGLConfig eglConfig;
+
+    @Nullable private SurfaceTexture activeSurfaceTexture;
+    private int surfaceWidth = 1;
+    private int surfaceHeight = 1;
     private boolean attached;
+    private boolean visible;
+    private volatile boolean released;
+    private boolean pipelineCreated;
+    private long lastRealityRefresh;
+    private long seenSharedVersion = -1L;
 
-    private final Runnable frameTicker = new Runnable() {
+    @Nullable
+    private volatile SkyRealityState lastSkyState;
+
+    private final Runnable renderRunnable = new Runnable() {
         @Override
         public void run() {
-            if (!shouldAnimate()) return;
-            postInvalidateOnAnimation();
-            handler.postDelayed(this, FRAME_MILLIS);
+            if (released || !visible || eglSurface == EGL14.EGL_NO_SURFACE) return;
+
+            try {
+                refreshRealityIfNeeded();
+                pipeline.drawFrame();
+                if (!EGL14.eglSwapBuffers(display, eglSurface)) {
+                    detachEglSurface();
+                    return;
+                }
+            } catch (RuntimeException ignored) {
+                detachEglSurface();
+                return;
+            }
+
+            if (!released && visible && eglSurface != EGL14.EGL_NO_SURFACE) {
+                renderHandler.postDelayed(this, FRAME_MILLIS);
+            }
         }
     };
 
     public LiveSkyView(Context context) {
-        super(context);
-        init(context);
+        this(context, null);
     }
 
     public LiveSkyView(Context context, @Nullable AttributeSet attrs) {
-        super(context, attrs);
-        init(context);
+        this(context, attrs, 0);
     }
 
     public LiveSkyView(Context context, @Nullable AttributeSet attrs, int defStyleAttr) {
         super(context, attrs, defStyleAttr);
-        init(context);
-    }
 
-    private void init(@NonNull Context context) {
-        options = new WallpaperPreferences(context).load();
-        applyOptions(options);
-        setWillNotDraw(false);
+        synchronized (SHARED_LOCK) {
+            if (sharedOptions == null) {
+                sharedOptions = new WallpaperPreferences(context).load();
+            }
+        }
+
+        setOpaque(true);
+        setSurfaceTextureListener(this);
+
+        renderThread = new HandlerThread("LiveWeather-AppGL", Process.THREAD_PRIORITY_DISPLAY);
+        renderThread.start();
+        renderHandler = new Handler(renderThread.getLooper());
     }
 
     public void setWeatherData(@Nullable WeatherResponse weather, double latitude, double longitude) {
-        renderer.setWeatherData(weather, latitude, longitude);
-        heroCloudRenderer.setWeatherData(weather);
-        heroRainRenderer.setWeatherData(weather);
-        heroStormRenderer.setWeatherData(weather);
-        invalidate();
-        restartTicker();
+        synchronized (SHARED_LOCK) {
+            sharedWeather = weather;
+            sharedLatitude = weather == null ? Double.NaN : latitude;
+            sharedLongitude = weather == null ? Double.NaN : longitude;
+            sharedVersion++;
+        }
+        requestRealityRefresh();
     }
 
     public void setAirQualityData(@Nullable AirQualityResponse airQuality) {
-        airHazeRenderer.setAirQuality(airQuality);
-        invalidate();
+        synchronized (SHARED_LOCK) {
+            sharedAirQuality = airQuality;
+            sharedVersion++;
+        }
+        requestRealityRefresh();
     }
 
     public void clearWeatherData() {
-        renderer.clearWeatherData();
-        heroCloudRenderer.clearWeatherData();
-        heroRainRenderer.clearWeatherData();
-        heroStormRenderer.clearWeatherData();
-        invalidate();
+        synchronized (SHARED_LOCK) {
+            sharedWeather = null;
+            sharedLatitude = Double.NaN;
+            sharedLongitude = Double.NaN;
+            sharedVersion++;
+        }
+        requestRealityRefresh();
     }
 
     public void clearAirQualityData() {
-        airHazeRenderer.setAirQuality(null);
-        invalidate();
+        synchronized (SHARED_LOCK) {
+            sharedAirQuality = null;
+            sharedVersion++;
+        }
+        requestRealityRefresh();
     }
 
     public void setRenderOptions(@NonNull WallpaperPreferences.Options options) {
-        this.options = options;
-        applyOptions(options);
-        invalidate();
-        restartTicker();
+        synchronized (SHARED_LOCK) {
+            sharedOptions = options;
+            sharedVersion++;
+        }
+        requestRealityRefresh();
     }
 
     @Nullable
     public SkyRealityState getLastState() {
-        return renderer.getLastSkyRealityState();
+        return lastSkyState;
     }
 
     @Override
     protected void onAttachedToWindow() {
         super.onAttachedToWindow();
         attached = true;
-        restartTicker();
+        updateVisibilityAndLoop();
     }
 
     @Override
     protected void onDetachedFromWindow() {
         attached = false;
-        handler.removeCallbacks(frameTicker);
+        visible = false;
+        renderHandler.removeCallbacks(renderRunnable);
+        releaseRendererThread();
         super.onDetachedFromWindow();
     }
 
     @Override
     protected void onWindowVisibilityChanged(int visibility) {
         super.onWindowVisibilityChanged(visibility);
-        if (visibility == VISIBLE) {
-            restartTicker();
-        } else {
-            handler.removeCallbacks(frameTicker);
-        }
+        updateVisibilityAndLoop();
     }
 
     @Override
     protected void onVisibilityChanged(@NonNull View changedView, int visibility) {
         super.onVisibilityChanged(changedView, visibility);
-        if (visibility == VISIBLE) {
-            restartTicker();
-        } else if (!shouldAnimate()) {
-            handler.removeCallbacks(frameTicker);
-        }
+        updateVisibilityAndLoop();
     }
 
     @Override
-    protected void onDraw(@NonNull Canvas canvas) {
-        super.onDraw(canvas);
-        long now = System.currentTimeMillis();
-
-        // Base sky/celestial layer. Legacy cloud/rain/lightning are disabled in
-        // applyOptions() so only one Hero implementation is ever visible.
-        renderer.draw(canvas, getWidth(), getHeight(), now);
-
-        // Path-based clouds naturally pass in front of Sun/Moon.
-        heroCloudRenderer.draw(canvas, getWidth(), getHeight(), now);
-
-        // Storm flash first illuminates the cloud/sky volume.
-        heroStormRenderer.drawAtmosphere(canvas, getWidth(), getHeight(), now);
-
-        airHazeRenderer.draw(canvas, getWidth(), getHeight());
-
-        // Rain + wet glass receive current lightning strength so foreground water
-        // catches the electrical flash.
-        float flash = heroStormRenderer.flashStrength(now);
-        heroRainRenderer.draw(canvas, getWidth(), getHeight(), now, flash);
-
-        // Visible electric branches stay on top of rain and wet-glass effects.
-        heroStormRenderer.drawForeground(canvas, getWidth(), getHeight(), now);
+    public void onSurfaceTextureAvailable(@NonNull SurfaceTexture surface, int width, int height) {
+        if (released) return;
+        activeSurfaceTexture = surface;
+        surfaceWidth = Math.max(1, width);
+        surfaceHeight = Math.max(1, height);
+        renderHandler.post(() -> {
+            if (released) return;
+            createEglSurface(surface, surfaceWidth, surfaceHeight);
+            seenSharedVersion = -1L;
+            restartLoopOnRenderThread();
+        });
     }
 
-    private void applyOptions(@NonNull WallpaperPreferences.Options options) {
-        // HRS-1B/HRS-2/HRS-3: NatureSceneRenderer remains responsible for sky,
-        // Sun/Moon/stars/snow/fog only. Hero renderers exclusively own cloud,
-        // rain and lightning so legacy effects cannot duplicate or leak artifacts.
-        renderer.setOptions(new WallpaperPreferences.Options(
-                false,
-                false,
-                false,
-                options.isSnow(),
-                options.isFog(),
-                options.isStars(),
-                options.isBatteryAdaptive()
-        ));
-        heroCloudRenderer.setEnabled(options.isClouds());
-        heroRainRenderer.setEnabled(options.isRain());
-        heroStormRenderer.setEnabled(options.isLightning());
+    @Override
+    public void onSurfaceTextureSizeChanged(@NonNull SurfaceTexture surface, int width, int height) {
+        surfaceWidth = Math.max(1, width);
+        surfaceHeight = Math.max(1, height);
+        renderHandler.post(() -> {
+            if (released || eglSurface == EGL14.EGL_NO_SURFACE) return;
+            if (EGL14.eglMakeCurrent(display, eglSurface, eglSurface, eglContext)) {
+                pipeline.onSurfaceChanged(surfaceWidth, surfaceHeight);
+            }
+        });
     }
 
-    private void restartTicker() {
-        handler.removeCallbacks(frameTicker);
-        if (shouldAnimate()) handler.post(frameTicker);
+    @Override
+    public boolean onSurfaceTextureDestroyed(@NonNull SurfaceTexture surface) {
+        activeSurfaceTexture = null;
+        if (!released) {
+            renderHandler.post(() -> {
+                renderHandler.removeCallbacks(renderRunnable);
+                detachEglSurface();
+            });
+        }
+        return true;
     }
 
-    private boolean shouldAnimate() {
-        return attached
+    @Override
+    public void onSurfaceTextureUpdated(@NonNull SurfaceTexture surface) {
+        // No-op. Frames are produced by the dedicated EGL thread.
+    }
+
+    private void updateVisibilityAndLoop() {
+        if (released) return;
+        boolean nowVisible = attached
                 && getWindowVisibility() == VISIBLE
                 && getVisibility() == VISIBLE
                 && isShown();
+        visible = nowVisible;
+        renderHandler.post(this::restartLoopOnRenderThread);
+    }
+
+    private void requestRealityRefresh() {
+        if (released) return;
+        renderHandler.post(() -> {
+            seenSharedVersion = -1L;
+            lastRealityRefresh = 0L;
+            restartLoopOnRenderThread();
+        });
+    }
+
+    private void restartLoopOnRenderThread() {
+        renderHandler.removeCallbacks(renderRunnable);
+        if (!released && visible && eglSurface != EGL14.EGL_NO_SURFACE) {
+            renderHandler.post(renderRunnable);
+        }
+    }
+
+    private void initializeEgl() {
+        if (released || display != EGL14.EGL_NO_DISPLAY) return;
+
+        display = EGL14.eglGetDisplay(EGL14.EGL_DEFAULT_DISPLAY);
+        if (display == EGL14.EGL_NO_DISPLAY) {
+            throw new IllegalStateException("Unable to obtain app EGL display");
+        }
+
+        int[] versions = new int[2];
+        if (!EGL14.eglInitialize(display, versions, 0, versions, 1)) {
+            throw new IllegalStateException("Unable to initialize app EGL");
+        }
+
+        int[] configAttributes = {
+                EGL14.EGL_RENDERABLE_TYPE, EGL14.EGL_OPENGL_ES2_BIT,
+                EGL14.EGL_RED_SIZE, 8,
+                EGL14.EGL_GREEN_SIZE, 8,
+                EGL14.EGL_BLUE_SIZE, 8,
+                EGL14.EGL_ALPHA_SIZE, 8,
+                EGL14.EGL_DEPTH_SIZE, 0,
+                EGL14.EGL_STENCIL_SIZE, 0,
+                EGL14.EGL_NONE
+        };
+
+        EGLConfig[] configs = new EGLConfig[1];
+        int[] count = new int[1];
+        if (!EGL14.eglChooseConfig(display, configAttributes, 0, configs, 0, 1, count, 0)
+                || count[0] <= 0) {
+            throw new IllegalStateException("No compatible app OpenGL ES 2 EGL config");
+        }
+        eglConfig = configs[0];
+
+        int[] contextAttributes = {
+                EGL14.EGL_CONTEXT_CLIENT_VERSION, 2,
+                EGL14.EGL_NONE
+        };
+        eglContext = EGL14.eglCreateContext(
+                display,
+                eglConfig,
+                EGL14.EGL_NO_CONTEXT,
+                contextAttributes,
+                0
+        );
+
+        if (eglContext == null || eglContext == EGL14.EGL_NO_CONTEXT) {
+            throw new IllegalStateException("Unable to create app OpenGL ES 2 context");
+        }
+    }
+
+    private void createEglSurface(@NonNull SurfaceTexture surfaceTexture, int width, int height) {
+        if (released) return;
+
+        if (display == EGL14.EGL_NO_DISPLAY
+                || eglContext == EGL14.EGL_NO_CONTEXT
+                || eglConfig == null) {
+            initializeEgl();
+        }
+
+        detachEglSurface();
+
+        int[] surfaceAttributes = {EGL14.EGL_NONE};
+        eglSurface = EGL14.eglCreateWindowSurface(
+                display,
+                eglConfig,
+                surfaceTexture,
+                surfaceAttributes,
+                0
+        );
+
+        if (eglSurface == null || eglSurface == EGL14.EGL_NO_SURFACE) {
+            eglSurface = EGL14.EGL_NO_SURFACE;
+            return;
+        }
+
+        if (!EGL14.eglMakeCurrent(display, eglSurface, eglSurface, eglContext)) {
+            detachEglSurface();
+            return;
+        }
+
+        if (!pipelineCreated) {
+            pipeline.onSurfaceCreated();
+            pipelineCreated = true;
+        }
+        pipeline.onSurfaceChanged(width, height);
+        seenSharedVersion = -1L;
+        lastRealityRefresh = 0L;
+    }
+
+    private void detachEglSurface() {
+        if (display == EGL14.EGL_NO_DISPLAY) return;
+
+        EGL14.eglMakeCurrent(
+                display,
+                EGL14.EGL_NO_SURFACE,
+                EGL14.EGL_NO_SURFACE,
+                EGL14.EGL_NO_CONTEXT
+        );
+
+        if (eglSurface != null && eglSurface != EGL14.EGL_NO_SURFACE) {
+            EGL14.eglDestroySurface(display, eglSurface);
+        }
+        eglSurface = EGL14.EGL_NO_SURFACE;
+    }
+
+    private void refreshRealityIfNeeded() {
+        long now = System.currentTimeMillis();
+
+        WeatherResponse weather;
+        AirQualityResponse airQuality;
+        WallpaperPreferences.Options options;
+        double latitude;
+        double longitude;
+        long version;
+
+        synchronized (SHARED_LOCK) {
+            weather = sharedWeather;
+            airQuality = sharedAirQuality;
+            options = sharedOptions;
+            latitude = sharedLatitude;
+            longitude = sharedLongitude;
+            version = sharedVersion;
+        }
+
+        if (version == seenSharedVersion
+                && lastRealityRefresh > 0L
+                && now - lastRealityRefresh < REALITY_REFRESH_MILLIS) {
+            return;
+        }
+
+        seenSharedVersion = version;
+        lastRealityRefresh = now;
+
+        if (options != null) pipeline.setOptions(options);
+
+        if (weather == null || Double.isNaN(latitude) || Double.isNaN(longitude)) {
+            pipeline.setSnapshot(null);
+            lastSkyState = null;
+            return;
+        }
+
+        GlSceneSnapshot snapshot = GlRealityAdapter.compose(
+                weather,
+                airQuality,
+                latitude,
+                longitude,
+                now,
+                0.5f
+        );
+        pipeline.setSnapshot(snapshot);
+        lastSkyState = SkyRealityEngine.calculate(weather, latitude, longitude, now);
+    }
+
+    private void releaseRendererThread() {
+        if (released) return;
+        released = true;
+
+        renderHandler.post(() -> {
+            renderHandler.removeCallbacksAndMessages(null);
+
+            if (display != EGL14.EGL_NO_DISPLAY
+                    && eglSurface != EGL14.EGL_NO_SURFACE
+                    && eglContext != EGL14.EGL_NO_CONTEXT) {
+                EGL14.eglMakeCurrent(display, eglSurface, eglSurface, eglContext);
+            }
+
+            if (pipelineCreated) {
+                pipeline.release();
+                pipelineCreated = false;
+            }
+
+            detachEglSurface();
+
+            if (display != EGL14.EGL_NO_DISPLAY && eglContext != EGL14.EGL_NO_CONTEXT) {
+                EGL14.eglDestroyContext(display, eglContext);
+            }
+            if (display != EGL14.EGL_NO_DISPLAY) {
+                EGL14.eglTerminate(display);
+            }
+
+            eglContext = EGL14.EGL_NO_CONTEXT;
+            display = EGL14.EGL_NO_DISPLAY;
+            renderThread.quitSafely();
+        });
     }
 }
