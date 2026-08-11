@@ -20,9 +20,7 @@ import io.github.cosinekitty.astronomy.Topocentric;
  *
  * Sun/Moon positions and lunar illumination come from Astronomy Engine.
  * Star visibility and ambient scene light are environmental estimates that
- * intentionally react to astronomical darkness, clouds, visibility,
- * precipitation and lunar glare. The same state is designed to feed the
- * app UI, widgets and future Live Wallpaper renderer.
+ * react to darkness, clouds, visibility, precipitation and lunar glare.
  */
 public final class SkyRealityEngine {
 
@@ -102,6 +100,7 @@ public final class SkyRealityEngine {
                 moon.getAltitude(),
                 moon.getAzimuth(),
                 phaseFraction * 100.0,
+                phaseAngle,
                 moonPhaseName(phaseAngle),
                 starVisibility,
                 ambientLight
