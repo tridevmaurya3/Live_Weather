@@ -15,7 +15,9 @@ import com.tridev.liveweather.data.remote.dto.AirQualityResponse;
 import com.tridev.liveweather.data.remote.dto.WeatherResponse;
 import com.tridev.liveweather.domain.SkyRealityState;
 import com.tridev.liveweather.ui.scene.AirHazeOverlayRenderer;
+import com.tridev.liveweather.ui.scene.HeroCloudRenderer;
 import com.tridev.liveweather.ui.scene.HeroRainRenderer;
+import com.tridev.liveweather.ui.scene.HeroStormRenderer;
 import com.tridev.liveweather.ui.scene.NatureSceneRenderer;
 
 public final class LiveSkyView extends View {
@@ -24,8 +26,11 @@ public final class LiveSkyView extends View {
 
     private final Handler handler = new Handler(Looper.getMainLooper());
     private final NatureSceneRenderer renderer = new NatureSceneRenderer();
+    private final HeroCloudRenderer heroCloudRenderer = new HeroCloudRenderer();
     private final HeroRainRenderer heroRainRenderer = new HeroRainRenderer();
+    private final HeroStormRenderer heroStormRenderer = new HeroStormRenderer();
     private final AirHazeOverlayRenderer airHazeRenderer = new AirHazeOverlayRenderer();
+
     private WallpaperPreferences.Options options;
     private boolean attached;
 
@@ -61,7 +66,9 @@ public final class LiveSkyView extends View {
 
     public void setWeatherData(@Nullable WeatherResponse weather, double latitude, double longitude) {
         renderer.setWeatherData(weather, latitude, longitude);
+        heroCloudRenderer.setWeatherData(weather);
         heroRainRenderer.setWeatherData(weather);
+        heroStormRenderer.setWeatherData(weather);
         invalidate();
         restartTicker();
     }
@@ -73,7 +80,9 @@ public final class LiveSkyView extends View {
 
     public void clearWeatherData() {
         renderer.clearWeatherData();
+        heroCloudRenderer.clearWeatherData();
         heroRainRenderer.clearWeatherData();
+        heroStormRenderer.clearWeatherData();
         invalidate();
     }
 
@@ -111,38 +120,65 @@ public final class LiveSkyView extends View {
     @Override
     protected void onWindowVisibilityChanged(int visibility) {
         super.onWindowVisibilityChanged(visibility);
-        if (visibility == VISIBLE) restartTicker(); else handler.removeCallbacks(frameTicker);
+        if (visibility == VISIBLE) {
+            restartTicker();
+        } else {
+            handler.removeCallbacks(frameTicker);
+        }
     }
 
     @Override
     protected void onVisibilityChanged(@NonNull View changedView, int visibility) {
         super.onVisibilityChanged(changedView, visibility);
-        if (visibility == VISIBLE) restartTicker();
-        else if (!shouldAnimate()) handler.removeCallbacks(frameTicker);
+        if (visibility == VISIBLE) {
+            restartTicker();
+        } else if (!shouldAnimate()) {
+            handler.removeCallbacks(frameTicker);
+        }
     }
 
     @Override
     protected void onDraw(@NonNull Canvas canvas) {
         super.onDraw(canvas);
         long now = System.currentTimeMillis();
+
+        // Base sky/celestial layer. Legacy cloud/rain/lightning are disabled in
+        // applyOptions() so only one Hero implementation is ever visible.
         renderer.draw(canvas, getWidth(), getHeight(), now);
+
+        // Path-based clouds naturally pass in front of Sun/Moon.
+        heroCloudRenderer.draw(canvas, getWidth(), getHeight(), now);
+
+        // Storm flash first illuminates the cloud/sky volume.
+        heroStormRenderer.drawAtmosphere(canvas, getWidth(), getHeight(), now);
+
         airHazeRenderer.draw(canvas, getWidth(), getHeight());
-        heroRainRenderer.draw(canvas, getWidth(), getHeight(), now);
+
+        // Rain + wet glass receive current lightning strength so foreground water
+        // catches the electrical flash.
+        float flash = heroStormRenderer.flashStrength(now);
+        heroRainRenderer.draw(canvas, getWidth(), getHeight(), now, flash);
+
+        // Visible electric branches stay on top of rain and wet-glass effects.
+        heroStormRenderer.drawForeground(canvas, getWidth(), getHeight(), now);
     }
 
     private void applyOptions(@NonNull WallpaperPreferences.Options options) {
-        // HRS-1A: NatureSceneRenderer keeps every environmental layer except
-        // its legacy rain streaks. HeroRainRenderer owns rain/wet-glass visuals.
+        // HRS-1B/HRS-2/HRS-3: NatureSceneRenderer remains responsible for sky,
+        // Sun/Moon/stars/snow/fog only. Hero renderers exclusively own cloud,
+        // rain and lightning so legacy effects cannot duplicate or leak artifacts.
         renderer.setOptions(new WallpaperPreferences.Options(
                 false,
-                options.isClouds(),
-                options.isLightning(),
+                false,
+                false,
                 options.isSnow(),
                 options.isFog(),
                 options.isStars(),
                 options.isBatteryAdaptive()
         ));
+        heroCloudRenderer.setEnabled(options.isClouds());
         heroRainRenderer.setEnabled(options.isRain());
+        heroStormRenderer.setEnabled(options.isLightning());
     }
 
     private void restartTicker() {
