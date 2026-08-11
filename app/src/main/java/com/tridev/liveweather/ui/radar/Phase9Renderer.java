@@ -7,10 +7,12 @@ import android.os.Handler;
 import android.os.Looper;
 import android.view.HapticFeedbackConstants;
 import android.view.View;
+import android.view.ViewGroup;
 import android.webkit.WebResourceRequest;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
+import android.widget.FrameLayout;
 import android.widget.SeekBar;
 import android.widget.TextView;
 
@@ -41,6 +43,7 @@ public final class Phase9Renderer {
     private final Gson gson = new Gson();
     private final Handler handler = new Handler(Looper.getMainLooper());
 
+    private final FrameLayout mapHost;
     private final WebView mapWebView;
     private final TextView locationValue;
     private final TextView statusValue;
@@ -58,6 +61,7 @@ public final class Phase9Renderer {
     private RadarUiState latestState;
     private boolean webReady;
     private boolean playing;
+    private boolean destroyed;
     private int frameIndex = -1;
     private String activeLayer = "rain";
     private Runnable refreshAction;
@@ -65,13 +69,9 @@ public final class Phase9Renderer {
     private final Runnable playTicker = new Runnable() {
         @Override
         public void run() {
-            if (!playing || latestState == null || !latestState.hasRadarFrames()) return;
+            if (destroyed || !playing || latestState == null || !latestState.hasRadarFrames()) return;
             int count = latestState.getRadar().getPastFrames().size();
-            if (count <= 1) {
-                stopPlayback();
-                return;
-            }
-            if (frameIndex >= count - 1) {
+            if (count <= 1 || frameIndex >= count - 1) {
                 stopPlayback();
                 return;
             }
@@ -88,7 +88,7 @@ public final class Phase9Renderer {
 
     public Phase9Renderer(@NonNull Activity activity) {
         this.activity = activity;
-        mapWebView = activity.findViewById(R.id.radarMapWebView);
+        mapHost = activity.findViewById(R.id.radarMapHost);
         locationValue = activity.findViewById(R.id.radarLocationValue);
         statusValue = activity.findViewById(R.id.radarStatusValue);
         frameTimeValue = activity.findViewById(R.id.radarFrameTimeValue);
@@ -102,6 +102,16 @@ public final class Phase9Renderer {
         recenterButton = activity.findViewById(R.id.radarRecenterButton);
         timelineSeek = activity.findViewById(R.id.radarTimelineSeek);
 
+        // Important performance contract: the XML contains no WebView. Chromium is
+        // created only when this renderer is constructed after the Radar tab becomes
+        // visible. This keeps app startup/Home free from WebView process + GPU cost.
+        mapWebView = new WebView(activity);
+        FrameLayout.LayoutParams mapParams = new FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.MATCH_PARENT
+        );
+        mapHost.addView(mapWebView, 0, mapParams);
+
         setupWebView();
         setupControls();
         selectLayer("rain");
@@ -112,6 +122,7 @@ public final class Phase9Renderer {
     }
 
     public void render(@NonNull RadarUiState state) {
+        if (destroyed) return;
         boolean locationChanged = latestState == null
                 || Math.abs(latestState.getLatitude() - state.getLatitude()) > 0.02d
                 || Math.abs(latestState.getLongitude() - state.getLongitude()) > 0.02d;
@@ -130,15 +141,32 @@ public final class Phase9Renderer {
         pushStateToMap();
     }
 
-    /**
-     * Stop renderer-owned callbacks when the page leaves the window. The WebView
-     * belongs to the Activity layout and is intentionally not destroy()ed here,
-     * because the same view can be detached and re-attached by the window/layout
-     * lifecycle. Android will release it with the Activity view hierarchy.
-     */
+    public void onVisible() {
+        if (destroyed) return;
+        mapWebView.onResume();
+        pushStateToMap();
+    }
+
+    public void onHidden() {
+        if (destroyed) return;
+        stopPlayback();
+        mapWebView.onPause();
+    }
+
     public void onDestroy() {
+        if (destroyed) return;
+        destroyed = true;
         stopPlayback();
         refreshAction = null;
+        webReady = false;
+        try {
+            mapWebView.stopLoading();
+            mapWebView.setWebViewClient(null);
+            mapWebView.loadUrl("about:blank");
+            mapHost.removeView(mapWebView);
+            mapWebView.destroy();
+        } catch (RuntimeException ignored) {
+        }
     }
 
     private void setupWebView() {
@@ -159,9 +187,11 @@ public final class Phase9Renderer {
         }
 
         mapWebView.setBackgroundColor(0xFF0B1F36);
+        mapWebView.setOverScrollMode(View.OVER_SCROLL_NEVER);
         mapWebView.setWebViewClient(new WebViewClient() {
             @Override
             public void onPageFinished(WebView view, String url) {
+                if (destroyed) return;
                 webReady = true;
                 pushStateToMap();
             }
@@ -369,7 +399,7 @@ public final class Phase9Renderer {
     }
 
     private void pushStateToMap() {
-        if (!webReady || latestState == null) return;
+        if (destroyed || !webReady || latestState == null) return;
 
         Map<String, Object> payload = new LinkedHashMap<>();
         payload.put("latitude", latestState.getLatitude());
@@ -407,6 +437,7 @@ public final class Phase9Renderer {
 
         String json = gson.toJson(payload);
         mapWebView.post(() -> {
+            if (destroyed) return;
             evaluate("RadarApp.setData(" + json + ");");
             evaluate("RadarApp.setLayer('" + activeLayer + "');");
             if (frameIndex >= 0) evaluate("RadarApp.setFrame(" + frameIndex + ");");
@@ -414,7 +445,7 @@ public final class Phase9Renderer {
     }
 
     private void evaluate(@NonNull String script) {
-        if (!webReady) return;
+        if (destroyed || !webReady) return;
         mapWebView.evaluateJavascript(
                 "if (window.RadarApp) { " + script + " }",
                 null
