@@ -14,7 +14,6 @@
         .wind-arrow { display:flex; align-items:center; gap:4px; color:#e9f8ff; text-shadow:0 1px 4px #00101f; font-weight:700; font-size:10px; white-space:nowrap; }
         .wind-arrow .arrow { display:inline-block; font-size:19px; color:#6fe6ff; transform-origin:50% 50%; }
         .temp-dot { min-width:34px; height:34px; border-radius:17px; display:flex; align-items:center; justify-content:center; color:white; font-size:10px; font-weight:800; border:1px solid rgba(255,255,255,.7); box-shadow:0 2px 8px rgba(0,0,0,.32); }
-        .model-label { background:rgba(7,20,35,.78); color:#e8f6ff; border:1px solid rgba(136,211,246,.25); padding:3px 6px; border-radius:8px; font-size:9px; white-space:nowrap; }
         .leaflet-control-zoom a { background:#102d49!important; color:#e7f6ff!important; border-color:#31506b!important; }
     </style>
 </head>
@@ -32,8 +31,9 @@
 
     L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
         pane:'basePane', maxZoom:7,
-        attribution:'&copy; OpenStreetMap contributors'
+        attribution:'&copy; <a href="https://www.openstreetmap.org/">OpenStreetMap</a> contributors'
     }).addTo(map);
+    map.attributionControl.addAttribution('<a href="https://open-meteo.com/">Open-Meteo</a> model overlays');
 
     let payload = null;
     let activeLayer = 'rain';
@@ -59,7 +59,7 @@
         const url = payload.radarHost + frame.path + '/256/{z}/{x}/{y}/2/1_1.png';
         return L.tileLayer(url, {
             pane:'radarPane', opacity:.78, maxZoom:7, tileSize:256,
-            attribution:'Radar: RainViewer'
+            attribution:'Radar: <a href="https://www.rainviewer.com/">RainViewer</a>'
         });
     }
 
