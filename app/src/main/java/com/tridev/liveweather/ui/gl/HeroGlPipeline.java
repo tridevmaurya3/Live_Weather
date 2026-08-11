@@ -9,14 +9,17 @@ import com.tridev.liveweather.data.local.WallpaperPreferences;
  * Shared GPU composition pipeline used by both the in-app live scene and
  * Android system Live Wallpaper.
  *
- * Render ownership/order is centralized here so app and wallpaper cannot drift
- * into different visual engines.
+ * Device Consistency Pass:
+ * the legacy base renderer now owns only sky/Sun/Moon. Stars, clouds and world
+ * silhouettes are texture-driven deterministic passes so emulator, Adreno and
+ * Mali receive the same source patterns.
  */
 public final class HeroGlPipeline {
 
     private final HeroGlCloudSceneRenderer sceneRenderer = new HeroGlCloudSceneRenderer();
-    private final HeroGlNightStarOverlayRenderer starRenderer = new HeroGlNightStarOverlayRenderer();
-    private final HeroGlWorldLayerRendererV3 worldRenderer = new HeroGlWorldLayerRendererV3();
+    private final HeroGlPortableStarRenderer starRenderer = new HeroGlPortableStarRenderer();
+    private final HeroGlPortableCloudRenderer cloudRenderer = new HeroGlPortableCloudRenderer();
+    private final HeroGlWorldLayerRendererV4 worldRenderer = new HeroGlWorldLayerRendererV4();
     private final HeroGlAtmosphereOverlayRenderer atmosphereRenderer = new HeroGlAtmosphereOverlayRenderer();
     private final HeroGlStormOverlayRenderer stormRenderer = new HeroGlStormOverlayRenderer();
     private final HeroGlRainOverlayRenderer rainRenderer = new HeroGlRainOverlayRenderer();
@@ -32,6 +35,7 @@ public final class HeroGlPipeline {
     public void onSurfaceCreated() {
         sceneRenderer.onSurfaceCreated();
         starRenderer.onSurfaceCreated();
+        cloudRenderer.onSurfaceCreated();
         worldRenderer.onSurfaceCreated();
         atmosphereRenderer.onSurfaceCreated();
         stormRenderer.onSurfaceCreated();
@@ -42,6 +46,7 @@ public final class HeroGlPipeline {
     public void onSurfaceChanged(int width, int height) {
         sceneRenderer.onSurfaceChanged(width, height);
         starRenderer.onSurfaceChanged(width, height);
+        cloudRenderer.onSurfaceChanged(width, height);
         worldRenderer.onSurfaceChanged(width, height);
         atmosphereRenderer.onSurfaceChanged(width, height);
         stormRenderer.onSurfaceChanged(width, height);
@@ -61,6 +66,7 @@ public final class HeroGlPipeline {
     public void drawFrame() {
         sceneRenderer.drawFrame();
         starRenderer.drawFrame();
+        cloudRenderer.drawFrame();
         worldRenderer.drawFrame();
         atmosphereRenderer.drawFrame();
         stormRenderer.drawFrame();
@@ -70,6 +76,7 @@ public final class HeroGlPipeline {
     public void release() {
         sceneRenderer.release();
         starRenderer.release();
+        cloudRenderer.release();
         worldRenderer.release();
         atmosphereRenderer.release();
         stormRenderer.release();
@@ -81,6 +88,7 @@ public final class HeroGlPipeline {
         if (state == null) {
             sceneRenderer.setSnapshot(null);
             starRenderer.setSnapshot(null);
+            cloudRenderer.setSnapshot(null);
             worldRenderer.setSnapshot(null);
             atmosphereRenderer.setSnapshot(null);
             stormRenderer.setSnapshot(null);
@@ -88,20 +96,20 @@ public final class HeroGlPipeline {
             return;
         }
 
+        /*
+         * Legacy base shader remains responsible for gradient sky, Sun and Moon.
+         * Its procedural stars/clouds are deliberately disabled; those are now
+         * owned by deterministic texture-backed passes below.
+         */
         GlSceneSnapshot sceneSnapshot = state.withVisualOptions(
-                options.isClouds(),
+                false,
                 false,
                 true,
                 options.isSnow(),
                 options.isFog(),
-                options.isStars()
+                false
         );
 
-        /*
-         * The star pass uses the real weather intensities for visibility gating
-         * even when rain particles are switched off. The Stars preference is the
-         * only direct user gate for this pass; a real astronomy zero stays zero.
-         */
         GlSceneSnapshot starSnapshot = state.withVisualOptions(
                 options.isClouds(),
                 true,
@@ -111,11 +119,15 @@ public final class HeroGlPipeline {
                 options.isStars()
         );
 
-        /*
-         * The world layer uses real scene intensities only to choose how its
-         * artistic environment is lit and whether rain/storm should reveal the
-         * restrained urban/wet-ground treatment. It never changes weather data.
-         */
+        GlSceneSnapshot cloudSnapshot = state.withVisualOptions(
+                options.isClouds(),
+                false,
+                true,
+                options.isSnow(),
+                options.isFog(),
+                false
+        );
+
         GlSceneSnapshot worldSnapshot = state.withVisualOptions(
                 options.isClouds(),
                 options.isRain(),
@@ -154,6 +166,7 @@ public final class HeroGlPipeline {
 
         sceneRenderer.setSnapshot(sceneSnapshot);
         starRenderer.setSnapshot(starSnapshot);
+        cloudRenderer.setSnapshot(cloudSnapshot);
         worldRenderer.setSnapshot(worldSnapshot);
         atmosphereRenderer.setSnapshot(atmosphereSnapshot);
         stormRenderer.setSnapshot(stormSnapshot);
