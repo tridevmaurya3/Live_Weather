@@ -57,6 +57,7 @@ public final class GlWallpaperRenderThread {
     private long lastRealityRefresh;
     private boolean visible;
     private boolean released;
+    private boolean pipelineCreated;
 
     private final Runnable renderRunnable = new Runnable() {
         @Override
@@ -120,7 +121,7 @@ public final class GlWallpaperRenderThread {
     public void setVisualOptions(@NonNull WallpaperPreferences.Options options) {
         handler.post(() -> {
             this.options = options;
-            pipeline.setOptions(options);
+            if (pipelineCreated) pipeline.setOptions(options);
             lastRealityRefresh = 0L;
         });
     }
@@ -147,7 +148,7 @@ public final class GlWallpaperRenderThread {
             latitude = Double.NaN;
             longitude = Double.NaN;
             lastRealityRefresh = 0L;
-            pipeline.setSnapshot(null);
+            if (pipelineCreated) pipeline.setSnapshot(null);
         });
     }
 
@@ -165,7 +166,15 @@ public final class GlWallpaperRenderThread {
             visible = false;
             handler.removeCallbacksAndMessages(null);
 
-            pipeline.release();
+            if (display != EGL14.EGL_NO_DISPLAY
+                    && eglSurface != EGL14.EGL_NO_SURFACE
+                    && context != EGL14.EGL_NO_CONTEXT) {
+                EGL14.eglMakeCurrent(display, eglSurface, eglSurface, context);
+            }
+            if (pipelineCreated) {
+                pipeline.release();
+                pipelineCreated = false;
+            }
             detachEglSurface();
 
             if (display != EGL14.EGL_NO_DISPLAY && context != EGL14.EGL_NO_CONTEXT) {
@@ -259,7 +268,10 @@ public final class GlWallpaperRenderThread {
             return;
         }
 
-        pipeline.onSurfaceCreated();
+        if (!pipelineCreated) {
+            pipeline.onSurfaceCreated();
+            pipelineCreated = true;
+        }
         pipeline.onSurfaceChanged(width, height);
         pipeline.setOptions(options);
         lastRealityRefresh = 0L;
@@ -288,7 +300,7 @@ public final class GlWallpaperRenderThread {
 
         WeatherResponse currentWeather = weather;
         if (currentWeather == null || Double.isNaN(latitude) || Double.isNaN(longitude)) {
-            pipeline.setSnapshot(null);
+            if (pipelineCreated) pipeline.setSnapshot(null);
             return;
         }
 
@@ -300,7 +312,7 @@ public final class GlWallpaperRenderThread {
                 now,
                 parallax
         );
-        pipeline.setSnapshot(snapshot);
+        if (pipelineCreated) pipeline.setSnapshot(snapshot);
     }
 
     private void restartLoop() {
