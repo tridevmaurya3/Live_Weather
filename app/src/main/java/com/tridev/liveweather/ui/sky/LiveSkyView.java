@@ -11,31 +11,26 @@ import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
 import com.tridev.liveweather.data.local.WallpaperPreferences;
+import com.tridev.liveweather.data.remote.dto.AirQualityResponse;
 import com.tridev.liveweather.data.remote.dto.WeatherResponse;
 import com.tridev.liveweather.domain.SkyRealityState;
+import com.tridev.liveweather.ui.scene.AirHazeOverlayRenderer;
 import com.tridev.liveweather.ui.scene.NatureSceneRenderer;
 
-/**
- * App-side animated sky/weather surface.
- *
- * The rendering implementation is shared with WallpaperService. Weather comes
- * from the shared cached pipeline while Sun/Moon/particle motion is local.
- */
 public final class LiveSkyView extends View {
 
     private static final long FRAME_MILLIS = 33L;
 
     private final Handler handler = new Handler(Looper.getMainLooper());
     private final NatureSceneRenderer renderer = new NatureSceneRenderer();
+    private final AirHazeOverlayRenderer airHazeRenderer = new AirHazeOverlayRenderer();
     private WallpaperPreferences.Options options;
     private boolean attached;
 
     private final Runnable frameTicker = new Runnable() {
         @Override
         public void run() {
-            if (!shouldAnimate()) {
-                return;
-            }
+            if (!shouldAnimate()) return;
             postInvalidateOnAnimation();
             handler.postDelayed(this, FRAME_MILLIS);
         }
@@ -62,18 +57,24 @@ public final class LiveSkyView extends View {
         setWillNotDraw(false);
     }
 
-    public void setWeatherData(
-            @Nullable WeatherResponse weather,
-            double latitude,
-            double longitude
-    ) {
+    public void setWeatherData(@Nullable WeatherResponse weather, double latitude, double longitude) {
         renderer.setWeatherData(weather, latitude, longitude);
         invalidate();
         restartTicker();
     }
 
+    public void setAirQualityData(@Nullable AirQualityResponse airQuality) {
+        airHazeRenderer.setAirQuality(airQuality);
+        invalidate();
+    }
+
     public void clearWeatherData() {
         renderer.clearWeatherData();
+        invalidate();
+    }
+
+    public void clearAirQualityData() {
+        airHazeRenderer.setAirQuality(null);
         invalidate();
     }
 
@@ -106,39 +107,26 @@ public final class LiveSkyView extends View {
     @Override
     protected void onWindowVisibilityChanged(int visibility) {
         super.onWindowVisibilityChanged(visibility);
-        if (visibility == VISIBLE) {
-            restartTicker();
-        } else {
-            handler.removeCallbacks(frameTicker);
-        }
+        if (visibility == VISIBLE) restartTicker(); else handler.removeCallbacks(frameTicker);
     }
 
     @Override
     protected void onVisibilityChanged(@NonNull View changedView, int visibility) {
         super.onVisibilityChanged(changedView, visibility);
-        if (visibility == VISIBLE) {
-            restartTicker();
-        } else if (!shouldAnimate()) {
-            handler.removeCallbacks(frameTicker);
-        }
+        if (visibility == VISIBLE) restartTicker();
+        else if (!shouldAnimate()) handler.removeCallbacks(frameTicker);
     }
 
     @Override
     protected void onDraw(@NonNull Canvas canvas) {
         super.onDraw(canvas);
-        renderer.draw(
-                canvas,
-                getWidth(),
-                getHeight(),
-                System.currentTimeMillis()
-        );
+        renderer.draw(canvas, getWidth(), getHeight(), System.currentTimeMillis());
+        airHazeRenderer.draw(canvas, getWidth(), getHeight());
     }
 
     private void restartTicker() {
         handler.removeCallbacks(frameTicker);
-        if (shouldAnimate()) {
-            handler.post(frameTicker);
-        }
+        if (shouldAnimate()) handler.post(frameTicker);
     }
 
     private boolean shouldAnimate() {
