@@ -15,7 +15,8 @@ import com.tridev.liveweather.data.local.WallpaperPreferences;
 public final class HeroGlPipeline {
 
     private final HeroGlCloudSceneRenderer sceneRenderer = new HeroGlCloudSceneRenderer();
-    private final HeroGlWorldLayerRendererV2 worldRenderer = new HeroGlWorldLayerRendererV2();
+    private final HeroGlNightStarOverlayRenderer starRenderer = new HeroGlNightStarOverlayRenderer();
+    private final HeroGlWorldLayerRendererV3 worldRenderer = new HeroGlWorldLayerRendererV3();
     private final HeroGlAtmosphereOverlayRenderer atmosphereRenderer = new HeroGlAtmosphereOverlayRenderer();
     private final HeroGlStormOverlayRenderer stormRenderer = new HeroGlStormOverlayRenderer();
     private final HeroGlRainOverlayRenderer rainRenderer = new HeroGlRainOverlayRenderer();
@@ -30,6 +31,7 @@ public final class HeroGlPipeline {
 
     public void onSurfaceCreated() {
         sceneRenderer.onSurfaceCreated();
+        starRenderer.onSurfaceCreated();
         worldRenderer.onSurfaceCreated();
         atmosphereRenderer.onSurfaceCreated();
         stormRenderer.onSurfaceCreated();
@@ -39,6 +41,7 @@ public final class HeroGlPipeline {
 
     public void onSurfaceChanged(int width, int height) {
         sceneRenderer.onSurfaceChanged(width, height);
+        starRenderer.onSurfaceChanged(width, height);
         worldRenderer.onSurfaceChanged(width, height);
         atmosphereRenderer.onSurfaceChanged(width, height);
         stormRenderer.onSurfaceChanged(width, height);
@@ -57,6 +60,7 @@ public final class HeroGlPipeline {
 
     public void drawFrame() {
         sceneRenderer.drawFrame();
+        starRenderer.drawFrame();
         worldRenderer.drawFrame();
         atmosphereRenderer.drawFrame();
         stormRenderer.drawFrame();
@@ -65,6 +69,7 @@ public final class HeroGlPipeline {
 
     public void release() {
         sceneRenderer.release();
+        starRenderer.release();
         worldRenderer.release();
         atmosphereRenderer.release();
         stormRenderer.release();
@@ -75,6 +80,7 @@ public final class HeroGlPipeline {
         GlSceneSnapshot state = fullSnapshot;
         if (state == null) {
             sceneRenderer.setSnapshot(null);
+            starRenderer.setSnapshot(null);
             worldRenderer.setSnapshot(null);
             atmosphereRenderer.setSnapshot(null);
             stormRenderer.setSnapshot(null);
@@ -87,6 +93,20 @@ public final class HeroGlPipeline {
                 false,
                 true,
                 options.isSnow(),
+                options.isFog(),
+                options.isStars()
+        );
+
+        /*
+         * The star pass uses the real weather intensities for visibility gating
+         * even when rain particles are switched off. The Stars preference is the
+         * only direct user gate for this pass; a real astronomy zero stays zero.
+         */
+        GlSceneSnapshot starSnapshot = state.withVisualOptions(
+                options.isClouds(),
+                true,
+                true,
+                true,
                 options.isFog(),
                 options.isStars()
         );
@@ -133,6 +153,7 @@ public final class HeroGlPipeline {
         );
 
         sceneRenderer.setSnapshot(sceneSnapshot);
+        starRenderer.setSnapshot(starSnapshot);
         worldRenderer.setSnapshot(worldSnapshot);
         atmosphereRenderer.setSnapshot(atmosphereSnapshot);
         stormRenderer.setSnapshot(stormSnapshot);
