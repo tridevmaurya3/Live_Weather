@@ -5,10 +5,6 @@ import androidx.annotation.NonNull;
 import com.tridev.liveweather.domain.LiveConditionResolver;
 import com.tridev.liveweather.domain.SkyRealityState;
 
-/**
- * Immutable renderer-facing snapshot produced from one weather + astronomy reality state.
- * App preview and WallpaperService consume this exact model.
- */
 public final class SceneState {
 
     private final SkyRealityState sky;
@@ -19,6 +15,7 @@ public final class SceneState {
     private final double snowIntensity;
     private final double fogIntensity;
     private final double stormIntensity;
+    private final double airHazeIntensity;
     private final double windSpeedKmh;
     private final double windDirectionDegrees;
     private final double windStrength;
@@ -37,6 +34,7 @@ public final class SceneState {
             double snowIntensity,
             double fogIntensity,
             double stormIntensity,
+            double airHazeIntensity,
             double windSpeedKmh,
             double windDirectionDegrees,
             double windStrength,
@@ -54,6 +52,7 @@ public final class SceneState {
         this.snowIntensity = snowIntensity;
         this.fogIntensity = fogIntensity;
         this.stormIntensity = stormIntensity;
+        this.airHazeIntensity = airHazeIntensity;
         this.windSpeedKmh = windSpeedKmh;
         this.windDirectionDegrees = windDirectionDegrees;
         this.windStrength = windStrength;
@@ -64,69 +63,21 @@ public final class SceneState {
         this.sceneLight = sceneLight;
     }
 
-    @NonNull
-    public SkyRealityState getSky() {
-        return sky;
-    }
-
-    @NonNull
-    public LiveConditionResolver.ResolvedCondition getCondition() {
-        return condition;
-    }
-
-    public double getCloudCover() {
-        return cloudCover;
-    }
-
-    public double getRainIntensity() {
-        return rainIntensity;
-    }
-
-    public double getDrizzleIntensity() {
-        return drizzleIntensity;
-    }
-
-    public double getSnowIntensity() {
-        return snowIntensity;
-    }
-
-    public double getFogIntensity() {
-        return fogIntensity;
-    }
-
-    public double getStormIntensity() {
-        return stormIntensity;
-    }
-
-    public double getWindSpeedKmh() {
-        return windSpeedKmh;
-    }
-
-    public double getWindDirectionDegrees() {
-        return windDirectionDegrees;
-    }
-
-    public double getWindStrength() {
-        return windStrength;
-    }
-
-    public double getVisibilityFactor() {
-        return visibilityFactor;
-    }
-
-    public double getSunVisibility() {
-        return sunVisibility;
-    }
-
-    public double getMoonVisibility() {
-        return moonVisibility;
-    }
-
-    public double getStarVisibility() {
-        return starVisibility;
-    }
-
-    public double getSceneLight() {
-        return sceneLight;
-    }
+    @NonNull public SkyRealityState getSky() { return sky; }
+    @NonNull public LiveConditionResolver.ResolvedCondition getCondition() { return condition; }
+    public double getCloudCover() { return cloudCover; }
+    public double getRainIntensity() { return rainIntensity; }
+    public double getDrizzleIntensity() { return drizzleIntensity; }
+    public double getSnowIntensity() { return snowIntensity; }
+    public double getFogIntensity() { return fogIntensity; }
+    public double getStormIntensity() { return stormIntensity; }
+    public double getAirHazeIntensity() { return airHazeIntensity; }
+    public double getWindSpeedKmh() { return windSpeedKmh; }
+    public double getWindDirectionDegrees() { return windDirectionDegrees; }
+    public double getWindStrength() { return windStrength; }
+    public double getVisibilityFactor() { return visibilityFactor; }
+    public double getSunVisibility() { return sunVisibility; }
+    public double getMoonVisibility() { return moonVisibility; }
+    public double getStarVisibility() { return starVisibility; }
+    public double getSceneLight() { return sceneLight; }
 }
