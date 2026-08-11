@@ -32,7 +32,8 @@
             android:layout_width="match_parent"
             android:layout_height="360dp"
             android:layout_marginTop="@dimen/space_16"
-            android:background="@drawable/bg_weather_wallpaper_preview">
+            android:background="@drawable/bg_weather_wallpaper_preview"
+            android:clipToOutline="true">
 
             <com.tridev.liveweather.ui.sky.LiveSkyView
                 android:id="@+id/wallpaperLiveSkyView"
