@@ -10,11 +10,6 @@ import com.tridev.liveweather.domain.LiveConditionResolver;
 import com.tridev.liveweather.domain.SkyRealityEngine;
 import com.tridev.liveweather.domain.SkyRealityState;
 
-import java.time.Duration;
-import java.time.LocalDateTime;
-import java.time.format.DateTimeParseException;
-import java.util.List;
-
 /**
  * Converts live weather + AQI haze + local astronomy into animation intensities.
  */
@@ -52,19 +47,6 @@ public final class DynamicRealityComposer {
 
         int code = condition.getWeatherCode() == null ? 0 : condition.getWeatherCode();
 
-        /*
-         * CLOUD REALITY CONTRACT
-         *
-         * A single current cloud-cover model point can briefly understate a mixed
-         * sky. Phase 6 already requests 15-minute cloud cover, so the scene now
-         * blends the current value with the nearest 15-minute neighbourhood.
-         * WMO codes 1/2/3 provide restrained minimum floors for mainly-clear,
-         * partly-cloudy and overcast conditions. This prevents a "partly cloudy"
-         * weather state from rendering as an empty blue sky while still avoiding
-         * decorative/fake clouds when the source data is genuinely clear.
-         */
-        double clouds = resolveCloudCover(weather, current, code);
-
         double visibilityMeters = current == null || current.getVisibility() == null
                 ? 16000d
                 : Math.max(0d, current.getVisibility());
@@ -94,7 +76,14 @@ public final class DynamicRealityComposer {
         double drizzle = drizzleCode
                 ? clamp(0.25d + precipSignal * 0.45d, 0.18d, 0.72d)
                 : 0d;
-        double rain = rainCode || currentRain > 0d || currentShowers > 0d || precipSignal > 0.06d
+
+        /*
+         * Confidence-aware precipitation contract:
+         * raw model trace values do not independently start visual rain. The
+         * LiveConditionResolver must first resolve the current state to a rain,
+         * shower or thunderstorm code. Raw amounts then refine intensity only.
+         */
+        double rain = rainCode
                 ? clamp(
                         0.24d + precipSignal * 0.62d + currentRain * 0.38d + currentShowers * 0.48d,
                         0.18d,
@@ -104,8 +93,9 @@ public final class DynamicRealityComposer {
         if (drizzleCode && rain < 0.4d) {
             rain = 0d;
         }
-        double snow = snowCode || currentSnow > 0d
-                ? clamp(0.28d + currentSnow * 0.30d, 0.20d, 1d)
+
+        double snow = snowCode
+                ? clamp(0.28d + Math.max(currentSnow, precipSignal) * 0.30d, 0.20d, 1d)
                 : 0d;
         double fog = fogCode
                 ? clamp(0.55d + (1d - visibilityFactor) * 0.45d, 0.45d, 1d)
@@ -114,13 +104,18 @@ public final class DynamicRealityComposer {
                 ? clamp(0.55d + rain * 0.45d, 0.55d, 1d)
                 : 0d;
 
-        if (rain > 0d || drizzle > 0d || snow > 0d || storm > 0d) {
-            clouds = Math.max(
-                    clouds,
-                    0.68d + 0.30d * Math.max(rain, Math.max(snow, storm))
-            );
-        }
-        clouds = clamp(clouds, 0d, 1d);
+        CloudPresenceState cloudPresence = CloudPresenceResolver.resolve(
+                weather,
+                condition,
+                rain,
+                drizzle,
+                snow,
+                fog,
+                storm,
+                airHaze,
+                visibilityFactor
+        );
+        double clouds = cloudPresence.getCloudAmount();
 
         double weatherTransparency = clamp(
                 1d
@@ -140,10 +135,10 @@ public final class DynamicRealityComposer {
         /*
          * FINAL MOON VISIBILITY CONTRACT
          *
-         * The texture owns lunar phase geometry. The composer must NOT multiply
-         * visibility by phase illumination again, otherwise a real thin crescent
-         * gets attenuated twice and disappears. Here we only model whether the
-         * lunar surface can be seen through the atmosphere/daylight.
+         * The texture/shader owns lunar phase geometry. The composer must NOT
+         * multiply visibility by phase illumination again, otherwise a real thin
+         * crescent gets attenuated twice and disappears. Here we only model
+         * whether the lunar surface can be seen through atmosphere/daylight.
          */
         double moonIllumination = clamp(sky.getMoonIlluminationPercent() / 100d, 0d, 1d);
         double moonVisibility = 0d;
@@ -195,7 +190,7 @@ public final class DynamicRealityComposer {
         return new SceneState(
                 sky,
                 condition,
-                clouds,
+                cloudPresence,
                 rain,
                 drizzle,
                 snow,
@@ -211,114 +206,6 @@ public final class DynamicRealityComposer {
                 starVisibility,
                 sceneLight
         );
-    }
-
-    private static double resolveCloudCover(
-            @NonNull WeatherResponse weather,
-            @Nullable WeatherResponse.CurrentWeather current,
-            int weatherCode
-    ) {
-        Double currentPercent = current == null ? null : current.getCloudCover();
-        Double minutelyPercent = nearestMinutelyCloudCover(weather, current);
-
-        double percent;
-        if (currentPercent != null && minutelyPercent != null) {
-            percent = clamp(currentPercent, 0d, 100d) * 0.45d
-                    + clamp(minutelyPercent, 0d, 100d) * 0.55d;
-        } else if (minutelyPercent != null) {
-            percent = clamp(minutelyPercent, 0d, 100d);
-        } else if (currentPercent != null) {
-            percent = clamp(currentPercent, 0d, 100d);
-        } else {
-            percent = 0d;
-        }
-
-        // WMO interpretation floors. They correct visual contradictions, not
-        // arbitrary decoration: code 2 must not render as a cloudless scene.
-        if (weatherCode == 1) {
-            percent = Math.max(percent, 14d);
-        } else if (weatherCode == 2) {
-            percent = Math.max(percent, 38d);
-        } else if (weatherCode == 3) {
-            percent = Math.max(percent, 82d);
-        }
-
-        return clamp(percent / 100d, 0d, 1d);
-    }
-
-    @Nullable
-    private static Double nearestMinutelyCloudCover(
-            @NonNull WeatherResponse weather,
-            @Nullable WeatherResponse.CurrentWeather current
-    ) {
-        WeatherResponse.Minutely15Weather minutely = weather.getMinutely15();
-        if (minutely == null || minutely.getCloudCover() == null
-                || minutely.getCloudCover().isEmpty()) {
-            return null;
-        }
-
-        List<Double> covers = minutely.getCloudCover();
-        List<String> times = minutely.getTime();
-        int center = fallbackCurrentMinutelyIndex(covers.size());
-
-        if (current != null && current.getTime() != null && times != null && !times.isEmpty()) {
-            int exact = times.indexOf(current.getTime());
-            if (exact >= 0) {
-                center = exact;
-            } else {
-                center = nearestTimeIndex(times, current.getTime(), center);
-            }
-        }
-
-        // Weighted 45-minute neighbourhood smooths one noisy grid point while
-        // still reacting quickly to a mixed/cloudy sky moving through the area.
-        double sum = 0d;
-        double weightSum = 0d;
-        for (int offset = -1; offset <= 1; offset++) {
-            int index = center + offset;
-            if (index < 0 || index >= covers.size()) continue;
-            Double value = covers.get(index);
-            if (value == null) continue;
-            double weight = offset == 0 ? 2d : 1d;
-            sum += clamp(value, 0d, 100d) * weight;
-            weightSum += weight;
-        }
-        return weightSum <= 0d ? null : sum / weightSum;
-    }
-
-    private static int nearestTimeIndex(
-            @NonNull List<String> times,
-            @NonNull String currentTime,
-            int fallback
-    ) {
-        try {
-            LocalDateTime target = LocalDateTime.parse(currentTime);
-            long bestDistance = Long.MAX_VALUE;
-            int bestIndex = fallback;
-            for (int index = 0; index < times.size(); index++) {
-                String value = times.get(index);
-                if (value == null) continue;
-                try {
-                    LocalDateTime candidate = LocalDateTime.parse(value);
-                    long distance = Math.abs(Duration.between(target, candidate).getSeconds());
-                    if (distance < bestDistance) {
-                        bestDistance = distance;
-                        bestIndex = index;
-                    }
-                } catch (DateTimeParseException ignored) {
-                }
-            }
-            return bestIndex;
-        } catch (DateTimeParseException ignored) {
-            return fallback;
-        }
-    }
-
-    private static int fallbackCurrentMinutelyIndex(int size) {
-        if (size <= 0) return 0;
-        // Repository requests four past 15-minute intervals, so index 4 is the
-        // best fallback for the current slot when provider timestamps do not match.
-        return Math.min(4, size - 1);
     }
 
     private static double clamp(double value, double min, double max) {
