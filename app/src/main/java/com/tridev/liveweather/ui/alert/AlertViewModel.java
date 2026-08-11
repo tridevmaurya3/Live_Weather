@@ -87,7 +87,11 @@ public final class AlertViewModel extends AndroidViewModel {
             preferences.saveLocation(location);
 
             if (!location.isIndia()) {
-                List<WeatherAlert> merged = AlertMerger.merge(new ArrayList<>(), smart, System.currentTimeMillis());
+                List<WeatherAlert> merged = AlertMerger.merge(
+                        new ArrayList<>(),
+                        smart,
+                        System.currentTimeMillis()
+                );
                 AlertUiState resolved = new AlertUiState(
                         false,
                         merged,
@@ -96,7 +100,10 @@ public final class AlertViewModel extends AndroidViewModel {
                         System.currentTimeMillis(),
                         false
                 );
-                state.setValue(resolved);
+                // Geocoder callbacks are allowed to arrive on a Binder/background thread.
+                // MutableLiveData.setValue() is main-thread only, so all resolver callback
+                // branches use postValue() to remain thread-safe.
+                state.postValue(resolved);
                 notificationManager.notifyNewAlerts(merged);
                 return;
             }
@@ -115,7 +122,7 @@ public final class AlertViewModel extends AndroidViewModel {
                         cached.getSavedAt(),
                         true
                 );
-                state.setValue(resolved);
+                state.postValue(resolved);
                 notificationManager.notifyNewAlerts(merged);
                 return;
             }
