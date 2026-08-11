@@ -6,6 +6,7 @@ import androidx.annotation.Nullable;
 import com.tridev.liveweather.data.remote.dto.AirQualityResponse;
 import com.tridev.liveweather.data.remote.dto.WeatherResponse;
 import com.tridev.liveweather.domain.SkyRealityState;
+import com.tridev.liveweather.domain.scene.CloudPresenceState;
 import com.tridev.liveweather.domain.scene.DynamicRealityComposer;
 import com.tridev.liveweather.domain.scene.SceneState;
 
@@ -39,6 +40,7 @@ public final class GlRealityAdapter {
                 epochMillis
         );
         SkyRealityState sky = state.getSky();
+        CloudPresenceState clouds = state.getCloudPresence();
         SkyGradientProfile skyProfile = SkyGradientProfile.resolve(state);
 
         float parallax = clamp(parallaxOffset, 0f, 1f);
@@ -68,7 +70,13 @@ public final class GlRealityAdapter {
                 (float) Math.toRadians(normalizeDegrees(sky.getMoonPhaseAngleDegrees())),
                 (float) sky.getMoonAltitude(),
                 clamp01((float) state.getStarVisibility()),
-                clamp01((float) state.getCloudCover()),
+                clamp01((float) clouds.getCloudAmount()),
+                clamp01((float) clouds.getDensity()),
+                clamp01((float) clouds.getFarLayer()),
+                clamp01((float) clouds.getMidLayer()),
+                clamp01((float) clouds.getNearLayer()),
+                clamp01((float) clouds.getStormCeiling()),
+                clamp01((float) clouds.getBrightness()),
                 clamp01((float) state.getRainIntensity()),
                 clamp01((float) state.getDrizzleIntensity()),
                 clamp01((float) state.getSnowIntensity()),
