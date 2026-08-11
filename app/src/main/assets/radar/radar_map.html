@@ -7,14 +7,15 @@
     <style>
         html, body, #map { width:100%; height:100%; margin:0; padding:0; background:#0b1f36; }
         body { overflow:hidden; font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif; }
-        .leaflet-control-attribution { background:rgba(6,16,29,.76)!important; color:#dbe9f4!important; font-size:9px!important; }
+        .leaflet-control-attribution { background:rgba(6,16,29,.78)!important; color:#dbe9f4!important; font-size:9px!important; }
         .leaflet-control-attribution a { color:#8ed9ff!important; }
-        .leaflet-base-pane img { filter:saturate(.72) brightness(.72) contrast(1.08); }
+        .leaflet-base-pane img { filter:saturate(.72) brightness(.78) contrast(1.06); }
         .location-pulse { width:18px; height:18px; border-radius:50%; background:#53d8ff; border:3px solid #fff; box-shadow:0 0 0 8px rgba(83,216,255,.18),0 0 22px rgba(83,216,255,.7); }
         .wind-arrow { display:flex; align-items:center; gap:4px; color:#e9f8ff; text-shadow:0 1px 4px #00101f; font-weight:700; font-size:10px; white-space:nowrap; }
         .wind-arrow .arrow { display:inline-block; font-size:19px; color:#6fe6ff; transform-origin:50% 50%; }
         .temp-dot { min-width:34px; height:34px; border-radius:17px; display:flex; align-items:center; justify-content:center; color:white; font-size:10px; font-weight:800; border:1px solid rgba(255,255,255,.7); box-shadow:0 2px 8px rgba(0,0,0,.32); }
         .leaflet-control-zoom a { background:#102d49!important; color:#e7f6ff!important; border-color:#31506b!important; }
+        .cloud-field-blob { filter:blur(11px); opacity:.96; }
     </style>
 </head>
 <body>
@@ -22,18 +23,31 @@
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
 (function () {
-    const map = L.map('map', { minZoom:3, maxZoom:7, zoomControl:true, preferCanvas:true }).setView([22.6, 79.0], 5);
+    const map = L.map('map', {
+        minZoom:3,
+        maxZoom:7,
+        zoomControl:true,
+        preferCanvas:true
+    }).setView([22.6, 79.0], 5);
+
     map.createPane('basePane');
     map.getPane('basePane').classList.add('leaflet-base-pane');
     map.getPane('basePane').style.zIndex = 200;
+
+    map.createPane('cloudPane');
+    map.getPane('cloudPane').style.zIndex = 410;
+
     map.createPane('radarPane');
     map.getPane('radarPane').style.zIndex = 430;
 
     L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        pane:'basePane', maxZoom:7,
+        pane:'basePane',
+        maxZoom:7,
         attribution:'&copy; <a href="https://www.openstreetmap.org/">OpenStreetMap</a> contributors'
     }).addTo(map);
     map.attributionControl.addAttribution('<a href="https://open-meteo.com/">Open-Meteo</a> model overlays');
+
+    const cloudSvgRenderer = L.svg({ padding:0.70, pane:'cloudPane' });
 
     let payload = null;
     let activeLayer = 'rain';
@@ -45,7 +59,10 @@
     let locationMarker = null;
 
     function clearWeatherLayers() {
-        if (radarLayer) { map.removeLayer(radarLayer); radarLayer = null; }
+        if (radarLayer) {
+            map.removeLayer(radarLayer);
+            radarLayer = null;
+        }
         map.removeLayer(cloudGroup);
         map.removeLayer(windGroup);
         map.removeLayer(tempGroup);
@@ -58,14 +75,12 @@
         if (!frame || !frame.path) return null;
         const url = payload.radarHost + frame.path + '/256/{z}/{x}/{y}/2/1_1.png';
         return L.tileLayer(url, {
-            pane:'radarPane', opacity:.78, maxZoom:7, tileSize:256,
+            pane:'radarPane',
+            opacity:.78,
+            maxZoom:7,
+            tileSize:256,
             attribution:'Radar: <a href="https://www.rainviewer.com/">RainViewer</a>'
         });
-    }
-
-    function cloudOpacity(value) {
-        const c = Math.max(0, Math.min(100, value || 0));
-        return 0.04 + (c / 100) * 0.48;
     }
 
     function tempColor(t) {
@@ -78,27 +93,81 @@
         return '#d95145';
     }
 
+    function hash(value) {
+        const x = Math.sin(value * 12.9898 + 78.233) * 43758.5453;
+        return x - Math.floor(x);
+    }
+
+    function cloudColor(cloud) {
+        if (cloud >= 82) return '#b9c3cd';
+        if (cloud >= 58) return '#cdd6de';
+        if (cloud >= 32) return '#dce6ed';
+        return '#eef6fb';
+    }
+
+    function addCloudBlob(point, cloud, index, variant) {
+        if (cloud < 4) return;
+
+        const seed = (point.lat || 0) * 17.0
+            + (point.lon || 0) * 31.0
+            + index * 13.0
+            + variant * 97.0;
+        const angle = hash(seed + 1.7) * Math.PI * 2.0;
+        const offsetDistance = variant === 0 ? 0 : 0.10 + hash(seed + 2.9) * 0.20;
+        const latOffset = Math.sin(angle) * offsetDistance;
+        const lonScale = Math.max(0.28, Math.cos((point.lat || 0) * Math.PI / 180));
+        const lonOffset = Math.cos(angle) * offsetDistance / lonScale;
+
+        const density = Math.max(0, Math.min(100, cloud)) / 100;
+        const radiusBase = 72000 + density * 72000;
+        const radiusScale = variant === 0 ? 1.0 : 0.58 + hash(seed + 4.1) * 0.30;
+        const opacityBase = 0.055 + density * 0.31;
+        const opacityScale = variant === 0 ? 1.0 : 0.48 + hash(seed + 5.2) * 0.22;
+
+        L.circle(
+            [(point.lat || 0) + latOffset, (point.lon || 0) + lonOffset],
+            {
+                renderer:cloudSvgRenderer,
+                pane:'cloudPane',
+                radius:radiusBase * radiusScale,
+                stroke:false,
+                fill:true,
+                fillColor:cloudColor(cloud),
+                fillOpacity:Math.min(0.42, opacityBase * opacityScale),
+                interactive:false,
+                className:'cloud-field-blob'
+            }
+        ).addTo(cloudGroup);
+    }
+
     function rebuildFieldLayers() {
         cloudGroup = L.layerGroup();
         windGroup = L.layerGroup();
         tempGroup = L.layerGroup();
         if (!payload || !payload.field) return;
 
-        payload.field.forEach(function (p) {
+        payload.field.forEach(function (p, index) {
             if (p.lat == null || p.lon == null) return;
-            const half = 0.50;
+
             const cloud = Math.max(0, Math.min(100, p.cloud == null ? 0 : p.cloud));
-            const cloudColor = cloud > 78 ? '#c9d0d7' : cloud > 45 ? '#dce4eb' : '#eef5fa';
-            L.rectangle([[p.lat-half,p.lon-half],[p.lat+half,p.lon+half]], {
-                stroke:false, fill:true, fillColor:cloudColor, fillOpacity:cloudOpacity(cloud), interactive:false
-            }).addTo(cloudGroup);
+
+            if (cloud >= 4) {
+                addCloudBlob(p, cloud, index, 0);
+                if (cloud >= 18) addCloudBlob(p, cloud, index, 1);
+                if (cloud >= 42) addCloudBlob(p, cloud, index, 2);
+            }
 
             const flowDirection = ((p.windDirection || 0) + 180) % 360;
             const windText = p.windSpeed == null ? '--' : Math.round(p.windSpeed) + ' km/h';
             const windHtml = '<div class="wind-arrow"><span class="arrow" style="transform:rotate(' + flowDirection + 'deg)">➜</span><span>' + windText + '</span></div>';
             L.marker([p.lat,p.lon], {
                 interactive:false,
-                icon:L.divIcon({className:'', html:windHtml, iconSize:[74,28], iconAnchor:[37,14]})
+                icon:L.divIcon({
+                    className:'',
+                    html:windHtml,
+                    iconSize:[74,28],
+                    iconAnchor:[37,14]
+                })
             }).addTo(windGroup);
 
             const temp = p.temperature;
@@ -106,7 +175,12 @@
             const tempHtml = '<div class="temp-dot" style="background:' + tempColor(temp) + '">' + tempText + '</div>';
             L.marker([p.lat,p.lon], {
                 interactive:false,
-                icon:L.divIcon({className:'', html:tempHtml, iconSize:[34,34], iconAnchor:[17,17]})
+                icon:L.divIcon({
+                    className:'',
+                    html:tempHtml,
+                    iconSize:[34,34],
+                    iconAnchor:[17,17]
+                })
             }).addTo(tempGroup);
         });
     }
@@ -116,13 +190,19 @@
         if (locationMarker) map.removeLayer(locationMarker);
         locationMarker = L.marker([payload.latitude,payload.longitude], {
             zIndexOffset:1200,
-            icon:L.divIcon({className:'', html:'<div class="location-pulse"></div>', iconSize:[24,24], iconAnchor:[12,12]})
+            icon:L.divIcon({
+                className:'',
+                html:'<div class="location-pulse"></div>',
+                iconSize:[24,24],
+                iconAnchor:[12,12]
+            })
         }).addTo(map);
     }
 
     function applyLayer() {
         clearWeatherLayers();
         if (!payload) return;
+
         if (activeLayer === 'rain') {
             radarLayer = makeRadarLayer(frameIndex);
             if (radarLayer) radarLayer.addTo(map);
@@ -136,7 +216,7 @@
     }
 
     window.RadarApp = {
-        setData: function (data) {
+        setData:function (data) {
             payload = (typeof data === 'string') ? JSON.parse(data) : data;
             if (!payload) return;
             frameIndex = payload.frames && payload.frames.length ? payload.frames.length - 1 : 0;
@@ -145,16 +225,18 @@
             map.setView([payload.latitude,payload.longitude], payload.zoom || 6, {animate:false});
             applyLayer();
         },
-        setLayer: function (layer) {
+        setLayer:function (layer) {
             activeLayer = layer || 'rain';
             applyLayer();
         },
-        setFrame: function (index) {
+        setFrame:function (index) {
             frameIndex = index || 0;
             if (activeLayer === 'rain') applyLayer();
         },
-        recenter: function () {
-            if (payload) map.setView([payload.latitude,payload.longitude], payload.zoom || 6, {animate:true});
+        recenter:function () {
+            if (payload) {
+                map.setView([payload.latitude,payload.longitude], payload.zoom || 6, {animate:true});
+            }
         }
     };
 })();
