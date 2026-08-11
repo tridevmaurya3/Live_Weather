@@ -23,10 +23,14 @@ public final class AlertMerger {
         add(unique, official, nowMillis);
         add(unique, smart, nowMillis);
         List<WeatherAlert> result = new ArrayList<>(unique.values());
-        result.sort(Comparator
-                .comparingInt((WeatherAlert alert) -> rank(alert.getSeverity())).reversed()
-                .thenComparing((WeatherAlert alert) -> alert.isOfficial() ? 0 : 1)
-                .thenComparingLong(WeatherAlert::getIssuedAt).reversed());
+        result.sort(
+                Comparator.<WeatherAlert>comparingInt(alert -> rank(alert.getSeverity()))
+                        .reversed()
+                        .thenComparing(alert -> alert.isOfficial() ? 0 : 1)
+                        .thenComparing(
+                                Comparator.comparingLong(WeatherAlert::getIssuedAt).reversed()
+                        )
+        );
         return result;
     }
 
