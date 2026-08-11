@@ -126,9 +126,13 @@ public final class CapAlertRepository {
             ));
         }
 
-        result.sort(Comparator
-                .comparingInt((WeatherAlert alert) -> severityRank(alert.getSeverity())).reversed()
-                .thenComparingLong(WeatherAlert::getIssuedAt).reversed());
+        result.sort(
+                Comparator.<WeatherAlert>comparingInt(alert -> severityRank(alert.getSeverity()))
+                        .reversed()
+                        .thenComparing(
+                                Comparator.comparingLong(WeatherAlert::getIssuedAt).reversed()
+                        )
+        );
         return result;
     }
 
