@@ -120,42 +120,51 @@ public final class DynamicRealityComposer {
                 : 0d;
 
         /*
-         * Daylight Moon contrast must solve two opposite problems:
-         * 1) a near-new Moon must never become an opaque black sticker;
-         * 2) a genuine thin crescent above the horizon should not vanish entirely.
+         * FINAL MOON VISIBILITY CONTRACT
          *
-         * Astronomy continues to control the actual phase and position. This
-         * block only supplies a restrained presentation floor for the lit
-         * crescent when it is physically above the horizon and illumination is
-         * meaningful enough to have a visible sliver.
+         * The texture owns lunar phase geometry. The composer must NOT multiply
+         * visibility by phase illumination again, otherwise a real thin crescent
+         * gets attenuated twice and disappears. Here we only model whether the
+         * lunar surface can be seen through the atmosphere/daylight.
+         *
+         * - Moon below horizon: hidden.
+         * - Extremely near New Moon in daylight: hidden.
+         * - Genuine thin crescent: readable, but still softer in bright daylight.
+         * - Clouds/fog/rain/haze may still obscure it naturally.
+         * - At night no artificial crescent floor is needed.
          */
         double moonIllumination = clamp(sky.getMoonIlluminationPercent() / 100d, 0d, 1d);
-        double daylightMoonContrast = 1d;
-        if (sky.getSunAltitude() > -6d) {
-            double daylightStrength = clamp((sky.getSunAltitude() + 6d) / 42d, 0d, 1d);
-            double phaseContrast = clamp((moonIllumination - 0.008d) / 0.34d, 0d, 1d);
-            double naturalContrast = phaseContrast * (1d - daylightStrength * 0.56d);
+        double moonVisibility = 0d;
 
-            double crescentReadabilityFloor = moonIllumination >= 0.015d
-                    ? 0.16d + 0.14d * Math.sqrt(moonIllumination)
-                    : 0d;
+        if (sky.getMoonAltitude() > -4d) {
+            double atmosphericVisibility = clamp(
+                    weatherTransparency * visibilityFactor,
+                    0d,
+                    1d
+            );
 
-            daylightMoonContrast = Math.max(naturalContrast, crescentReadabilityFloor);
+            if (sky.getSunAltitude() > -6d) {
+                double daylightStrength = clamp((sky.getSunAltitude() + 6d) / 46d, 0d, 1d);
 
-            if (moonIllumination < 0.008d && sky.getSunAltitude() > -2d) {
-                daylightMoonContrast = 0d;
+                if (moonIllumination < 0.006d && sky.getSunAltitude() > -2d) {
+                    moonVisibility = 0d;
+                } else {
+                    double daylightContrast = 1d - daylightStrength * 0.34d;
+                    double crescentReadability = moonIllumination >= 0.012d
+                            ? 0.62d
+                            : 0.42d;
+
+                    moonVisibility = clamp(
+                            atmosphericVisibility
+                                    * Math.max(daylightContrast, crescentReadability),
+                            0d,
+                            1d
+                    );
+                }
+            } else {
+                moonVisibility = atmosphericVisibility;
             }
         }
-
-        double moonVisibility = sky.getMoonAltitude() > -4d
-                ? clamp(
-                        weatherTransparency
-                                * visibilityFactor
-                                * daylightMoonContrast,
-                        0d,
-                        1d
-                )
-                : 0d;
 
         double starVisibility = clamp(
                 sky.getStarVisibilityPercent() / 100d
