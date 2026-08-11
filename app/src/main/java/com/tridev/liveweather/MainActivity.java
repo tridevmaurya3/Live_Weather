@@ -6,7 +6,9 @@ import android.content.ActivityNotFoundException;
 import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
+import android.content.pm.PackageManager;
 import android.location.Location;
+import android.os.Build;
 import android.os.Bundle;
 import android.view.HapticFeedbackConstants;
 import android.view.View;
@@ -25,10 +27,14 @@ import androidx.lifecycle.ViewModelProvider;
 import com.google.android.material.bottomnavigation.BottomNavigationView;
 import com.tridev.liveweather.core.location.DeviceLocationManager;
 import com.tridev.liveweather.core.location.PlaceNameResolver;
+import com.tridev.liveweather.data.local.AlertPreferences;
 import com.tridev.liveweather.data.local.WallpaperPreferences;
 import com.tridev.liveweather.domain.CityLocation;
 import com.tridev.liveweather.domain.WeatherUiState;
+import com.tridev.liveweather.notification.AlertNotificationManager;
 import com.tridev.liveweather.ui.air.AirQualityViewModel;
+import com.tridev.liveweather.ui.alert.AlertViewModel;
+import com.tridev.liveweather.ui.alert.Phase8Renderer;
 import com.tridev.liveweather.ui.city.CityScreenRenderer;
 import com.tridev.liveweather.ui.city.CityViewModel;
 import com.tridev.liveweather.ui.phase7.Phase7Renderer;
@@ -39,6 +45,7 @@ import com.tridev.liveweather.ui.weather.WeatherScreenRenderer;
 import com.tridev.liveweather.ui.weather.WeatherViewModel;
 import com.tridev.liveweather.wallpaper.LiveWeatherWallpaperService;
 import com.tridev.liveweather.worker.WallpaperWeatherScheduler;
+import com.tridev.liveweather.worker.WeatherAlertScheduler;
 
 import java.util.Map;
 
@@ -64,14 +71,19 @@ public class MainActivity extends AppCompatActivity {
     private DeviceLocationManager deviceLocationManager;
     private PlaceNameResolver placeNameResolver;
     private ActivityResultLauncher<String[]> locationPermissionLauncher;
+    private ActivityResultLauncher<String> notificationPermissionLauncher;
     private WeatherViewModel weatherViewModel;
     private AirQualityViewModel airQualityViewModel;
+    private AlertViewModel alertViewModel;
     private WeatherScreenRenderer weatherScreenRenderer;
     private Phase6Renderer phase6Renderer;
     private Phase7Renderer phase7Renderer;
+    private Phase8Renderer phase8Renderer;
     private CityViewModel cityViewModel;
     private CityScreenRenderer cityScreenRenderer;
     private WallpaperPreferences wallpaperPreferences;
+    private AlertPreferences alertPreferences;
+    private AlertNotificationManager alertNotificationManager;
 
     private double latestLatitude = Double.NaN;
     private double latestLongitude = Double.NaN;
@@ -81,17 +93,21 @@ public class MainActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
 
         registerLocationPermissionLauncher();
+        registerNotificationPermissionLauncher();
         EdgeToEdge.enable(this);
         setContentView(R.layout.activity_main);
 
         deviceLocationManager = new DeviceLocationManager(this);
         placeNameResolver = new PlaceNameResolver(this);
         wallpaperPreferences = new WallpaperPreferences(this);
+        alertPreferences = new AlertPreferences(this);
+        alertNotificationManager = new AlertNotificationManager(this);
 
         bindViews();
         weatherScreenRenderer = new WeatherScreenRenderer(this);
         phase6Renderer = new Phase6Renderer(this);
         phase7Renderer = new Phase7Renderer(this);
+        phase8Renderer = new Phase8Renderer(this);
         cityScreenRenderer = new CityScreenRenderer(this);
 
         applySystemInsets();
@@ -99,17 +115,30 @@ public class MainActivity extends AppCompatActivity {
         setupQuickActions();
         setupWallpaperEngine();
         setupAirQualityEngine();
+        setupAlertEngine();
         setupWeatherEngine();
         setupCityEngine();
         setupLocationEngine();
 
         WallpaperWeatherScheduler.schedule(this);
+        WeatherAlertScheduler.schedule(this);
+        handleLaunchIntent(getIntent());
     }
 
     private void registerLocationPermissionLauncher() {
         locationPermissionLauncher = registerForActivityResult(
                 new ActivityResultContracts.RequestMultiplePermissions(),
                 this::handleLocationPermissionResult
+        );
+    }
+
+    private void registerNotificationPermissionLauncher() {
+        notificationPermissionLauncher = registerForActivityResult(
+                new ActivityResultContracts.RequestPermission(),
+                granted -> {
+                    alertPreferences.setNotificationsEnabled(granted);
+                    updateAlertNotificationUi();
+                }
         );
     }
 
@@ -179,6 +208,7 @@ public class MainActivity extends AppCompatActivity {
                 performLightHaptic(view);
                 refreshWeatherManually();
                 refreshAirQualityManually();
+                refreshAlertsManually();
             });
         }
     }
@@ -247,6 +277,51 @@ public class MainActivity extends AppCompatActivity {
         });
     }
 
+    private void setupAlertEngine() {
+        alertViewModel = new ViewModelProvider(this).get(AlertViewModel.class);
+        phase8Renderer.setCallbacks(
+                this::openAlertsCenter,
+                this::refreshAlertsManually,
+                this::toggleAlertNotifications
+        );
+        alertViewModel.getState().observe(this, state -> {
+            if (state != null) phase8Renderer.render(state);
+        });
+        updateAlertNotificationUi();
+    }
+
+    private void toggleAlertNotifications() {
+        if (alertPreferences.isNotificationsEnabled()
+                && alertNotificationManager.canPostNotifications()) {
+            alertPreferences.setNotificationsEnabled(false);
+            updateAlertNotificationUi();
+            return;
+        }
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU
+                && checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS)
+                != PackageManager.PERMISSION_GRANTED) {
+            notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS);
+            return;
+        }
+
+        alertPreferences.setNotificationsEnabled(true);
+        updateAlertNotificationUi();
+    }
+
+    private void updateAlertNotificationUi() {
+        if (phase8Renderer == null || alertPreferences == null || alertNotificationManager == null) return;
+        phase8Renderer.setNotificationsEnabled(
+                alertPreferences.isNotificationsEnabled(),
+                alertNotificationManager.canPostNotifications()
+        );
+    }
+
+    private void openAlertsCenter() {
+        bottomNavigation.setSelectedItemId(R.id.nav_more);
+        phase8Renderer.scrollToAlerts();
+    }
+
     private void openLiveWallpaperPreview() {
         ComponentName component = new ComponentName(this, LiveWeatherWallpaperService.class);
         Intent previewIntent = new Intent(WallpaperManager.ACTION_CHANGE_LIVE_WALLPAPER);
@@ -283,6 +358,7 @@ public class MainActivity extends AppCompatActivity {
             weatherScreenRenderer.render(state);
             phase6Renderer.render(state);
             phase7Renderer.renderCelestial(state);
+            alertViewModel.refresh(state, false);
 
             if (state.hasWeather() && state.getWeather() != null
                     && !Double.isNaN(state.getLatitude()) && !Double.isNaN(state.getLongitude())) {
@@ -309,11 +385,13 @@ public class MainActivity extends AppCompatActivity {
             performLightHaptic(view);
             refreshWeatherManually();
             refreshAirQualityManually();
+            refreshAlertsManually();
         });
         forecastStatus.setOnClickListener(view -> {
             performLightHaptic(view);
             refreshWeatherManually();
             refreshAirQualityManually();
+            refreshAlertsManually();
         });
     }
 
@@ -491,6 +569,14 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
+    private void refreshAlertsManually() {
+        if (weatherViewModel == null || alertViewModel == null) return;
+        WeatherUiState state = weatherViewModel.getWeatherState().getValue();
+        if (state != null && state.hasWeather()) {
+            alertViewModel.refresh(state, true);
+        }
+    }
+
     private void renderLocationError(DeviceLocationManager.LocationError error) {
         if (cityViewModel.getSelectedCity() != null) return;
         if (error == DeviceLocationManager.LocationError.PERMISSION_REQUIRED) {
@@ -516,6 +602,19 @@ public class MainActivity extends AppCompatActivity {
         if (weatherViewModel == null) return false;
         WeatherUiState state = weatherViewModel.getWeatherState().getValue();
         return state != null && state.hasWeather();
+    }
+
+    private void handleLaunchIntent(Intent intent) {
+        if (intent != null && intent.getBooleanExtra("open_weather_alerts", false)) {
+            bottomNavigation.post(this::openAlertsCenter);
+        }
+    }
+
+    @Override
+    protected void onNewIntent(Intent intent) {
+        super.onNewIntent(intent);
+        setIntent(intent);
+        handleLaunchIntent(intent);
     }
 
     private void renderDestination(int itemId) {
