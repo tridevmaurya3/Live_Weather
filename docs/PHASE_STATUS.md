@@ -220,8 +220,92 @@ Live Weather now synchronizes weather, astronomy and atmospheric-composition int
 
 The user can inspect current and near-term AQI/pollutants, aerosol/dust haze, Sun/Moon position, daylight progress and upcoming major lunar events. AQI haze also participates in the animated app and Live Wallpaper atmosphere without creating network calls in the render loop.
 
+## Phase 8 — Weather Alerts
+Status: COMPLETE
+
+### Step 8.1 — Alert Source Contract
+Status: COMPLETE
+
+- WMO-registered India Meteorological Department CAP RSS feed is the active authoritative India warning source
+- Direct IMD JSON warning endpoints are retained only as an optional future whitelisted adapter and are not the mobile production dependency
+- IMD official alerts and app-derived Smart Risk alerts remain separate source types
+- Official/model-derived source badges are preserved in UI and notifications
+
+### Step 8.2 — Location-Aware Official CAP Engine
+Status: COMPLETE
+
+- Active weather coordinates are reverse-geocoded to district/state/country
+- IMD CAP is used only for India locations
+- CAP/RSS XML consumer hardened against external XML entities
+- District/state area matching filters official alerts for the selected location
+- HTTP ETag / If-None-Match support added
+- HTTP 304 retains cached official alerts without reparsing unchanged data
+- Per-location official alert cache stores alerts, ETag and update time
+- Expired official alerts are filtered
+
+### Step 8.3 — Smart Risk Engine
+Status: COMPLETE
+
+- Smart Risk is generated from the shared weather state, never from a separate weather fetch
+- Thunderstorm risk
+- Strong current precipitation
+- Strong wind gusts
+- Very low visibility
+- Heavy-rain potential
+- Strong-gust potential
+- Very-high UV
+- High-heat risk
+- Smart Risk is explicitly labelled as model-derived and never presented as an IMD warning
+
+### Step 8.4 — Dashboard + Weather Alerts Center
+Status: COMPLETE
+
+- Highest-priority active alert appears as a compact Home banner
+- Home banner opens the Weather Alerts Center
+- More screen receives a full Alerts Center
+- Active alert location, source, severity, message and validity are visible
+- Official IMD and Smart Risk cards have distinct source labels
+- No-alert state is explicit instead of displaying a fake placeholder warning
+- Manual alert refresh action added
+
+### Step 8.5 — Contextual Android Notifications
+Status: COMPLETE
+
+- Android 13+ POST_NOTIFICATIONS permission is declared
+- Permission is requested only from the user's Enable alerts action
+- Separate notification channels for official alerts and Smart Risk
+- Official non-info warnings can notify when enabled
+- Smart Risk notifications are limited to ORANGE/RED to reduce noise
+- Persistent alert fingerprints prevent repeated notifications for the same event
+- Notification taps open the Weather Alerts Center
+
+### Step 8.6 — Background Alert Refresh
+Status: COMPLETE
+
+- Network-constrained WorkManager alert refresh scheduled at Android's 15-minute periodic minimum
+- Background worker reuses WeatherCache for Smart Risk and does not duplicate the weather network request
+- Official CAP is refreshed separately using ETag caching
+- Cached official alerts remain available if the CAP refresh fails
+- Background GPS permission is not requested
+- Background alerts use the last foreground-resolved district and active cached weather coordinates
+
+### Step 8.7 — Weather Alert Accuracy Contract
+Status: COMPLETE
+
+- docs/WEATHER_ALERT_ENGINE.md added
+- Official source and Smart Risk are never conflated
+- Cached official state is identified when refresh is unavailable
+- Absence of an in-app alert is not represented as proof that hazardous weather is impossible
+- Source attribution and alert-cache strategy are documented
+
+## Phase 8 Result
+
+Live Weather now has a source-aware, location-aware alert system. India locations can consume the official IMD CAP warning feed while the app separately derives high-confidence Smart Risk signals from the same shared weather state used by the dashboard and live environment.
+
+The alert system includes severity ranking, caching, deduplication, dashboard presentation, a detailed Alerts Center, contextual Android notification permission, notification deep-linking and battery-aware background refresh without background GPS or duplicate weather-network loops.
+
 ## Next
 
-Phase 8 — Weather Alerts
+Phase 9 — Live Weather Radar
 
-Planned scope: location-aware severe-weather alert ingestion where authoritative provider coverage is available, alert severity/urgency intelligence, compact dashboard alerts, detail view, notification policy, deduplication and safe background refresh while preserving the shared Reality State.
+Planned scope: professional map/radar experience with precipitation/cloud/wind layers, animated timeline where provider data supports it, active-location synchronization, source/licensing transparency and integration with the shared weather/alert reality state.
