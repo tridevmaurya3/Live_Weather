@@ -16,6 +16,9 @@ import java.nio.FloatBuffer;
  * transparent overlay after the atmospheric scene, so rain depth, wet glass and
  * heavy-rain veils can evolve without destabilising clouds, Moon or stars.
  *
+ * ODM-3 synchronization: storm exposure timing is shared with the dedicated
+ * storm renderer so rain streaks brighten on the same multi-pulse event clock.
+ *
  * The pass is confidence-driven: it receives only the rain/drizzle intensities
  * already resolved by DynamicRealityComposer. It performs no network or weather
  * decisions inside the frame loop.
@@ -142,7 +145,6 @@ public final class HeroGlRainOverlayRenderer {
 
             "void main(){\n" +
             "  vec2 p=vec2(vUv.x,1.0-vUv.y);\n" +
-            "  float aspect=uResolution.x/max(1.0,uResolution.y);\n" +
             "  float rain=clamp(uRain,0.0,1.0);\n" +
             "  float drizzle=clamp(uDrizzle,0.0,1.0);\n" +
             "  float effective=max(rain,drizzle*0.62);\n" +
@@ -155,15 +157,19 @@ public final class HeroGlRainOverlayRenderer {
             "  float slope=windSide*(0.045+uWind*0.36);\n" +
             "  float heavy=smoothstep(0.46,0.94,rain);\n" +
             "  float medium=smoothstep(0.16,0.66,rain);\n" +
-            "  float flashWindow=max(4.3,7.4-uStorm*2.7);\n" +
+
+            "  float flashWindow=max(4.6,7.8-uStorm*2.5);\n" +
             "  float cycle=floor(uTime/flashWindow);\n" +
             "  float phase=mod(uTime,flashWindow);\n" +
-            "  float eventStart=0.42+hash11(cycle+11.9)*1.55;\n" +
+            "  float eventStart=0.48+hash11(cycle+11.9)*1.42;\n" +
             "  float local=phase-eventStart;\n" +
-            "  float stormPulse=0.0;\n" +
-            "  if(local>=0.0 && local<0.085) stormPulse=1.0-local/0.085;\n" +
-            "  else if(local>=0.16 && local<0.255) stormPulse=(1.0-(local-0.16)/0.095)*0.54;\n" +
-            "  stormPulse*=uStorm;\n" +
+            "  float pulse1=0.0;\n" +
+            "  if(local>=0.0 && local<0.070) pulse1=1.0-local/0.070;\n" +
+            "  float pulse2=0.0;\n" +
+            "  if(local>=0.115 && local<0.190) pulse2=(1.0-(local-0.115)/0.075)*0.56;\n" +
+            "  float pulse3=0.0;\n" +
+            "  if(local>=0.245 && local<0.315) pulse3=(1.0-(local-0.245)/0.070)*0.22;\n" +
+            "  float stormPulse=(pulse1+pulse2+pulse3)*uStorm;\n" +
 
             "  float fine=streakLayer(p,78.0,38.0,0.58,2.7,0.010,0.46,slope*0.60,0.34+rain*0.30);\n" +
             "  float far=streakLayer(p+vec2(0.19,0.06),55.0,27.0,0.78,6.1,0.014,0.55,slope*0.76,0.30+rain*0.42);\n" +
