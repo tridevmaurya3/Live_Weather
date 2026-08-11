@@ -15,8 +15,10 @@ import retrofit2.Response;
 public final class AirQualityRepository {
 
     private static final String CURRENT_VARIABLES =
-            "european_aqi,us_aqi,pm10,pm2_5,carbon_monoxide,nitrogen_dioxide," +
-                    "sulphur_dioxide,ozone,aerosol_optical_depth,dust,uv_index,uv_index_clear_sky";
+            "european_aqi,us_aqi,us_aqi_pm2_5,us_aqi_pm10,us_aqi_nitrogen_dioxide," +
+                    "us_aqi_ozone,us_aqi_sulphur_dioxide,us_aqi_carbon_monoxide," +
+                    "pm10,pm2_5,carbon_monoxide,nitrogen_dioxide,sulphur_dioxide,ozone," +
+                    "aerosol_optical_depth,dust,uv_index,uv_index_clear_sky";
 
     private static final String HOURLY_VARIABLES = CURRENT_VARIABLES;
     private static final String TIMEZONE_AUTO = "auto";
