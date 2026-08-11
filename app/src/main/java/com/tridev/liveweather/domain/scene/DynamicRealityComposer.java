@@ -1,15 +1,17 @@
 package com.tridev.liveweather.domain.scene;
 
 import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
 
+import com.tridev.liveweather.data.remote.dto.AirQualityResponse;
 import com.tridev.liveweather.data.remote.dto.WeatherResponse;
 import com.tridev.liveweather.domain.LiveConditionResolver;
 import com.tridev.liveweather.domain.SkyRealityEngine;
 import com.tridev.liveweather.domain.SkyRealityState;
+import com.tridev.liveweather.ui.air.AirQualityIntelligence;
 
 /**
- * Converts raw live weather + local astronomy into animation intensities.
- * No renderer is allowed to invent an unrelated weather condition.
+ * Converts live weather + AQI haze + local astronomy into animation intensities.
  */
 public final class DynamicRealityComposer {
 
@@ -23,14 +25,24 @@ public final class DynamicRealityComposer {
             double longitude,
             long epochMillis
     ) {
+        return compose(weather, null, latitude, longitude, epochMillis);
+    }
+
+    @NonNull
+    public static SceneState compose(
+            @NonNull WeatherResponse weather,
+            @Nullable AirQualityResponse airQuality,
+            double latitude,
+            double longitude,
+            long epochMillis
+    ) {
         SkyRealityState sky = SkyRealityEngine.calculate(
                 weather,
                 latitude,
                 longitude,
                 epochMillis
         );
-        LiveConditionResolver.ResolvedCondition condition =
-                LiveConditionResolver.resolve(weather);
+        LiveConditionResolver.ResolvedCondition condition = LiveConditionResolver.resolve(weather);
         WeatherResponse.CurrentWeather current = weather.getCurrent();
 
         double clouds = normalized(current == null ? null : current.getCloudCover(), 100d);
@@ -38,6 +50,9 @@ public final class DynamicRealityComposer {
                 ? 16000d
                 : Math.max(0d, current.getVisibility());
         double visibilityFactor = clamp(visibilityMeters / 16000d, 0.08d, 1d);
+        double airHaze = AirQualityIntelligence.hazeIntensity(airQuality);
+        visibilityFactor = clamp(visibilityFactor * (1d - airHaze * 0.48d), 0.05d, 1d);
+
         double windSpeed = current == null || current.getWindSpeed10m() == null
                 ? 0d
                 : Math.max(0d, current.getWindSpeed10m());
@@ -85,8 +100,8 @@ public final class DynamicRealityComposer {
         clouds = clamp(clouds, 0d, 1d);
 
         double weatherTransparency = clamp(
-                1d - clouds * 0.82d - fog * 0.70d - rain * 0.30d - snow * 0.20d,
-                0.03d,
+                1d - clouds * 0.82d - fog * 0.70d - rain * 0.30d - snow * 0.20d - airHaze * 0.38d,
+                0.025d,
                 1d
         );
         double sunVisibility = sky.getSunAltitude() > -4d
@@ -96,12 +111,13 @@ public final class DynamicRealityComposer {
                 ? clamp(weatherTransparency * visibilityFactor, 0d, 1d)
                 : 0d;
         double starVisibility = clamp(
-                sky.getStarVisibilityPercent() / 100d * weatherTransparency,
+                sky.getStarVisibilityPercent() / 100d * weatherTransparency * (1d - airHaze * 0.45d),
                 0d,
                 1d
         );
         double sceneLight = clamp(
-                sky.getAmbientLightPercent() / 100d * (1d - clouds * 0.22d - storm * 0.20d),
+                sky.getAmbientLightPercent() / 100d
+                        * (1d - clouds * 0.22d - storm * 0.20d - airHaze * 0.08d),
                 0.01d,
                 1d
         );
@@ -115,6 +131,7 @@ public final class DynamicRealityComposer {
                 snow,
                 fog,
                 storm,
+                airHaze,
                 windSpeed,
                 windDirection,
                 windStrength,
