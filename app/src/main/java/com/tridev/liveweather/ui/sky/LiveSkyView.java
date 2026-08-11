@@ -15,6 +15,7 @@ import com.tridev.liveweather.data.remote.dto.AirQualityResponse;
 import com.tridev.liveweather.data.remote.dto.WeatherResponse;
 import com.tridev.liveweather.domain.SkyRealityState;
 import com.tridev.liveweather.ui.scene.AirHazeOverlayRenderer;
+import com.tridev.liveweather.ui.scene.HeroRainRenderer;
 import com.tridev.liveweather.ui.scene.NatureSceneRenderer;
 
 public final class LiveSkyView extends View {
@@ -23,6 +24,7 @@ public final class LiveSkyView extends View {
 
     private final Handler handler = new Handler(Looper.getMainLooper());
     private final NatureSceneRenderer renderer = new NatureSceneRenderer();
+    private final HeroRainRenderer heroRainRenderer = new HeroRainRenderer();
     private final AirHazeOverlayRenderer airHazeRenderer = new AirHazeOverlayRenderer();
     private WallpaperPreferences.Options options;
     private boolean attached;
@@ -53,12 +55,13 @@ public final class LiveSkyView extends View {
 
     private void init(@NonNull Context context) {
         options = new WallpaperPreferences(context).load();
-        renderer.setOptions(options);
+        applyOptions(options);
         setWillNotDraw(false);
     }
 
     public void setWeatherData(@Nullable WeatherResponse weather, double latitude, double longitude) {
         renderer.setWeatherData(weather, latitude, longitude);
+        heroRainRenderer.setWeatherData(weather);
         invalidate();
         restartTicker();
     }
@@ -70,6 +73,7 @@ public final class LiveSkyView extends View {
 
     public void clearWeatherData() {
         renderer.clearWeatherData();
+        heroRainRenderer.clearWeatherData();
         invalidate();
     }
 
@@ -80,7 +84,7 @@ public final class LiveSkyView extends View {
 
     public void setRenderOptions(@NonNull WallpaperPreferences.Options options) {
         this.options = options;
-        renderer.setOptions(options);
+        applyOptions(options);
         invalidate();
         restartTicker();
     }
@@ -120,8 +124,25 @@ public final class LiveSkyView extends View {
     @Override
     protected void onDraw(@NonNull Canvas canvas) {
         super.onDraw(canvas);
-        renderer.draw(canvas, getWidth(), getHeight(), System.currentTimeMillis());
+        long now = System.currentTimeMillis();
+        renderer.draw(canvas, getWidth(), getHeight(), now);
         airHazeRenderer.draw(canvas, getWidth(), getHeight());
+        heroRainRenderer.draw(canvas, getWidth(), getHeight(), now);
+    }
+
+    private void applyOptions(@NonNull WallpaperPreferences.Options options) {
+        // HRS-1A: NatureSceneRenderer keeps every environmental layer except
+        // its legacy rain streaks. HeroRainRenderer owns rain/wet-glass visuals.
+        renderer.setOptions(new WallpaperPreferences.Options(
+                false,
+                options.isClouds(),
+                options.isLightning(),
+                options.isSnow(),
+                options.isFog(),
+                options.isStars(),
+                options.isBatteryAdaptive()
+        ));
+        heroRainRenderer.setEnabled(options.isRain());
     }
 
     private void restartTicker() {
