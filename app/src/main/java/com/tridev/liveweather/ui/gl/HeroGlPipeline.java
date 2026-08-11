@@ -10,9 +10,9 @@ import com.tridev.liveweather.data.local.WallpaperPreferences;
  * Android system Live Wallpaper.
  *
  * Device Consistency Pass:
- * Sky/Sun/Moon are analytic and hash-free. Stars, clouds and world silhouettes
- * are texture-driven deterministic passes so emulator, Adreno and Mali receive
- * the same source patterns.
+ * Sky/Sun/Moon are analytic and hash-free. Stars, clouds, world, rain and storm
+ * use deterministic texture-backed passes so emulator, Adreno and Mali receive
+ * the same source patterns and timing family.
  */
 public final class HeroGlPipeline {
 
@@ -21,8 +21,8 @@ public final class HeroGlPipeline {
     private final HeroGlPortableCloudRenderer cloudRenderer = new HeroGlPortableCloudRenderer();
     private final HeroGlWorldLayerRendererV4 worldRenderer = new HeroGlWorldLayerRendererV4();
     private final HeroGlAtmosphereOverlayRenderer atmosphereRenderer = new HeroGlAtmosphereOverlayRenderer();
-    private final HeroGlStormOverlayRenderer stormRenderer = new HeroGlStormOverlayRenderer();
-    private final HeroGlRainOverlayRenderer rainRenderer = new HeroGlRainOverlayRenderer();
+    private final HeroGlPortableStormRenderer stormRenderer = new HeroGlPortableStormRenderer();
+    private final HeroGlPortableRainRenderer rainRenderer = new HeroGlPortableRainRenderer();
 
     @Nullable
     private GlSceneSnapshot fullSnapshot;
