@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<com.tridev.liveweather.ui.radar.RadarPageLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:orientation="vertical"
@@ -244,4 +244,4 @@
         android:text="RainViewer radar • Open-Meteo model overlays • OpenStreetMap base"
         android:textAlignment="center" />
 
-</LinearLayout>
+</com.tridev.liveweather.ui.radar.RadarPageLayout>
