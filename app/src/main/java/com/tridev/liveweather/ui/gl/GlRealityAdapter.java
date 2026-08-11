@@ -50,12 +50,14 @@ public final class GlRealityAdapter {
 
         /*
          * SkyRealityEngine already accounts for darkness, cloud transparency,
-         * visibility, precipitation and lunar glare. DynamicRealityComposer's
-         * legacy scene-star value applies weather transparency again, which made
-         * the GPU night sky excessively empty. Use the astronomy engine result,
-         * add only AQI haze correction, then apply a sqrt display curve so valid
-         * low star visibility survives launcher/wallpaper dimming. A resolved
-         * zero remains exactly zero, so stars are never invented in daylight.
+         * visibility, precipitation and lunar glare. Do not multiply the legacy
+         * SceneState weather transparency again. Apply only AQI haze correction.
+         *
+         * The GPU star dots are intentionally tiny. A gamma-like 0.38 exponent
+         * keeps a resolved zero exactly zero but makes real low night visibility
+         * survive launcher dimming and screenshot compression. Cloud layers are
+         * rendered after stars in the base shader, so real clouds still occlude
+         * the boosted points locally.
          */
         double resolvedStarVisibility = clamp(
                 (sky.getStarVisibilityPercent() / 100d)
@@ -63,7 +65,9 @@ public final class GlRealityAdapter {
                 0d,
                 1d
         );
-        float gpuStarVisibility = clamp01((float) Math.sqrt(resolvedStarVisibility));
+        float gpuStarVisibility = resolvedStarVisibility <= 0d
+                ? 0f
+                : clamp01((float) Math.pow(resolvedStarVisibility, 0.38d));
 
         return new GlSceneSnapshot(
                 skyProfile.topR,
