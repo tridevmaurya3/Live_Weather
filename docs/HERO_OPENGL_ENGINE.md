@@ -1,135 +1,119 @@
 # Hero OpenGL Weather Engine Migration
 
-Status: STAGE 1 ACTIVE — ODM-1 SKY + CLOUD FOUNDATION COMPLETE
+Status: ODM-1 THROUGH ODM-5 CODE COMPLETE — FINAL REAL-DEVICE VISUAL ACCEPTANCE PENDING
 
 ## Purpose
 
-The Hero weather experience is migrating from Canvas/path sprites to an original OpenGL ES weather renderer. The goal is a continuous, high-fidelity atmosphere without rectangular bitmap artifacts or cartoon cloud rows.
+The Hero weather experience has migrated from Canvas/path-based weather visuals to an original OpenGL ES 2.0 rendering architecture. The goal is a continuous, high-fidelity atmosphere without rectangular bitmap artifacts, cartoon cloud rows or separate visual engines for the app and Android Live Wallpaper.
 
-The attached/reference application was studied only for rendering architecture ideas. Its copyrighted graphics are not copied. Live Weather uses its own shader-generated sky, clouds, rain, wet-glass, lightning, Moon and stars.
+The external/reference application was studied only for rendering architecture ideas. Its copyrighted graphics are not copied. Live Weather uses original procedural/GPU sky, clouds, rain, wet-glass, lightning, Moon and stars.
 
-## Stage 1 Architecture
+## Current shared architecture
 
-- `HeroGlCloudSceneRenderer` — active OpenGL ES 2.0 system Live Wallpaper renderer after ODM-1C/1D.
-- `HeroGlSceneRenderer` — retained earlier GPU renderer/fallback reference.
+- `HeroGlPipeline` — single rendering ownership/order shared by app and system wallpaper.
+- `HeroGlCloudSceneRenderer` — sky, Sun, Moon, stars and multi-depth clouds.
+- `HeroGlAtmosphereOverlayRenderer` — cinematic distance atmosphere and horizon scattering.
+- `HeroGlStormOverlayRenderer` — storm atmosphere and electrical effects.
+- `HeroGlRainOverlayRenderer` — drizzle/rain depth and wet-screen effects.
 - `GlSceneSnapshot` — immutable normalized GPU state.
-- `GlRealityAdapter` — converts shared weather + AQI + astronomy reality into GPU uniforms.
-- `CloudPresenceResolver` — resolves visual cloud mode, amount, density, far/mid/near presence, storm ceiling and brightness before rendering.
-- `SkyGradientProfile` — resolves time-of-day + weather-aware top/mid/horizon atmospheric palettes.
-- `GlWallpaperRenderThread` — dedicated EGL14 render thread attached to `WallpaperService.Engine` surface.
-- `LiveWeatherWallpaperService` — lifecycle/cache coordinator only; no Canvas animation loop.
+- `GlRealityAdapter` — converts shared weather + AQI + astronomy reality into GPU values.
+- `CloudPresenceResolver` — resolves cloud mode, amount, density, far/mid/near presence, storm ceiling and brightness.
+- `SkyGradientProfile` — time-of-day + weather-aware sky palette.
+- `LiveSkyView` — in-app `TextureView` + EGL14 surface using `HeroGlPipeline`.
+- `GlWallpaperRenderThread` — Android system wallpaper EGL14 thread using the same `HeroGlPipeline`.
+- `LiveWeatherWallpaperService` — wallpaper lifecycle/cache coordinator.
 
-Network/weather refresh remains outside the render loop. The GL thread animates continuously while the wallpaper is visible and periodically refreshes the local astronomy/reality snapshot.
+Network/weather refresh remains outside all frame loops.
 
-## ODM-1 — Original Design Match: Sky + Cloud Foundation
+## Original Design Match stages
 
-Status: COMPLETE IN CODE — REAL-DEVICE VISUAL ACCEPTANCE PENDING
+### ODM-1 — Sky + Cloud Foundation
 
-### ODM-1A Sky Gradient Engine
+- Weather-aware clear/partly-cloudy/overcast/rain/storm/twilight/night palettes.
+- Structured cloud presence from current + near-term weather reality.
+- Independent far/mid/near cloud fields and storm ceiling.
+- Wind-driven depth/parallax, turbulence, feathered edges and lighting.
+- Strict gates against decorative clouds, rectangles and one-sheet grey wash.
 
-- Replaced generic weather-darkening of a single sky palette with dedicated atmospheric profiles.
-- Clear, partly cloudy, overcast, rain, storm, twilight and night retain different vertical colour depth.
-- Haze/fog are weighted toward the horizon instead of washing the entire sky grey.
+### ODM-2 — Rain + Wet Screen
 
-### ODM-1B Cloud Presence Resolver
+- Dedicated transparent GPU pass.
+- Drizzle separate from normal/heavy rain.
+- Fine/far/mid/near streak depth.
+- Wind response and heavy-rain curtain.
+- Fixed/sliding wet-glass droplets, trails, lower wet film and restrained splashes.
 
-- Cloud presence combines current cloud cover, nearest 15-minute cloud neighbourhood, resolved WMO condition, confirmed precipitation, storm, visibility and haze.
-- Clear weather has no decorative cloud floor.
-- Partly cloudy cannot become an empty sky.
-- Confirmed precipitation receives a believable cloud source.
-- Storm receives a dedicated ceiling value.
-- GPU state carries cloud amount, density, far/mid/near layers, storm ceiling and brightness.
+### ODM-3 — Storm + Lightning
 
-### ODM-1C GPU Cloud Field Renderer
+- Dedicated storm/electrical pass.
+- Short irregular main channel and smaller branches.
+- Localized cloud illumination.
+- Restrained multi-pulse exposure flash.
+- Rain exposure response synchronized with storm timing.
+- Legacy full-height/cable-like lightning removed from the active pipeline.
 
-- System Live Wallpaper switched to `HeroGlCloudSceneRenderer`.
-- Clouds are split into independent far veil, mid clusters, near banks and storm ceiling.
-- Layers use different scales, drift speeds, vertical envelopes and parallax response.
-- No bitmap cloud rectangles are used by this active renderer.
+### ODM-4 — Moon + Stars + Night
 
-### ODM-1D Motion, Lighting and Artifact Cleanup
+- Astronomy remains authoritative for Sun/Moon position and Moon phase.
+- Continuous phase-correct lunar sphere shading.
+- Lunar limb, maria/crater variation and subtle earthshine.
+- Daylight/twilight/weather visibility remains reality-driven.
+- Multiple star brightness classes, subtle colour-temperature differences, twinkle, horizon extinction and Moon-glare suppression.
+- Night retains vertical depth and illuminated-Moon sky fill without fake decorative glow.
 
-- Parallax is centred around the neutral wallpaper offset so the centre page has no permanent directional bias.
-- Far/mid/near layers use separate wind speeds and subtle cross-wind turbulence instead of scrolling as one sheet.
-- Low-frequency domain warp breaks obvious repeating cloud-field shapes.
-- Strict presence gates prevent faint full-screen cloud tint in genuinely clear conditions.
-- Cloud edges receive restrained Sun-facing silver light; internal/storm mass remains darker.
-- Storm ceiling has an independent dark ceiling blend.
-- Sun/Moon obstruction uses the combined real cloud mask rather than total cloud percentage alone.
-- Lunar limb masking uses a GLSL-safe smoothstep expression; Moon phase/position/visibility authority remains unchanged.
+### ODM-5 — Final Atmosphere + App/Wallpaper Match
 
-### ODM-1 Acceptance Contract
+- Added restrained cinematic atmosphere pass for distance depth, lower-horizon haze/fog, low-Sun scattering, lunar fill and storm/rain atmosphere.
+- Migrated app `LiveSkyView` from Canvas renderers to `TextureView` + EGL14.
+- App global background, Forecast live-sky preview, Wallpaper settings preview and Android system Live Wallpaper now use the same `HeroGlPipeline`.
+- App live weather/AQI/location/options state is shared between visible preview surfaces.
+- Hidden app previews stop scheduling frames.
+- GPU preview surfaces respect rounded/card clipping.
+- EGL surface recreation reuses programs while the context remains alive and releases programs at context shutdown.
 
-ODM-1 is accepted visually only when a real device shows all of the following:
-
-- clear weather is genuinely clear,
-- partly cloudy contains meaningful scattered masses,
-- cloudy/overcast has broad layered coverage,
-- far/mid/near clouds visibly differ in motion/depth,
-- storm has a distinct upper dark ceiling,
-- no rectangular/square moving cloud artifacts,
-- no repeated scalloped/cartoon cloud rows,
-- no single uniform grey sheet,
-- cloud lighting has soft depth without looking painted or outlined.
-
-## Celestial Reality Contract
+## Celestial reality contract
 
 ### Moon position
 
-Moon altitude and azimuth come from the existing Astronomy Engine / `SkyRealityEngine`. The GL renderer does not invent a Moon position. Below-horizon Moon visibility is zero.
+Moon altitude and azimuth come from Astronomy Engine / `SkyRealityEngine`. Below-horizon visibility is zero.
 
 ### Moon phase
 
-The GPU receives the real astronomical lunar phase angle. The fragment shader treats the Moon as a sphere and computes the illuminated limb/terminator from that phase angle. This supports new moon, crescent, quarter, gibbous and full moon continuously instead of switching icon assets.
+The GPU receives real astronomical lunar phase angle and illumination. The shader owns phase geometry; the composer must not multiply visibility by lunar illumination a second time.
 
-The shader must never replace a thin crescent with a full grey or black disc.
+### Daytime Moon
 
-### Daytime Moon visibility
-
-`DynamicRealityComposer` remains the authority for Moon visibility. It combines atmospheric transparency and daylight contrast without multiplying lunar illumination twice. Near-new-moon daylight can be effectively invisible; a meaningful crescent can remain faintly readable when the Moon is above the horizon.
+`DynamicRealityComposer` remains authority for atmospheric/daylight Moon visibility. A meaningful crescent can remain faintly visible when geometry and atmospheric conditions allow it; near-new Moon in daylight may be effectively invisible.
 
 ### Stars
 
-Star visibility remains reality-driven:
+Stars are controlled by astronomical darkness plus cloud, fog, precipitation, atmospheric visibility and AQI haze. They are not decorative daylight dots.
 
-- astronomical darkness / twilight state,
-- cloud cover,
-- fog,
-- rain/snow/storm opacity,
-- atmospheric visibility,
-- AQI aerosol haze,
-- Moon glare as already represented by the astronomy sky state.
+## Rendering order
 
-Stars must not appear as decorative dots in daylight, heavy overcast, dense fog or strong precipitation.
+Every active Hero GPU surface uses the same order:
 
-## GPU Visual Layers in Stage 1
+1. Sky + celestial + cloud foundation.
+2. Cinematic atmosphere.
+3. Storm/electrical layer.
+4. Rain/wet-screen foreground.
+5. Surface buffer swap.
 
-- weather-aware time-of-day sky gradient,
-- horizon haze,
-- procedural star field with subtle twinkle,
-- luminous Sun,
-- phase-correct Moon + halo,
-- multi-depth far/mid/near cloud fields,
-- independent storm ceiling,
-- continuous multi-depth rain,
-- wet-glass droplets,
-- irregular lightning flash/channel/branches,
-- rain/fog ground mist.
+## Performance contract
 
-## Performance Contract
+- Rendering runs off the UI thread.
+- No network call or texture generation occurs per frame.
+- Reality/astronomy snapshots refresh periodically rather than every frame.
+- Hidden app previews stop their animation loop.
+- System wallpaper stops while Android reports it hidden.
+- Inactive rain and storm passes early-out.
+- System wallpaper retains battery-adaptive FPS behavior.
+- EGL shader programs are not recreated for every surface recreation when the same context remains alive.
 
-- EGL/OpenGL rendering runs on a dedicated `HandlerThread`.
-- Weather/network data is never fetched per frame.
-- Reality/astronomy snapshot refresh is approximately every 30 seconds.
-- Wallpaper rendering stops when Android reports the wallpaper hidden.
-- Normal animation target is about 30 FPS.
-- Battery adaptive mode reduces target FPS under low battery / Power Saver.
-- OpenGL context/surface resources are recreated when the wallpaper surface is recreated.
+## Visual settings contract
 
-## Visual Settings Contract
+Rain, Clouds, Lightning, Snow, Fog and Stars settings continue to control the corresponding visual layers. Sun/Moon/time/astronomy reality remains synchronized independently of decorative settings.
 
-Rain, Clouds, Lightning, Snow, Fog and Stars preferences continue to control the corresponding GPU visual intensities. Sun/Moon/time/astronomy reality sync remains always active.
+## Final acceptance
 
-## Migration Safety
-
-Stage 1 switches the actual Android system Live Wallpaper to the GPU path. In-app `LiveSkyView` remains on the current Canvas Hero renderer until the system Live Wallpaper GPU path passes the real-device visual checkpoint. After that checkpoint, Stage 2 can migrate the app/Forecast/Wallpaper preview to the same GL scene engine so all surfaces are visually identical.
+ODM-1 through ODM-5 are code-complete. Exact visual acceptance against the original generated concept is intentionally not claimed from source code alone. Final acceptance requires a real-device combined review of clear/cloudy/rain/storm/night scenes, UI readability and performance.
