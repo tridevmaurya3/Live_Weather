@@ -19,22 +19,22 @@ import java.time.format.DateTimeParseException;
 import java.util.List;
 
 /**
- * Artifact-free Hero cloud renderer.
+ * Hero cloud renderer.
  *
- * Unlike the earlier sprite implementation this renderer never scales a cloud
- * bitmap. Every cloud is a closed irregular Bezier mass with transparent space
- * outside the Path, therefore moving rectangular texture bounds cannot appear.
- * Current + nearest 15-minute cloud cover and the resolved WMO condition decide
- * how much cloud is visible.
+ * HRS-3 contract:
+ * - no bitmap bounds and no rectangular moving artifacts;
+ * - broad smooth cloud banks instead of repeated semicircle/scallop shapes;
+ * - current + nearest 15-minute cloud cover + WMO condition decide visibility;
+ * - rain/storm states produce fewer, larger, darker masses;
+ * - wind moves cloud banks continuously while vertical motion remains restrained.
  */
 public final class HeroCloudRenderer {
 
     private static final long STATE_REFRESH_MILLIS = 5_000L;
 
     private final Paint fillPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
-    private final Paint detailPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+    private final Paint hazePaint = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Path cloudPath = new Path();
-    private final Path detailPath = new Path();
 
     private WeatherResponse weather;
     private boolean enabled = true;
@@ -50,9 +50,7 @@ public final class HeroCloudRenderer {
 
     public HeroCloudRenderer() {
         fillPaint.setStyle(Paint.Style.FILL);
-        detailPaint.setStyle(Paint.Style.STROKE);
-        detailPaint.setStrokeCap(Paint.Cap.ROUND);
-        detailPaint.setStrokeJoin(Paint.Join.ROUND);
+        hazePaint.setStyle(Paint.Style.FILL);
     }
 
     public void setEnabled(boolean enabled) {
@@ -87,37 +85,41 @@ public final class HeroCloudRenderer {
         if (animationOriginMillis == 0L) animationOriginMillis = nowMillis;
         float seconds = Math.max(0L, nowMillis - animationOriginMillis) / 1000f;
 
-        int layerCount = cover >= 0.82f ? 4 : cover >= 0.58f ? 3 : cover >= 0.24f ? 2 : 1;
+        // Fewer, broader layers read as atmospheric cloud banks instead of rows
+        // of repeated cartoon puffs.
+        int layerCount = cover >= 0.88f ? 3 : cover >= 0.34f ? 2 : 1;
         float direction = (float) Math.toRadians(windDirectionDegrees + 180f);
         float flowX = (float) Math.sin(direction);
         float flowY = -(float) Math.cos(direction);
 
+        // Very high cover gets one non-rectangular upper veil to connect masses.
+        if (cover > 0.76f) {
+            drawUpperVeil(canvas, width, height, cover, stormIntensity, seconds, flowX);
+        }
+
         for (int layer = 0; layer < layerCount; layer++) {
             float depth = layerCount == 1
-                    ? 0.68f
-                    : 0.26f + layer * (0.68f / Math.max(1, layerCount - 1));
+                    ? 0.62f
+                    : 0.24f + layer * (0.70f / Math.max(1, layerCount - 1));
             CloudStyle style = chooseStyle(cover, layer, layerCount);
             int count = cloudCount(style, cover, layer);
-            float baseSpeed = (1.1f + windSpeedKmh * 0.105f) * (0.52f + depth * 0.74f);
+            float baseSpeed = (0.85f + windSpeedKmh * 0.090f) * (0.52f + depth * 0.72f);
 
             for (int i = 0; i < count; i++) {
                 int seed = style.ordinal() * 100_003 + layer * 5_009 + i * 977;
                 float scale = cloudScale(style, depth, seed);
                 float cloudWidth = width * scale;
                 float cloudHeight = cloudWidth * cloudAspect(style);
-                float track = width + cloudWidth * 2.4f;
-                float origin = hash01(seed * 17 + 3) * track - cloudWidth * 1.15f;
-                float travel = seconds * baseSpeed * (0.78f + hash01(seed * 29 + 11) * 0.44f);
-                float x = positiveMod(origin + flowX * travel, track) - cloudWidth * 1.15f;
+                float track = width + cloudWidth * 2.2f;
+                float origin = hash01(seed * 17 + 3) * track - cloudWidth * 1.10f;
+                float travel = seconds * baseSpeed * (0.76f + hash01(seed * 29 + 11) * 0.48f);
+                float x = positiveMod(origin + flowX * travel, track) - cloudWidth * 1.10f;
 
-                // Vertical wind response must remain bounded. The previous
-                // epoch-time multiplication could push clouds off-screen after
-                // long runtimes. A slow oscillation keeps atmospheric motion alive.
                 float verticalWave = (float) Math.sin(
-                        seconds * (0.018f + depth * 0.011f) + seed * 0.013f
+                        seconds * (0.012f + depth * 0.010f) + seed * 0.013f
                 );
-                float yDrift = verticalWave * height * (0.006f + depth * 0.010f)
-                        + flowY * height * 0.004f * depth;
+                float yDrift = verticalWave * height * (0.004f + depth * 0.008f)
+                        + flowY * height * 0.0035f * depth;
                 float y = cloudY(height, style, depth, seed) + yDrift;
 
                 float alpha = cloudAlpha(style, cover, depth);
@@ -183,13 +185,13 @@ public final class HeroCloudRenderer {
 
     private CloudStyle chooseStyle(float cover, int layer, int layerCount) {
         if (stormIntensity > 0.10f) {
-            return layer <= 1 ? CloudStyle.STRATUS : CloudStyle.STORM;
+            return layer == layerCount - 1 ? CloudStyle.STORM : CloudStyle.STRATUS;
         }
         if (rainIntensity > 0.18f) {
             return layer == 0 ? CloudStyle.STRATUS : CloudStyle.RAIN_CUMULUS;
         }
-        if (cover > 0.82f) {
-            return layer == layerCount - 1 ? CloudStyle.STRATUS : CloudStyle.CUMULUS;
+        if (cover > 0.80f) {
+            return layer == 0 ? CloudStyle.THIN : CloudStyle.STRATUS;
         }
         if (cover > 0.48f) {
             return layer == 0 ? CloudStyle.THIN : CloudStyle.CUMULUS;
@@ -200,78 +202,78 @@ public final class HeroCloudRenderer {
     private int cloudCount(CloudStyle style, float cover, int layer) {
         switch (style) {
             case STRATUS:
-                return 3 + Math.round(cover * 2f) + layer;
+                return 2 + (cover > 0.86f ? 1 : 0);
             case STORM:
-                return 3 + layer;
+                return 2 + Math.min(1, layer);
             case RAIN_CUMULUS:
-                return 3 + Math.round(cover * 3f);
+                return 2 + (cover > 0.80f ? 1 : 0);
             case THIN:
-                return 2 + Math.round(cover * 2f);
+                return 1 + (cover > 0.62f ? 1 : 0);
             case CUMULUS:
             default:
-                return 2 + Math.round(cover * 3f) + Math.min(1, layer);
+                return 2 + (cover > 0.54f ? 1 : 0);
         }
     }
 
     private float cloudScale(CloudStyle style, float depth, int seed) {
-        float jitter = 0.82f + hash01(seed * 37 + 13) * 0.36f;
+        float jitter = 0.84f + hash01(seed * 37 + 13) * 0.32f;
         float base;
         switch (style) {
             case STRATUS:
-                base = 0.58f;
+                base = 0.72f;
                 break;
             case STORM:
-                base = 0.52f;
+                base = 0.68f;
                 break;
             case RAIN_CUMULUS:
-                base = 0.43f;
+                base = 0.58f;
                 break;
             case THIN:
-                base = 0.46f;
+                base = 0.62f;
                 break;
             case CUMULUS:
             default:
-                base = 0.36f;
+                base = 0.50f;
                 break;
         }
-        return base * (0.70f + depth * 0.56f) * jitter;
+        return base * (0.76f + depth * 0.46f) * jitter;
     }
 
     private float cloudAspect(CloudStyle style) {
         switch (style) {
             case STRATUS:
-                return 0.30f;
-            case STORM:
-                return 0.52f;
-            case RAIN_CUMULUS:
-                return 0.48f;
-            case THIN:
                 return 0.22f;
+            case STORM:
+                return 0.40f;
+            case RAIN_CUMULUS:
+                return 0.34f;
+            case THIN:
+                return 0.16f;
             case CUMULUS:
             default:
-                return 0.44f;
+                return 0.32f;
         }
     }
 
     private float cloudY(int height, CloudStyle style, float depth, int seed) {
-        float jitter = (hash01(seed * 47 + 19) - 0.5f) * height * 0.14f;
+        float jitter = (hash01(seed * 47 + 19) - 0.5f) * height * 0.18f;
         float base;
         switch (style) {
             case STRATUS:
-                base = height * (0.13f + depth * 0.15f);
+                base = height * (0.12f + depth * 0.14f);
                 break;
             case STORM:
-                base = height * (0.08f + depth * 0.19f);
+                base = height * (0.06f + depth * 0.15f);
                 break;
             case RAIN_CUMULUS:
-                base = height * (0.11f + depth * 0.19f);
+                base = height * (0.09f + depth * 0.17f);
                 break;
             case THIN:
-                base = height * (0.10f + depth * 0.09f);
+                base = height * (0.08f + depth * 0.08f);
                 break;
             case CUMULUS:
             default:
-                base = height * (0.10f + depth * 0.18f);
+                base = height * (0.08f + depth * 0.17f);
                 break;
         }
         return base + jitter;
@@ -281,23 +283,56 @@ public final class HeroCloudRenderer {
         float base;
         switch (style) {
             case STRATUS:
-                base = 0.52f;
+                base = 0.44f;
                 break;
             case STORM:
-                base = 0.78f;
+                base = 0.72f;
                 break;
             case RAIN_CUMULUS:
-                base = 0.66f;
+                base = 0.58f;
                 break;
             case THIN:
-                base = 0.35f;
+                base = 0.24f;
                 break;
             case CUMULUS:
             default:
-                base = 0.50f;
+                base = 0.42f;
                 break;
         }
-        return clamp(base + cover * 0.24f + depth * 0.08f, 0.28f, 0.96f);
+        return clamp(base + cover * 0.20f + depth * 0.05f, 0.22f, 0.92f);
+    }
+
+    private void drawUpperVeil(
+            Canvas canvas,
+            int width,
+            int height,
+            float cover,
+            float storm,
+            float seconds,
+            float flowX
+    ) {
+        int alpha = clampInt(Math.round((cover - 0.76f) / 0.24f * (storm > 0.1f ? 54f : 30f)), 0, 58);
+        if (alpha <= 0) return;
+
+        float drift = (float) Math.sin(seconds * 0.012f) * width * 0.025f + flowX * width * 0.015f;
+        float top = height * 0.02f;
+        float bottom = height * (storm > 0.1f ? 0.34f : 0.26f);
+        int tone = storm > 0.1f ? Color.rgb(57, 66, 79) : Color.rgb(202, 212, 220);
+        hazePaint.setShader(new LinearGradient(
+                drift,
+                top,
+                width + drift,
+                bottom,
+                new int[]{
+                        withAlpha(tone, alpha),
+                        withAlpha(tone, Math.max(0, alpha - 8)),
+                        Color.TRANSPARENT
+                },
+                new float[]{0f, 0.58f, 1f},
+                Shader.TileMode.CLAMP
+        ));
+        canvas.drawRect(0f, top, width, bottom, hazePaint);
+        hazePaint.setShader(null);
     }
 
     private void drawCloudMass(
@@ -314,13 +349,15 @@ public final class HeroCloudRenderer {
 
         int[] tones = cloudTones(style);
         int top = withAlpha(tones[0], Math.round(alpha * 255f));
-        int middle = withAlpha(tones[1], Math.round(alpha * 242f));
+        int middle = withAlpha(tones[1], Math.round(alpha * 246f));
         int bottom = withAlpha(tones[2], Math.round(alpha * 255f));
 
+        // One very restrained atmospheric shadow. The previous multiple offset
+        // passes made clouds look like stacked horizontal bands.
         canvas.save();
-        canvas.translate(0f, height * 0.055f);
+        canvas.translate(width * 0.003f, height * 0.025f);
         fillPaint.setShader(null);
-        fillPaint.setColor(withAlpha(tones[2], Math.round(alpha * 82f)));
+        fillPaint.setColor(withAlpha(tones[2], Math.round(alpha * 34f)));
         canvas.drawPath(cloudPath, fillPaint);
         canvas.restore();
 
@@ -330,45 +367,27 @@ public final class HeroCloudRenderer {
                 0f,
                 y + height,
                 new int[]{top, middle, bottom},
-                new float[]{0f, 0.48f, 1f},
+                new float[]{0f, 0.52f, 1f},
                 Shader.TileMode.CLAMP
         ));
         canvas.drawPath(cloudPath, fillPaint);
         fillPaint.setShader(null);
 
-        detailPath.reset();
-        float bandY = y + height * (style == CloudStyle.STORM ? 0.62f : 0.58f);
-        detailPath.moveTo(x + width * 0.12f, bandY);
-        detailPath.cubicTo(
-                x + width * 0.32f,
-                bandY + height * (hash01(seed * 71 + 3) - 0.5f) * 0.11f,
-                x + width * 0.60f,
-                bandY - height * 0.07f,
-                x + width * 0.88f,
-                bandY + height * 0.02f
-        );
-        detailPaint.setStrokeWidth(Math.max(1.2f, height * 0.055f));
-        detailPaint.setColor(withAlpha(tones[2], Math.round(alpha * 44f)));
-        canvas.drawPath(detailPath, detailPaint);
-
+        // Tiny diffuse top-light only; no decorative interior stripe.
         if (daylight && style != CloudStyle.STORM && style != CloudStyle.STRATUS) {
-            detailPath.reset();
-            float highlightY = y + height * 0.28f;
-            detailPath.moveTo(x + width * 0.18f, highlightY);
-            detailPath.cubicTo(
-                    x + width * 0.36f,
-                    highlightY - height * 0.08f,
-                    x + width * 0.56f,
-                    highlightY - height * 0.05f,
-                    x + width * 0.72f,
-                    highlightY
-            );
-            detailPaint.setStrokeWidth(Math.max(1.0f, height * 0.035f));
-            detailPaint.setColor(Color.argb(Math.round(alpha * 40f), 255, 255, 255));
-            canvas.drawPath(detailPath, detailPaint);
+            canvas.save();
+            canvas.translate(0f, -height * 0.012f);
+            fillPaint.setColor(Color.argb(Math.round(alpha * 18f), 255, 255, 255));
+            canvas.drawPath(cloudPath, fillPaint);
+            canvas.restore();
         }
     }
 
+    /**
+     * Creates one smooth atmospheric silhouette using broad anchor points.
+     * There are no repeated semicircle lobes and the underside is nearly flat,
+     * which removes the cartoon scallop pattern visible in the previous build.
+     */
     private void buildCloudPath(
             Path path,
             float x,
@@ -380,114 +399,113 @@ public final class HeroCloudRenderer {
     ) {
         path.reset();
 
-        float topBaseline;
-        float bottomBaseline;
-        float peakMin;
-        float peakRange;
-        int lobes;
+        float topBase;
+        float dome;
+        float bottomBase;
+        float topNoise;
+        int topSegments;
 
         switch (style) {
             case THIN:
-                topBaseline = 0.50f;
-                bottomBaseline = 0.72f;
-                peakMin = 0.05f;
-                peakRange = 0.08f;
-                lobes = 7;
+                topBase = 0.56f;
+                dome = 0.13f;
+                bottomBase = 0.72f;
+                topNoise = 0.055f;
+                topSegments = 6;
                 break;
             case STRATUS:
-                topBaseline = 0.44f;
-                bottomBaseline = 0.76f;
-                peakMin = 0.04f;
-                peakRange = 0.10f;
-                lobes = 8;
+                topBase = 0.50f;
+                dome = 0.10f;
+                bottomBase = 0.76f;
+                topNoise = 0.065f;
+                topSegments = 6;
                 break;
             case STORM:
-                topBaseline = 0.46f;
-                bottomBaseline = 0.88f;
-                peakMin = 0.14f;
-                peakRange = 0.18f;
-                lobes = 9;
+                topBase = 0.54f;
+                dome = 0.29f;
+                bottomBase = 0.88f;
+                topNoise = 0.11f;
+                topSegments = 7;
                 break;
             case RAIN_CUMULUS:
-                topBaseline = 0.50f;
-                bottomBaseline = 0.84f;
-                peakMin = 0.12f;
-                peakRange = 0.18f;
-                lobes = 8;
+                topBase = 0.56f;
+                dome = 0.24f;
+                bottomBase = 0.84f;
+                topNoise = 0.095f;
+                topSegments = 7;
                 break;
             case CUMULUS:
             default:
-                topBaseline = 0.54f;
-                bottomBaseline = 0.80f;
-                peakMin = 0.12f;
-                peakRange = 0.22f;
-                lobes = 8;
+                topBase = 0.58f;
+                dome = 0.27f;
+                bottomBase = 0.80f;
+                topNoise = 0.095f;
+                topSegments = 7;
                 break;
         }
 
-        float leftY = y + height * bottomBaseline;
-        path.moveTo(x, leftY);
-
-        float segment = width / lobes;
-        float currentY = y + height * (topBaseline + 0.03f);
+        float leftBottomY = y + height * (bottomBase - 0.015f);
+        float firstX = x + width * 0.055f;
+        float firstY = y + height * (topBase - dome * 0.20f);
+        path.moveTo(x, leftBottomY);
         path.cubicTo(
-                x + segment * 0.20f,
-                leftY - height * 0.10f,
-                x + segment * 0.42f,
-                currentY,
-                x + segment * 0.58f,
-                currentY
+                x + width * 0.012f,
+                leftBottomY - height * 0.08f,
+                firstX - width * 0.018f,
+                firstY + height * 0.035f,
+                firstX,
+                firstY
         );
 
-        float currentX = x + segment * 0.58f;
-        for (int i = 0; i < lobes; i++) {
-            float endX = x + Math.min(width, segment * (i + 1.12f));
-            float edgeWeight = (float) Math.sin(Math.PI * (i + 0.5f) / lobes);
-            float peak = peakMin + peakRange * edgeWeight
-                    * (0.65f + hash01(seed + i * 113) * 0.55f);
-            float peakY = y + height * (topBaseline - peak);
-            float endY = y + height * (
-                    topBaseline
-                            + (hash01(seed + i * 139 + 7) - 0.5f) * 0.12f
-            );
-            float dx = Math.max(segment * 0.45f, endX - currentX);
-            path.cubicTo(
-                    currentX + dx * 0.24f,
-                    peakY,
-                    currentX + dx * 0.72f,
-                    peakY,
-                    endX,
-                    endY
-            );
-            currentX = endX;
-            currentY = endY;
+        float previousX = firstX;
+        float previousY = firstY;
+        for (int i = 1; i <= topSegments; i++) {
+            float t = i / (float) topSegments;
+            float anchorX = x + width * (0.055f + 0.89f * t);
+            float envelope = (float) Math.sin(Math.PI * t);
+            float broadShape = dome * envelope * (0.68f + hash01(seed + i * 131) * 0.38f);
+            float irregular = (hash01(seed * 17 + i * 173) - 0.5f) * topNoise;
+            float anchorY = y + height * (topBase - broadShape + irregular);
+
+            float midX = (previousX + anchorX) * 0.5f;
+            float midY = (previousY + anchorY) * 0.5f;
+            path.quadTo(previousX, previousY, midX, midY);
+            previousX = anchorX;
+            previousY = anchorY;
         }
 
-        float rightX = x + width;
-        float rightBottom = y + height * (bottomBaseline + 0.01f);
+        float rightTopX = x + width * 0.955f;
+        float rightTopY = y + height * (topBase - dome * 0.18f);
+        path.quadTo(previousX, previousY, rightTopX, rightTopY);
+
+        float rightBottomY = y + height * (bottomBase + 0.010f);
         path.cubicTo(
-                rightX - width * 0.06f,
-                currentY + height * 0.08f,
-                rightX,
-                rightBottom - height * 0.08f,
-                rightX,
-                rightBottom
+                x + width * 0.985f,
+                rightTopY + height * 0.04f,
+                x + width,
+                rightBottomY - height * 0.07f,
+                x + width,
+                rightBottomY
         );
 
+        // Broad low-frequency underside, intentionally not scalloped.
+        float prevBottomX = x + width;
+        float prevBottomY = rightBottomY;
         int bottomSegments = 5;
-        for (int i = bottomSegments - 1; i >= 0; i--) {
+        for (int i = 1; i <= bottomSegments; i++) {
             float t = i / (float) bottomSegments;
-            float px = x + width * t;
-            float py = y + height * (
-                    bottomBaseline
-                            + (hash01(seed * 211 + i * 53) - 0.5f)
-                            * (style == CloudStyle.STORM ? 0.12f : 0.075f)
-            );
-            float cx = (rightX + px) * 0.5f;
-            float cy = y + height * (bottomBaseline + 0.035f);
-            path.quadTo(cx, cy, px, py);
-            rightX = px;
+            float anchorX = x + width * (1f - t);
+            float middleSag = (float) Math.sin(Math.PI * t) * 0.018f;
+            float irregular = (hash01(seed * 211 + i * 59) - 0.5f)
+                    * (style == CloudStyle.STORM ? 0.050f : 0.034f);
+            float anchorY = y + height * (bottomBase + middleSag + irregular);
+            float midX = (prevBottomX + anchorX) * 0.5f;
+            float midY = (prevBottomY + anchorY) * 0.5f;
+            path.quadTo(prevBottomX, prevBottomY, midX, midY);
+            prevBottomX = anchorX;
+            prevBottomY = anchorY;
         }
+        path.quadTo(prevBottomX, prevBottomY, x, leftBottomY);
         path.close();
     }
 
@@ -495,49 +513,49 @@ public final class HeroCloudRenderer {
         if (!daylight) {
             if (style == CloudStyle.STORM || style == CloudStyle.STRATUS) {
                 return new int[]{
-                        Color.rgb(84, 96, 112),
-                        Color.rgb(55, 67, 84),
-                        Color.rgb(31, 41, 56)
+                        Color.rgb(88, 100, 116),
+                        Color.rgb(57, 69, 86),
+                        Color.rgb(32, 42, 57)
                 };
             }
             return new int[]{
-                    Color.rgb(119, 133, 151),
-                    Color.rgb(81, 96, 115),
-                    Color.rgb(49, 61, 78)
+                    Color.rgb(124, 138, 156),
+                    Color.rgb(84, 99, 118),
+                    Color.rgb(51, 63, 80)
             };
         }
 
         switch (style) {
             case STORM:
                 return new int[]{
-                        Color.rgb(119, 127, 139),
-                        Color.rgb(75, 84, 98),
-                        Color.rgb(43, 52, 65)
+                        Color.rgb(125, 133, 145),
+                        Color.rgb(79, 88, 102),
+                        Color.rgb(45, 54, 67)
                 };
             case STRATUS:
                 return new int[]{
-                        Color.rgb(205, 211, 216),
-                        Color.rgb(166, 176, 185),
-                        Color.rgb(123, 136, 148)
+                        Color.rgb(211, 217, 222),
+                        Color.rgb(174, 184, 193),
+                        Color.rgb(129, 142, 154)
                 };
             case RAIN_CUMULUS:
                 return new int[]{
-                        Color.rgb(213, 220, 224),
-                        Color.rgb(164, 176, 186),
-                        Color.rgb(108, 122, 136)
+                        Color.rgb(221, 227, 231),
+                        Color.rgb(174, 186, 196),
+                        Color.rgb(115, 129, 143)
                 };
             case THIN:
                 return new int[]{
-                        Color.rgb(250, 252, 253),
-                        Color.rgb(232, 238, 242),
-                        Color.rgb(202, 212, 220)
+                        Color.rgb(252, 253, 254),
+                        Color.rgb(236, 241, 245),
+                        Color.rgb(209, 218, 226)
                 };
             case CUMULUS:
             default:
                 return new int[]{
-                        Color.rgb(252, 253, 253),
-                        Color.rgb(231, 237, 240),
-                        Color.rgb(181, 192, 201)
+                        Color.rgb(254, 254, 254),
+                        Color.rgb(236, 241, 244),
+                        Color.rgb(187, 198, 207)
                 };
         }
     }
