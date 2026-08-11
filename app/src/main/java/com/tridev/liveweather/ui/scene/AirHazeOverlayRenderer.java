@@ -9,7 +9,7 @@ import android.graphics.Shader;
 import androidx.annotation.Nullable;
 
 import com.tridev.liveweather.data.remote.dto.AirQualityResponse;
-import com.tridev.liveweather.ui.air.AirQualityIntelligence;
+import com.tridev.liveweather.domain.AirQualityReality;
 
 /**
  * Lightweight post-processing layer that visually integrates AQI haze without
@@ -28,7 +28,7 @@ public final class AirHazeOverlayRenderer {
         if (airQuality == null || width <= 0 || height <= 0) {
             return;
         }
-        double haze = AirQualityIntelligence.hazeIntensity(airQuality);
+        double haze = AirQualityReality.hazeIntensity(airQuality);
         if (haze < 0.03d) {
             return;
         }
