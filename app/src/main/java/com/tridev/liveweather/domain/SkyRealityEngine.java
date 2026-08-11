@@ -48,9 +48,13 @@ public final class SkyRealityEngine {
         WeatherResponse.CurrentWeather current = weather.getCurrent();
         LiveConditionResolver.ResolvedCondition resolved = LiveConditionResolver.resolve(weather);
 
-        double cloudPercent = current == null || current.getCloudCover() == null
+        double rawCloudPercent = current == null || current.getCloudCover() == null
                 ? 0.0
                 : clamp(current.getCloudCover(), 0.0, 100.0);
+        double starCloudPercent = reconcileStarCloudPercent(
+                rawCloudPercent,
+                resolved.getWeatherCode()
+        );
         double visibilityMeters = current == null || current.getVisibility() == null
                 ? 12000.0
                 : Math.max(0.0, current.getVisibility());
@@ -58,7 +62,7 @@ public final class SkyRealityEngine {
         boolean precipitationCondition = isPrecipitationCode(resolved.getWeatherCode());
 
         double darkness = darknessFactor(sun.getAltitude());
-        double cloudTransparency = Math.pow(1.0 - (cloudPercent / 100.0), 1.35);
+        double cloudTransparency = Math.pow(1.0 - (starCloudPercent / 100.0), 1.25);
         double visibilityFactor = clamp(visibilityMeters / 20000.0, 0.12, 1.0);
         double precipitationFactor;
         if (precipitation >= 1.0) {
@@ -83,7 +87,7 @@ public final class SkyRealityEngine {
         starVisibility = clampPercent(starVisibility);
 
         double daylight = daylightFactor(sun.getAltitude());
-        double weatherDimmer = 1.0 - (0.30 * (cloudPercent / 100.0));
+        double weatherDimmer = 1.0 - (0.30 * (rawCloudPercent / 100.0));
         if (precipitationCondition) {
             weatherDimmer *= 0.78;
         }
@@ -126,6 +130,39 @@ public final class SkyRealityEngine {
                 equatorial.getDec(),
                 Refraction.Normal
         );
+    }
+
+    /**
+     * Open-Meteo may occasionally expose a raw cloud percentage that conflicts
+     * with the resolved current WMO condition used by the UI. Star visibility
+     * should not collapse to zero while the authoritative current condition says
+     * clear/mainly-clear, nor should an overcast/precipitation condition be made
+     * artificially transparent by a transient low raw cloud sample.
+     */
+    private static double reconcileStarCloudPercent(double rawCloudPercent, Integer code) {
+        if (code == null) {
+            return rawCloudPercent;
+        }
+
+        if (code == 0) {
+            return Math.min(rawCloudPercent, 18.0);
+        }
+        if (code == 1) {
+            return Math.min(rawCloudPercent, 38.0);
+        }
+        if (code == 2) {
+            return clamp(rawCloudPercent, 28.0, 74.0);
+        }
+        if (code == 3) {
+            return Math.max(rawCloudPercent, 78.0);
+        }
+        if (code == 45 || code == 48) {
+            return Math.max(rawCloudPercent, 62.0);
+        }
+        if (isPrecipitationCode(code)) {
+            return Math.max(rawCloudPercent, 72.0);
+        }
+        return rawCloudPercent;
     }
 
     private static boolean isPrecipitationCode(Integer code) {
