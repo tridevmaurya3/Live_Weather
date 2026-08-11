@@ -6,13 +6,11 @@ import androidx.annotation.Nullable;
 import com.tridev.liveweather.domain.scene.SceneState;
 
 /**
- * ODM-1A atmospheric sky palette.
+ * Weather- and astronomy-aware atmospheric sky palette.
  *
- * The previous GPU pipeline selected a time-of-day palette and then darkened the
- * whole sky with one generic multiplier. That flattened clear/cloudy/rain/storm
- * scenes into similar grey-blue sheets. This profile keeps time-of-day as the
- * astronomical base, then blends dedicated weather palettes and localises haze
- * and fog primarily toward the horizon.
+ * ODM-4 adds a restrained lunar night fill: only an actually visible,
+ * illuminated Moon can lift the night palette, and cloud cover attenuates that
+ * contribution. No decorative Moon/night brightness is invented.
  */
 public final class SkyGradientProfile {
 
@@ -54,7 +52,6 @@ public final class SkyGradientProfile {
         boolean daylight = sunAltitude > -4f;
 
         if (daylight) {
-            // Partly cloudy keeps blue depth while muting saturation slightly.
             if (cloud >= 0.24f) {
                 float amount = clamp01((cloud - 0.20f) / 0.55f) * 0.34f;
                 blend(top, rgb(54, 111, 158), amount * 0.62f);
@@ -62,7 +59,6 @@ public final class SkyGradientProfile {
                 blend(horizon, rgb(190, 207, 211), amount);
             }
 
-            // Overcast is a separate atmospheric profile, not a darkened clear sky.
             if (cloud >= 0.70f) {
                 float amount = clamp01((cloud - 0.68f) / 0.32f) * 0.64f;
                 blend(top, rgb(66, 91, 111), amount * 0.82f);
@@ -70,7 +66,6 @@ public final class SkyGradientProfile {
                 blend(horizon, rgb(181, 190, 193), amount);
             }
 
-            // Rain cools the lower atmosphere while retaining vertical separation.
             if (rain > 0.02f) {
                 float amount = 0.22f + rain * 0.46f;
                 blend(top, rgb(45, 72, 96), amount * 0.72f);
@@ -78,7 +73,6 @@ public final class SkyGradientProfile {
                 blend(horizon, rgb(145, 158, 162), amount);
             }
 
-            // Storm has its own deep blue-charcoal ceiling and lifted wet horizon.
             if (storm > 0.02f) {
                 float amount = 0.36f + storm * 0.54f;
                 blend(top, rgb(22, 34, 49), amount);
@@ -86,16 +80,27 @@ public final class SkyGradientProfile {
                 blend(horizon, rgb(111, 120, 124), amount * 0.92f);
             }
         } else {
-            // Night weather must remain night: reduce contrast instead of turning grey.
             float weather = clamp01(cloud * 0.38f + rain * 0.25f + storm * 0.48f);
             if (weather > 0f) {
                 blend(top, rgb(5, 10, 20), weather * 0.68f);
                 blend(mid, rgb(16, 25, 37), weather * 0.76f);
                 blend(horizon, rgb(36, 44, 53), weather * 0.88f);
             }
+
+            float moonIllumination = clamp01((float) (state.getSky().getMoonIlluminationPercent() / 100d));
+            float moonVisibility = clamp01((float) state.getMoonVisibility());
+            float lunarFill = moonVisibility
+                    * moonIllumination
+                    * clamp01(1f - cloud * 0.62f)
+                    * clamp01(1f - fog * 0.72f)
+                    * 0.18f;
+            if (lunarFill > 0.002f) {
+                blend(top, rgb(12, 23, 42), lunarFill * 0.34f);
+                blend(mid, rgb(23, 39, 61), lunarFill * 0.68f);
+                blend(horizon, rgb(44, 58, 75), lunarFill);
+            }
         }
 
-        // Haze and fog belong near the horizon. Only a restrained amount reaches mid sky.
         float horizonAtmosphere = clamp01(haze * 0.58f + fog * 0.82f);
         if (horizonAtmosphere > 0f) {
             float[] veil = daylight ? rgb(194, 199, 196) : rgb(76, 82, 88);
@@ -103,7 +108,6 @@ public final class SkyGradientProfile {
             blend(mid, veil, horizonAtmosphere * 0.13f);
         }
 
-        // Keep a visible luminance separation between zenith and horizon.
         float sceneLight = clamp01((float) state.getSceneLight());
         float minimumExposure = daylight ? 0.52f : 0.34f;
         float exposure = Math.max(minimumExposure, 0.72f + sceneLight * 0.28f - storm * 0.18f);
