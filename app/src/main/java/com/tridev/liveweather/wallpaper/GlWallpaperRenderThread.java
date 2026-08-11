@@ -18,7 +18,7 @@ import com.tridev.liveweather.data.remote.dto.AirQualityResponse;
 import com.tridev.liveweather.data.remote.dto.WeatherResponse;
 import com.tridev.liveweather.ui.gl.GlRealityAdapter;
 import com.tridev.liveweather.ui.gl.GlSceneSnapshot;
-import com.tridev.liveweather.ui.gl.HeroGlSceneRenderer;
+import com.tridev.liveweather.ui.gl.HeroGlCloudSceneRenderer;
 
 /**
  * Dedicated EGL14 render thread for the system Live Wallpaper.
@@ -34,7 +34,7 @@ public final class GlWallpaperRenderThread {
 
     private final HandlerThread thread;
     private final Handler handler;
-    private final HeroGlSceneRenderer renderer = new HeroGlSceneRenderer();
+    private final HeroGlCloudSceneRenderer renderer = new HeroGlCloudSceneRenderer();
 
     private EGLDisplay display = EGL14.EGL_NO_DISPLAY;
     private EGLContext context = EGL14.EGL_NO_CONTEXT;
