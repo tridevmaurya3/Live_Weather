@@ -16,11 +16,12 @@ import com.tridev.liveweather.domain.LiveConditionResolver;
 /**
  * Hero thunderstorm renderer.
  *
- * Responsibilities:
- * - deep storm darkening that never exposes rectangular texture bounds;
- * - irregular whole-screen lightning flashes;
- * - radial cloud illumination around the strike;
- * - deterministic branched lightning with a short electrical afterglow.
+ * HRS-2 responsibilities:
+ * - persistent storm darkening without rectangular artifacts;
+ * - irregular multi-pulse whole-screen electrical flashes;
+ * - broad cloud-ceiling illumination around each strike;
+ * - deterministic branched lightning + short afterglow;
+ * - distant lightning may illuminate clouds without showing a dominant bolt.
  */
 public final class HeroStormRenderer {
 
@@ -55,8 +56,8 @@ public final class HeroStormRenderer {
     }
 
     /**
-     * Draw behind the foreground rain. This makes the entire cloud/sky volume
-     * react to lightning rather than rendering a bright line on an unchanged sky.
+     * Draw behind foreground rain. The flash lights the atmosphere/cloud volume
+     * first so the strike feels emitted rather than pasted onto the wallpaper.
      */
     public void drawAtmosphere(
             @NonNull Canvas canvas,
@@ -73,21 +74,21 @@ public final class HeroStormRenderer {
         StormFlashController.FlashFrame frame = flashController.frame(nowMillis, storm);
         float flash = frame.getFlashStrength();
 
-        // Persistent storm ceiling / pressure-darkening. It is a full-screen
-        // gradient, never a moving rectangle or sprite.
-        int topAlpha = clampInt(Math.round(35f + storm * 68f), 28, 110);
-        int lowerAlpha = clampInt(Math.round(24f + storm * 52f + rainIntensity * 24f), 18, 96);
+        // Deep pressure-darkened storm ceiling.
+        int topAlpha = clampInt(Math.round(46f + storm * 82f), 36, 134);
+        int midAlpha = clampInt(Math.round(34f + storm * 68f + rainIntensity * 18f), 28, 116);
+        int lowerAlpha = clampInt(Math.round(24f + storm * 48f + rainIntensity * 28f), 18, 104);
         paint.setShader(new LinearGradient(
                 0f,
                 0f,
                 0f,
                 height,
                 new int[]{
-                        Color.argb(topAlpha, 4, 12, 26),
-                        Color.argb(lowerAlpha, 15, 25, 37),
-                        Color.argb(Math.max(10, lowerAlpha / 2), 31, 42, 48)
+                        Color.argb(topAlpha, 3, 10, 23),
+                        Color.argb(midAlpha, 11, 21, 35),
+                        Color.argb(lowerAlpha, 30, 42, 50)
                 },
-                new float[]{0f, 0.58f, 1f},
+                new float[]{0f, 0.56f, 1f},
                 Shader.TileMode.CLAMP
         ));
         canvas.drawRect(0f, 0f, width, height, paint);
@@ -96,32 +97,59 @@ public final class HeroStormRenderer {
         if (flash <= 0.001f) return;
 
         float strikeX = width * frame.getAnchorXFraction();
-        float glowY = height * (0.25f + cloudCover * 0.12f);
-        float radius = Math.max(width, height) * (0.45f + flash * 0.22f);
+        float cloudY = height * (0.16f + cloudCover * 0.10f);
+        float localRadius = Math.max(width, height) * (0.40f + flash * 0.26f);
 
+        // Local cloud illumination around the electrical channel.
         paint.setShader(new RadialGradient(
                 strikeX,
-                glowY,
-                radius,
+                cloudY,
+                localRadius,
                 new int[]{
-                        Color.argb(clampInt(Math.round(210f * flash), 0, 230), 231, 241, 255),
-                        Color.argb(clampInt(Math.round(118f * flash), 0, 155), 170, 197, 238),
+                        Color.argb(clampInt(Math.round(238f * flash), 0, 248), 238, 246, 255),
+                        Color.argb(clampInt(Math.round(158f * flash), 0, 184), 184, 207, 244),
+                        Color.argb(clampInt(Math.round(52f * flash), 0, 72), 105, 135, 190),
                         Color.TRANSPARENT
                 },
-                new float[]{0f, 0.34f, 1f},
+                new float[]{0f, 0.22f, 0.55f, 1f},
                 Shader.TileMode.CLAMP
         ));
-        canvas.drawRect(0f, 0f, width, height, paint);
+        canvas.drawRect(0f, 0f, width, height * 0.72f, paint);
         paint.setShader(null);
 
-        // Whole-scene electrical flash. Strong strikes can momentarily wash out
-        // the screen, matching the way real lightning illuminates rain and cloud.
-        int flashAlpha = clampInt(Math.round((92f + storm * 110f) * flash), 0, 224);
-        paint.setColor(Color.argb(flashAlpha, 218, 232, 255));
+        // Wide cloud-ceiling flash: even distant lightning should make the whole
+        // storm bank breathe with light for a fraction of a second.
+        int ceilingAlpha = clampInt(Math.round((62f + storm * 88f) * flash), 0, 182);
+        paint.setShader(new LinearGradient(
+                0f,
+                0f,
+                0f,
+                height * 0.58f,
+                new int[]{
+                        Color.argb(ceilingAlpha, 224, 237, 255),
+                        Color.argb(ceilingAlpha / 2, 158, 188, 235),
+                        Color.TRANSPARENT
+                },
+                new float[]{0f, 0.50f, 1f},
+                Shader.TileMode.CLAMP
+        ));
+        canvas.drawRect(0f, 0f, width, height * 0.62f, paint);
+        paint.setShader(null);
+
+        // Whole-screen electrical response. Close strikes can briefly wash the
+        // screen nearly white, as requested for the Hero storm effect.
+        int flashAlpha = clampInt(Math.round((118f + storm * 124f) * flash), 0, 242);
+        paint.setColor(Color.argb(flashAlpha, 220, 235, 255));
         canvas.drawRect(0f, 0f, width, height, paint);
+
+        if (flash > 0.76f) {
+            int whitePulse = clampInt(Math.round((flash - 0.76f) / 0.24f * 96f), 0, 104);
+            paint.setColor(Color.argb(whitePulse, 250, 253, 255));
+            canvas.drawRect(0f, 0f, width, height, paint);
+        }
     }
 
-    /** Draw the visible bolt above rain/wet-glass layers. */
+    /** Draw visible lightning branches above rain/wet-glass layers. */
     public void drawForeground(
             @NonNull Canvas canvas,
             int width,
@@ -147,12 +175,12 @@ public final class HeroStormRenderer {
             );
         }
 
-        // A very short high-energy front-glass pulse makes the strike feel like
-        // emitted light rather than a white graphic pasted onto the wallpaper.
-        if (frame.getFlashStrength() > 0.72f) {
-            int alpha = clampInt(Math.round(48f * frame.getFlashStrength()), 0, 58);
+        // Short lens/front-glass electrical pulse.
+        float flash = frame.getFlashStrength();
+        if (flash > 0.64f) {
+            int alpha = clampInt(Math.round(68f * flash), 0, 78);
             paint.setShader(null);
-            paint.setColor(Color.argb(alpha, 245, 250, 255));
+            paint.setColor(Color.argb(alpha, 247, 251, 255));
             canvas.drawRect(0f, 0f, width, height, paint);
         }
     }
@@ -184,14 +212,14 @@ public final class HeroStormRenderer {
         );
         cloudCover = (float) clamp(clouds / 100d, 0d, 1d);
 
-        // Lightning is only enabled by thunderstorm WMO codes. Strong rain/gusts
-        // can deepen the storm visual but never fabricate electrical activity.
+        // Electrical activity is never fabricated from rain alone. It is enabled
+        // only for thunderstorm WMO codes; rain/gusts merely tune intensity.
         if (code >= 95) {
             stormIntensity = (float) clamp(
-                    0.62d
-                            + rainIntensity * 0.24d
+                    0.66d
+                            + rainIntensity * 0.22d
                             + Math.min(1d, gusts / 90d) * 0.16d,
-                    0.62d,
+                    0.66d,
                     1d
             );
         } else {
