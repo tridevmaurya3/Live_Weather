@@ -10,13 +10,13 @@ import com.tridev.liveweather.data.local.WallpaperPreferences;
  * Android system Live Wallpaper.
  *
  * Device Consistency Pass:
- * the legacy base renderer now owns only sky/Sun/Moon. Stars, clouds and world
- * silhouettes are texture-driven deterministic passes so emulator, Adreno and
- * Mali receive the same source patterns.
+ * Sky/Sun/Moon are analytic and hash-free. Stars, clouds and world silhouettes
+ * are texture-driven deterministic passes so emulator, Adreno and Mali receive
+ * the same source patterns.
  */
 public final class HeroGlPipeline {
 
-    private final HeroGlCloudSceneRenderer sceneRenderer = new HeroGlCloudSceneRenderer();
+    private final HeroGlSkyCelestialRenderer sceneRenderer = new HeroGlSkyCelestialRenderer();
     private final HeroGlPortableStarRenderer starRenderer = new HeroGlPortableStarRenderer();
     private final HeroGlPortableCloudRenderer cloudRenderer = new HeroGlPortableCloudRenderer();
     private final HeroGlWorldLayerRendererV4 worldRenderer = new HeroGlWorldLayerRendererV4();
@@ -96,11 +96,6 @@ public final class HeroGlPipeline {
             return;
         }
 
-        /*
-         * Legacy base shader remains responsible for gradient sky, Sun and Moon.
-         * Its procedural stars/clouds are deliberately disabled; those are now
-         * owned by deterministic texture-backed passes below.
-         */
         GlSceneSnapshot sceneSnapshot = state.withVisualOptions(
                 false,
                 false,
