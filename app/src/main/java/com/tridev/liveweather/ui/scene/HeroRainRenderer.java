@@ -34,6 +34,7 @@ public final class HeroRainRenderer {
     private long lastStateRefresh;
     private long lastFrameMillis;
     private long lastPositiveRainSignal;
+    private long animationOriginMillis;
 
     private float targetRain;
     private float targetDrizzle;
@@ -69,6 +70,7 @@ public final class HeroRainRenderer {
         lastStateRefresh = 0L;
         lastFrameMillis = 0L;
         lastPositiveRainSignal = 0L;
+        animationOriginMillis = 0L;
         targetRain = 0f;
         targetDrizzle = 0f;
         targetStorm = 0f;
@@ -94,6 +96,9 @@ public final class HeroRainRenderer {
     ) {
         if (!enabled || weather == null || width <= 0 || height <= 0) return;
 
+        if (animationOriginMillis == 0L) animationOriginMillis = nowMillis;
+        float seconds = Math.max(0L, nowMillis - animationOriginMillis) / 1000f;
+
         refreshState(nowMillis);
         smoothState(nowMillis);
 
@@ -102,16 +107,16 @@ public final class HeroRainRenderer {
         float effective = Math.max(rain, drizzle * 0.72f);
         if (effective < 0.015f) return;
 
-        drawRainCurtain(canvas, width, height, effective, nowMillis);
+        drawRainCurtain(canvas, width, height, effective, seconds);
 
         if (drizzle > rain) {
-            drawDepthLayer(canvas, width, height, drizzle, nowMillis, 0.20f, true, 0);
-            drawDepthLayer(canvas, width, height, drizzle, nowMillis, 0.52f, true, 1);
-            drawDepthLayer(canvas, width, height, drizzle, nowMillis, 0.86f, true, 2);
+            drawDepthLayer(canvas, width, height, drizzle, seconds, 0.20f, true, 0);
+            drawDepthLayer(canvas, width, height, drizzle, seconds, 0.52f, true, 1);
+            drawDepthLayer(canvas, width, height, drizzle, seconds, 0.86f, true, 2);
         } else {
-            drawDepthLayer(canvas, width, height, rain, nowMillis, 0.18f, false, 0);
-            drawDepthLayer(canvas, width, height, rain, nowMillis, 0.50f, false, 1);
-            drawDepthLayer(canvas, width, height, rain, nowMillis, 0.92f, false, 2);
+            drawDepthLayer(canvas, width, height, rain, seconds, 0.18f, false, 0);
+            drawDepthLayer(canvas, width, height, rain, seconds, 0.50f, false, 1);
+            drawDepthLayer(canvas, width, height, rain, seconds, 0.92f, false, 2);
         }
 
         float wetness = clamp01((Math.max(effective, stormIntensity * 0.78f) - 0.10f) / 0.90f);
@@ -157,9 +162,6 @@ public final class HeroRainRenderer {
             lastPositiveRainSignal = nowMillis;
         } else if (lastPositiveRainSignal > 0L
                 && nowMillis - lastPositiveRainSignal < RAIN_SIGNAL_HOLD_MILLIS) {
-            // Do not let one temporary model dip stop an otherwise continuous
-            // rainy wallpaper. Hold the last visual target briefly, then normal
-            // smoothing will decay once the dry state persists.
             rain = Math.max(rain, Math.max(targetRain, rainIntensity) * 0.94f);
             drizzle = Math.max(drizzle, Math.max(targetDrizzle, drizzleIntensity) * 0.94f);
         }
@@ -187,8 +189,6 @@ public final class HeroRainRenderer {
         float dt = clamp((nowMillis - lastFrameMillis) / 1000f, 0f, 0.20f);
         lastFrameMillis = nowMillis;
 
-        // Fast enough to respond to real weather, slow enough to avoid visible
-        // popping when Open-Meteo current/minutely samples disagree for one tick.
         float weatherRate = 1f - (float) Math.exp(-dt * 1.55f);
         float windRate = 1f - (float) Math.exp(-dt * 0.85f);
 
@@ -204,13 +204,11 @@ public final class HeroRainRenderer {
             int width,
             int height,
             float intensity,
-            long nowMillis
+            float seconds
     ) {
         float heavy = clamp01((intensity - 0.22f) / 0.78f);
         if (heavy <= 0.01f) return;
 
-        // Atmospheric rain veil: one static full-screen gradient, so it cannot
-        // create moving rectangular blocks.
         int topAlpha = clampInt(Math.round(4f + heavy * 15f), 0, 22);
         int midAlpha = clampInt(Math.round(8f + heavy * 28f), 0, 40);
         int lowerAlpha = clampInt(Math.round(12f + heavy * 38f), 0, 54);
@@ -230,8 +228,6 @@ public final class HeroRainRenderer {
         canvas.drawRect(0f, 0f, width, height, veilPaint);
         veilPaint.setShader(null);
 
-        // Dense far rain. These streaks recycle forever through positiveMod.
-        float seconds = nowMillis / 1000f;
         float direction = (float) Math.toRadians(windDirectionDegrees + 180f);
         float windNorm = clamp01(windSpeedKmh / 75f);
         int count = 90 + Math.round(heavy * 150f);
@@ -266,12 +262,11 @@ public final class HeroRainRenderer {
             int width,
             int height,
             float intensity,
-            long nowMillis,
+            float seconds,
             float depth,
             boolean drizzle,
             int layerIndex
     ) {
-        float seconds = nowMillis / 1000f;
         float direction = (float) Math.toRadians(windDirectionDegrees + 180f);
         float windNorm = clamp01(windSpeedKmh / 70f);
 
@@ -317,7 +312,6 @@ public final class HeroRainRenderer {
             float vertical = length * (0.95f + Math.abs((float) Math.cos(direction)) * 0.05f);
 
             if (depth > 0.78f) {
-                // Near drop motion blur.
                 streakPaint.setStrokeWidth(thickness * 2.6f);
                 streakPaint.setColor(Color.argb(
                         clampInt(Math.round(alpha * 0.20f), 10, 56),
@@ -327,7 +321,6 @@ public final class HeroRainRenderer {
                 ));
                 canvas.drawLine(x, y, x + slant, y + vertical, streakPaint);
 
-                // Bright wet core.
                 streakPaint.setStrokeWidth(thickness);
                 streakPaint.setColor(Color.argb(alpha, 215, 236, 249));
                 canvas.drawLine(x, y, x + slant, y + vertical, streakPaint);
