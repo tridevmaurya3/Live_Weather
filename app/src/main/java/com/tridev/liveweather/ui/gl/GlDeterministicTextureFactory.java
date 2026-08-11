@@ -10,12 +10,10 @@ import java.nio.ByteOrder;
 /**
  * Creates deterministic, context-local GPU textures from Java-side data.
  *
- * Why this exists:
- * procedural fragment hashes based on large sin()/fract() constants can diverge
- * noticeably between desktop emulator GPUs and real mobile mediump hardware.
- * These textures are generated once with deterministic integer math on the CPU
- * and then sampled by simple shaders, so emulator/Adreno/Mali receive the same
- * source field.
+ * Procedural fragment hashes based on large sin()/fract() constants can diverge
+ * between desktop emulator GPUs and real mobile mediump hardware. These fields
+ * are generated once with deterministic integer/float math on the CPU and then
+ * sampled by simple shaders, so emulator/Adreno/Mali receive the same bytes.
  */
 public final class GlDeterministicTextureFactory {
 
@@ -28,34 +26,18 @@ public final class GlDeterministicTextureFactory {
 
     public static int createCloudNoiseTexture() {
         final int size = CLOUD_SIZE;
-        float[] field = new float[size * size];
-        int seed = 0x4C495645;
-        for (int i = 0; i < field.length; i++) {
-            seed = next(seed);
-            field[i] = ((seed >>> 8) & 0x00FFFFFF) / 16777215f;
-        }
-
-        float[] temp = new float[field.length];
-        // Wrapped blur creates a seamless texture and broad cloud masses.
-        for (int pass = 0; pass < 6; pass++) {
-            int radius = pass < 2 ? 8 : (pass < 4 ? 4 : 2);
-            boxBlurWrapped(field, temp, size, radius);
-            float[] swap = field;
-            field = temp;
-            temp = swap;
-        }
-
         ByteBuffer pixels = ByteBuffer.allocateDirect(size * size * 4)
                 .order(ByteOrder.nativeOrder());
+
+        // Three seamless value-noise octaves. O(width*height), unlike the old
+        // repeated large-kernel blur, so multiple in-app GL surfaces can create
+        // their own context texture without a CPU spike.
         for (int y = 0; y < size; y++) {
             for (int x = 0; x < size; x++) {
-                int index = y * size + x;
-                float broad = field[index];
-                // Add a small deterministic high-frequency component without
-                // depending on GPU hash precision.
-                int h = mix32(x * 73856093 ^ y * 19349663 ^ 0x6A09E667);
-                float detail = ((h >>> 8) & 0x00FFFFFF) / 16777215f;
-                float value = clamp01(broad * 0.88f + detail * 0.12f);
+                float broad = periodicValueNoise(x, y, size, 8, 0x4C495645);
+                float medium = periodicValueNoise(x, y, size, 16, 0x13572468);
+                float detail = periodicValueNoise(x, y, size, 32, 0x6A09E667);
+                float value = clamp01(broad * 0.56f + medium * 0.30f + detail * 0.14f);
                 int channel = Math.round(value * 255f);
                 pixels.put((byte) channel);
                 pixels.put((byte) channel);
@@ -72,7 +54,6 @@ public final class GlDeterministicTextureFactory {
         byte[] rgba = new byte[size * size * 4];
         int seed = 0x53544152;
 
-        // Thousands of tiny deterministic candidates, most intentionally dim.
         for (int i = 0; i < 1050; i++) {
             seed = next(seed);
             int x = Math.floorMod(seed, size);
@@ -122,6 +103,39 @@ public final class GlDeterministicTextureFactory {
         return uploadRgbaTexture(pixels, width, 1, true);
     }
 
+    private static float periodicValueNoise(
+            int x,
+            int y,
+            int size,
+            int cells,
+            int seed
+    ) {
+        float gx = x / (float) size * cells;
+        float gy = y / (float) size * cells;
+        int x0 = (int) Math.floor(gx);
+        int y0 = (int) Math.floor(gy);
+        int x1 = (x0 + 1) % cells;
+        int y1 = (y0 + 1) % cells;
+        x0 = Math.floorMod(x0, cells);
+        y0 = Math.floorMod(y0, cells);
+
+        float fx = gx - (float) Math.floor(gx);
+        float fy = gy - (float) Math.floor(gy);
+        fx = fx * fx * (3f - 2f * fx);
+        fy = fy * fy * (3f - 2f * fy);
+
+        float a = unitHash(x0, y0, seed);
+        float b = unitHash(x1, y0, seed);
+        float c = unitHash(x0, y1, seed);
+        float d = unitHash(x1, y1, seed);
+        return lerp(lerp(a, b, fx), lerp(c, d, fx), fy);
+    }
+
+    private static float unitHash(int x, int y, int seed) {
+        int h = mix32(seed ^ (x * 0x1F123BB5) ^ (y * 0x5F356495));
+        return ((h >>> 8) & 0x00FFFFFF) / 16777215f;
+    }
+
     private static float[] makePeriodicNoise(int width, int seed) {
         final int controlCount = 32;
         float[] controls = new float[controlCount];
@@ -149,23 +163,6 @@ public final class GlDeterministicTextureFactory {
             result[x] = clamp01(primary * 0.68f + secondary * 0.32f);
         }
         return result;
-    }
-
-    private static void boxBlurWrapped(float[] source, float[] target, int size, int radius) {
-        int diameter = radius * 2 + 1;
-        for (int y = 0; y < size; y++) {
-            for (int x = 0; x < size; x++) {
-                float sum = 0f;
-                for (int oy = -radius; oy <= radius; oy++) {
-                    int sy = Math.floorMod(y + oy, size);
-                    for (int ox = -radius; ox <= radius; ox++) {
-                        int sx = Math.floorMod(x + ox, size);
-                        sum += source[sy * size + sx];
-                    }
-                }
-                target[y * size + x] = sum / (diameter * diameter);
-            }
-        }
     }
 
     private static void putStarPixel(byte[] rgba, int size, int x, int y, int brightness, int type) {
