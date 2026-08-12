@@ -46,3 +46,16 @@ not visual acceptance.
 - Verify Moon/Sun/stars across cloud cover and twilight boundaries.
 - Verify dust/haze/fog/snow and high-gust scenes.
 - Add device diagnostics for active weather evidence and renderer quality mode.
+
+
+## Checkpoint 20A.3 — real animated cloud asset engine
+
+- Retired the analytic cloud-shape renderer from the active pipeline.
+- Added a photoreal cloud atlas resource with eight weather-oriented cloud types.
+- Added a texture-based OpenGL renderer with continuously wrapping far/mid/near
+  layers, independent scale/opacity and parallax.
+- Weather cover selects clear/cumulus/broken/overcast sprites; confirmed rain
+  and storm select dark rain and shelf-cloud sprites.
+- Real wind direction, sustained speed and gust response control motion.
+- Day/night brightness and storm intensity tint the same physical cloud assets.
+- Atlas background is removed in the shader before alpha blending.

@@ -2,6 +2,7 @@ package com.tridev.liveweather;
 
 import android.app.Activity;
 import android.app.Application;
+import android.content.Context;
 import android.os.Bundle;
 
 import androidx.annotation.NonNull;
@@ -18,9 +19,21 @@ import com.tridev.liveweather.widget.WidgetRefreshScheduler;
 public final class LiveWeatherApplication extends Application
         implements Application.ActivityLifecycleCallbacks {
 
+    private static volatile Context applicationContext;
+
+    @NonNull
+    public static Context appContext() {
+        Context value = applicationContext;
+        if (value == null) {
+            throw new IllegalStateException("LiveWeatherApplication is not initialized");
+        }
+        return value;
+    }
+
     @Override
     public void onCreate() {
         super.onCreate();
+        applicationContext = getApplicationContext();
         WeatherFormatter.configure(new UnitPreferences(this).load());
         WidgetRefreshScheduler.schedule(this);
         WeatherWidgetUpdater.updateAll(this);

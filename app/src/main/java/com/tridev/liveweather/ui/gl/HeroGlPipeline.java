@@ -12,7 +12,7 @@ import com.tridev.liveweather.data.local.WallpaperPreferences;
  * Final stable visual rebuild:
  * - analytic hash-free sky/Sun/Moon
  * - fixed Java-generated GL-point stars
- * - analytic soft cloud banks with aspect-locked UVs
+ * - photoreal weather-selected cloud texture atlas with layered parallax
  * - smooth analytic hills/forest with no texture/profile spikes
  * - portable storm and rain overlays retained after the stable base scene
  */
@@ -20,7 +20,7 @@ public final class HeroGlPipeline {
 
     private final HeroGlSkyCelestialRenderer sceneRenderer = new HeroGlSkyCelestialRenderer();
     private final HeroGlFixedStarRenderer starRenderer = new HeroGlFixedStarRenderer();
-    private final HeroGlAnalyticCloudRenderer cloudRenderer = new HeroGlAnalyticCloudRenderer();
+    private final HeroGlTextureCloudRenderer cloudRenderer = new HeroGlTextureCloudRenderer();
     private final HeroGlAnalyticWorldRenderer worldRenderer = new HeroGlAnalyticWorldRenderer();
     private final HeroGlAtmosphereOverlayRenderer atmosphereRenderer = new HeroGlAtmosphereOverlayRenderer();
     private final HeroGlPortableStormRenderer stormRenderer = new HeroGlPortableStormRenderer();
