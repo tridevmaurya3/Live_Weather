@@ -7,6 +7,7 @@ import android.widget.LinearLayout;
 import android.widget.TextView;
 
 import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
 import androidx.core.content.ContextCompat;
 
 import com.tridev.liveweather.R;
@@ -146,6 +147,7 @@ public final class Phase6Renderer {
         homeWeatherInsight.setText(intelligence.getHeadline());
 
         if (intelligence.isPrecipitationNowConfirmed()
+                && !isSnowCode(resolved.getWeatherCode())
                 && resolved.getPrecipitationSignalMm() > 0.02d) {
             homeRainValue.setText(
                     WeatherFormatter.precipitation(resolved.getPrecipitationSignalMm()) + " signal"
@@ -350,6 +352,10 @@ public final class Phase6Renderer {
             default:
                 return "timing unavailable";
         }
+    }
+
+    private static boolean isSnowCode(@Nullable Integer code) {
+        return code != null && ((code >= 71 && code <= 77) || code == 85 || code == 86);
     }
 
     @NonNull
