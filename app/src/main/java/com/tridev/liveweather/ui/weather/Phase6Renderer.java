@@ -23,7 +23,8 @@ import java.util.Locale;
 /**
  * Phase 6 overlay renderer. It intentionally runs after the main renderer so
  * precipitation-first condition resolution can correct a conflicting raw WMO
- * clear-sky state without destabilising the Phase 5 forecast/chart renderer.
+ * clear-sky state without destabilising the forecast/chart renderer.
+ * Phase 16 routes all user-facing units through WeatherFormatter.
  */
 public final class Phase6Renderer {
 
@@ -142,11 +143,9 @@ public final class Phase6Renderer {
         homeWeatherInsight.setText(DashboardIntelligence.insight(response));
 
         if (resolved.getPrecipitationSignalMm() > 0.02d) {
-            homeRainValue.setText(String.format(
-                    Locale.getDefault(),
-                    "%.2f mm signal",
-                    resolved.getPrecipitationSignalMm()
-            ));
+            homeRainValue.setText(
+                    WeatherFormatter.precipitation(resolved.getPrecipitationSignalMm()) + " signal"
+            );
         }
 
         if (current != null) {
@@ -277,12 +276,12 @@ public final class Phase6Renderer {
 
         forecastPrecipBreakdownValue.setText(String.format(
                 Locale.getDefault(),
-                "PRECIPITATION · Total %s · Rain %s · Showers %s · Snow %.2f cm · resolved signal %.2f mm",
+                "PRECIPITATION · Total %s · Rain %s · Showers %s · Snow %.2f cm · resolved signal %s",
                 WeatherFormatter.precipitation(current.getPrecipitation()),
                 WeatherFormatter.precipitation(current.getRain()),
                 WeatherFormatter.precipitation(current.getShowers()),
                 current.getSnowfall() == null ? 0d : current.getSnowfall(),
-                resolved.getPrecipitationSignalMm()
+                WeatherFormatter.precipitation(resolved.getPrecipitationSignalMm())
         ));
 
         forecastWindDetailValue.setText(String.format(
@@ -296,8 +295,8 @@ public final class Phase6Renderer {
         forecastAtmosphereDetailValue.setText(String.format(
                 Locale.getDefault(),
                 "ATMOSPHERE · MSL %s · Surface %s · Clouds %s · Visibility %s",
-                pressure(current.getPressureMsl()),
-                pressure(current.getSurfacePressure()),
+                WeatherFormatter.pressure(current.getPressureMsl()),
+                WeatherFormatter.pressure(current.getSurfacePressure()),
                 WeatherFormatter.percent(current.getCloudCover()),
                 DashboardIntelligence.visibility(current.getVisibility())
         ));
@@ -343,12 +342,6 @@ public final class Phase6Renderer {
         forecastAtmosphereDetailValue.setText(R.string.phase6_details_waiting);
         forecastComfortDetailValue.setText(R.string.phase6_details_waiting);
         forecastDataQualityValue.setText(R.string.phase6_data_quality_waiting);
-    }
-
-    private String pressure(Double value) {
-        return value == null
-                ? "—"
-                : String.format(Locale.getDefault(), "%.0f hPa", value);
     }
 
     private int dp(int value) {
