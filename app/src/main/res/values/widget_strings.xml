@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="widget_brand">LIVE WEATHER</string>
+    <string name="widget_compact_name">Live Weather · Current</string>
+    <string name="widget_wide_name">Live Weather · Forecast</string>
+    <string name="widget_waiting">Waiting for weather</string>
+    <string name="widget_tap_refresh">Tap ↻ to refresh</string>
+    <string name="widget_refreshing">Updating…</string>
+    <string name="widget_updated_format">Updated %1$s</string>
+    <string name="widget_updated_short_format">%1$s</string>
+    <string name="widget_humidity_waiting">Humidity —</string>
+    <string name="widget_wind_waiting">Wind —</string>
+    <string name="widget_metrics_waiting">Humidity — · Wind — · Rain —</string>
+    <string name="widget_humidity_format">Humidity %1$s</string>
+    <string name="widget_wind_format">Wind %1$s</string>
+    <string name="widget_metrics_format">Humidity %1$s · Wind %2$s · Rain %3$s</string>
+</resources>
