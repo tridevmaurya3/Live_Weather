@@ -13,7 +13,7 @@
         .location-pulse { width:18px; height:18px; border-radius:50%; background:#53d8ff; border:3px solid #fff; box-shadow:0 0 0 8px rgba(83,216,255,.18),0 0 22px rgba(83,216,255,.7); }
         .wind-arrow { display:flex; align-items:center; gap:4px; color:#e9f8ff; text-shadow:0 1px 4px #00101f; font-weight:700; font-size:10px; white-space:nowrap; }
         .wind-arrow .arrow { display:inline-block; font-size:19px; color:#6fe6ff; transform-origin:50% 50%; }
-        .temp-dot { min-width:34px; height:34px; border-radius:17px; display:flex; align-items:center; justify-content:center; color:white; font-size:10px; font-weight:800; border:1px solid rgba(255,255,255,.7); box-shadow:0 2px 8px rgba(0,0,0,.32); }
+        .temp-dot { min-width:34px; height:34px; border-radius:17px; display:flex; align-items:center; justify-content:center; color:white; font-size:10px; font-weight:800; border:1px solid rgba(255,255,255,.7); box-shadow:0 2px 8px rgba(0,0,0,.32); padding:0 4px; }
         .leaflet-control-zoom a { background:#102d49!important; color:#e7f6ff!important; border-color:#31506b!important; }
         .cloud-field-blob { filter:blur(11px); opacity:.96; }
     </style>
@@ -158,28 +158,28 @@
             }
 
             const flowDirection = ((p.windDirection || 0) + 180) % 360;
-            const windText = p.windSpeed == null ? '--' : Math.round(p.windSpeed) + ' km/h';
+            const windText = p.windLabel || '--';
             const windHtml = '<div class="wind-arrow"><span class="arrow" style="transform:rotate(' + flowDirection + 'deg)">➜</span><span>' + windText + '</span></div>';
             L.marker([p.lat,p.lon], {
                 interactive:false,
                 icon:L.divIcon({
                     className:'',
                     html:windHtml,
-                    iconSize:[74,28],
-                    iconAnchor:[37,14]
+                    iconSize:[80,28],
+                    iconAnchor:[40,14]
                 })
             }).addTo(windGroup);
 
             const temp = p.temperature;
-            const tempText = temp == null ? '--' : Math.round(temp) + '°';
+            const tempText = p.temperatureLabel || '--';
             const tempHtml = '<div class="temp-dot" style="background:' + tempColor(temp) + '">' + tempText + '</div>';
             L.marker([p.lat,p.lon], {
                 interactive:false,
                 icon:L.divIcon({
                     className:'',
                     html:tempHtml,
-                    iconSize:[34,34],
-                    iconAnchor:[17,17]
+                    iconSize:[42,34],
+                    iconAnchor:[21,17]
                 })
             }).addTo(tempGroup);
         });
