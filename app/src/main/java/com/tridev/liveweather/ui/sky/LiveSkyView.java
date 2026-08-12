@@ -18,6 +18,8 @@ import android.widget.FrameLayout;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
+import com.tridev.liveweather.core.performance.PerformancePolicy;
+import com.tridev.liveweather.data.local.PerformancePreferences;
 import com.tridev.liveweather.data.local.WallpaperPreferences;
 import com.tridev.liveweather.data.remote.dto.AirQualityResponse;
 import com.tridev.liveweather.data.remote.dto.WeatherResponse;
@@ -28,26 +30,18 @@ import com.tridev.liveweather.ui.gl.GlSceneSnapshot;
 import com.tridev.liveweather.ui.gl.HeroGlPipeline;
 
 /**
- * ODM-5 in-app live weather surface.
+ * In-app live weather surface backed by the same OpenGL pipeline as the system
+ * Live Wallpaper.
  *
- * LiveSkyView intentionally remains a normal Android container so layouts can
- * safely apply backgrounds, alpha, rounded outlines and card styling. The
- * actual OpenGL output is rendered into a private child TextureView.
- *
- * This avoids Android's TextureView restriction that throws when a background
- * drawable is applied directly to a TextureView while still keeping the same
- * public LiveSkyView API used by MainActivity, Forecast and Wallpaper preview.
+ * Phase 14 keeps rendering lifecycle-aware and battery-aware: hidden views draw
+ * zero frames, while visible views share one adaptive frame policy with the
+ * system wallpaper.
  */
 public final class LiveSkyView extends FrameLayout implements TextureView.SurfaceTextureListener {
 
     private static final long REALITY_REFRESH_MILLIS = 30_000L;
-    private static final long FRAME_MILLIS = 33L;
+    private static final long PERFORMANCE_REFRESH_MILLIS = 15_000L;
 
-    /*
-     * MainActivity owns several LiveSkyView instances (global background,
-     * Forecast live-sky card, Wallpaper preview). Weather is shared so all
-     * visible instances render the same current reality without duplicate wiring.
-     */
     private static final Object SHARED_LOCK = new Object();
     @Nullable private static WeatherResponse sharedWeather;
     @Nullable private static AirQualityResponse sharedAirQuality;
@@ -56,10 +50,12 @@ public final class LiveSkyView extends FrameLayout implements TextureView.Surfac
     private static double sharedLongitude = Double.NaN;
     private static long sharedVersion = 1L;
 
+    private final Context appContext;
     private final TextureView textureView;
     private final HeroGlPipeline pipeline = new HeroGlPipeline();
     private final HandlerThread renderThread;
     private final Handler renderHandler;
+    private final PerformancePreferences performancePreferences;
 
     private EGLDisplay display = EGL14.EGL_NO_DISPLAY;
     private EGLContext eglContext = EGL14.EGL_NO_CONTEXT;
@@ -73,6 +69,8 @@ public final class LiveSkyView extends FrameLayout implements TextureView.Surfac
     private volatile boolean released;
     private boolean pipelineCreated;
     private long lastRealityRefresh;
+    private long lastPerformanceRefresh;
+    private long frameIntervalMillis = PerformancePolicy.SMOOTH_FRAME_MILLIS;
     private long seenSharedVersion = -1L;
 
     @Nullable
@@ -84,6 +82,7 @@ public final class LiveSkyView extends FrameLayout implements TextureView.Surfac
             if (released || !visible || eglSurface == EGL14.EGL_NO_SURFACE) return;
 
             try {
+                refreshPerformanceIfNeeded();
                 refreshRealityIfNeeded();
                 pipeline.drawFrame();
                 if (!EGL14.eglSwapBuffers(display, eglSurface)) {
@@ -96,7 +95,7 @@ public final class LiveSkyView extends FrameLayout implements TextureView.Surfac
             }
 
             if (!released && visible && eglSurface != EGL14.EGL_NO_SURFACE) {
-                renderHandler.postDelayed(this, FRAME_MILLIS);
+                renderHandler.postDelayed(this, frameIntervalMillis);
             }
         }
     };
@@ -112,16 +111,25 @@ public final class LiveSkyView extends FrameLayout implements TextureView.Surfac
     public LiveSkyView(Context context, @Nullable AttributeSet attrs, int defStyleAttr) {
         super(context, attrs, defStyleAttr);
 
+        appContext = context.getApplicationContext();
+        performancePreferences = new PerformancePreferences(appContext);
+
         synchronized (SHARED_LOCK) {
             if (sharedOptions == null) {
                 sharedOptions = new WallpaperPreferences(context).load();
             }
         }
 
-        /*
-         * The wrapper can legally own XML backgrounds and outlines. The child
-         * TextureView deliberately has no background drawable.
-         */
+        WallpaperPreferences.Options initialOptions;
+        synchronized (SHARED_LOCK) {
+            initialOptions = sharedOptions;
+        }
+        frameIntervalMillis = PerformancePolicy.frameIntervalMillis(
+                appContext,
+                performancePreferences.loadMode(),
+                initialOptions == null || initialOptions.isBatteryAdaptive()
+        );
+
         setClipToOutline(true);
         setClipChildren(true);
 
@@ -225,6 +233,7 @@ public final class LiveSkyView extends FrameLayout implements TextureView.Surfac
             if (released) return;
             createEglSurface(surface, surfaceWidth, surfaceHeight);
             seenSharedVersion = -1L;
+            lastPerformanceRefresh = 0L;
             restartLoopOnRenderThread();
         });
     }
@@ -254,16 +263,15 @@ public final class LiveSkyView extends FrameLayout implements TextureView.Surfac
 
     @Override
     public void onSurfaceTextureUpdated(@NonNull SurfaceTexture surface) {
-        // No-op. Frames are produced by the dedicated EGL thread.
+        // Frames are produced by the dedicated EGL thread.
     }
 
     private void updateVisibilityAndLoop() {
         if (released) return;
-        boolean nowVisible = attached
+        visible = attached
                 && getWindowVisibility() == VISIBLE
                 && getVisibility() == VISIBLE
                 && isShown();
-        visible = nowVisible;
         renderHandler.post(this::restartLoopOnRenderThread);
     }
 
@@ -272,6 +280,7 @@ public final class LiveSkyView extends FrameLayout implements TextureView.Surfac
         renderHandler.post(() -> {
             seenSharedVersion = -1L;
             lastRealityRefresh = 0L;
+            lastPerformanceRefresh = 0L;
             restartLoopOnRenderThread();
         });
     }
@@ -369,6 +378,7 @@ public final class LiveSkyView extends FrameLayout implements TextureView.Surfac
         pipeline.onSurfaceChanged(width, height);
         seenSharedVersion = -1L;
         lastRealityRefresh = 0L;
+        lastPerformanceRefresh = 0L;
     }
 
     private void detachEglSurface() {
@@ -385,6 +395,25 @@ public final class LiveSkyView extends FrameLayout implements TextureView.Surfac
             EGL14.eglDestroySurface(display, eglSurface);
         }
         eglSurface = EGL14.EGL_NO_SURFACE;
+    }
+
+    private void refreshPerformanceIfNeeded() {
+        long now = System.currentTimeMillis();
+        if (lastPerformanceRefresh > 0L
+                && now - lastPerformanceRefresh < PERFORMANCE_REFRESH_MILLIS) {
+            return;
+        }
+        lastPerformanceRefresh = now;
+
+        WallpaperPreferences.Options options;
+        synchronized (SHARED_LOCK) {
+            options = sharedOptions;
+        }
+        frameIntervalMillis = PerformancePolicy.frameIntervalMillis(
+                appContext,
+                performancePreferences.loadMode(),
+                options == null || options.isBatteryAdaptive()
+        );
     }
 
     private void refreshRealityIfNeeded() {
