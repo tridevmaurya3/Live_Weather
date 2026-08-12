@@ -290,7 +290,7 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="@dimen/space_6"
-                android:text="@string/more_performance_sub" />
+                android:text="@string/more_performance_release" />
         </LinearLayout>
 
         <LinearLayout
@@ -312,7 +312,15 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="@dimen/space_6"
-                android:text="@string/more_about_phase_three" />
+                android:text="@string/more_about_release" />
+
+            <TextView
+                style="@style/TextAppearance.LiveWeather.Caption"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="@dimen/space_8"
+                android:text="@string/more_version_release"
+                android:textColor="@color/weather_aqua" />
         </LinearLayout>
 
         <TextView
@@ -321,7 +329,7 @@
             android:layout_height="wrap_content"
             android:layout_gravity="center_horizontal"
             android:layout_marginTop="@dimen/space_16"
-            android:text="@string/status_phase_three"
+            android:text="@string/status_phase_fifteen"
             android:textColor="@color/weather_sky_blue" />
 
     </LinearLayout>
