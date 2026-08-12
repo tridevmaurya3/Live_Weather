@@ -183,10 +183,7 @@ public final class WeatherIntelligence2 {
                 return "Thunderstorm classification is active now in the weather model. Check official alerts and Radar for local context.";
             case PRECIPITATION_NOW_CONFIRMED:
                 if (isSnowCode(resolved.getWeatherCode())) {
-                    return resolved.getPrecipitationSignalMm() > 0d
-                            ? "Snow is indicated now by the current or corroborated short-term model signal ("
-                            + WeatherFormatter.precipitation(resolved.getPrecipitationSignalMm()) + " water-equivalent signal)."
-                            : "Snow is classified now by the current weather model.";
+                    return "Snow is indicated now by the current or corroborated short-term weather model.";
                 }
                 return resolved.getPrecipitationSignalMm() > 0d
                         ? "Rain/showers are indicated now by the current or corroborated short-term model signal ("
@@ -397,6 +394,10 @@ public final class WeatherIntelligence2 {
             Double amount = WeatherFormatter.valueAt(hourly.getPrecipitation(), index);
             Integer code = WeatherFormatter.valueAt(hourly.getWeatherCode(), index);
             String time = WeatherFormatter.valueAt(hourly.getTime(), index);
+
+            // Precipitation probability can also refer to snow. Phase 18 rain
+            // timing must not relabel a snow forecast as a rain window.
+            if (isSnowCode(code)) continue;
 
             double chance = value(probability);
             double precip = value(amount);
