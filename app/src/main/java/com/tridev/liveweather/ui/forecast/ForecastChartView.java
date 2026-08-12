@@ -11,6 +11,7 @@ import androidx.annotation.Nullable;
 import androidx.core.content.ContextCompat;
 
 import com.tridev.liveweather.R;
+import com.tridev.liveweather.ui.weather.WeatherFormatter;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -18,8 +19,9 @@ import java.util.List;
 import java.util.Locale;
 
 /**
- * Lightweight native chart for Phase 5 forecast trends.
+ * Lightweight native chart for forecast trends.
  * Supports a temperature line mode and precipitation probability bar mode.
+ * Phase 16 converts temperature values at draw time using the shared unit setting.
  */
 public final class ForecastChartView extends View {
 
@@ -118,7 +120,7 @@ public final class ForecastChartView extends View {
     private void drawTemperature(Canvas canvas, int count) {
         List<Double> finiteValues = new ArrayList<>();
         for (int i = 0; i < count; i++) {
-            Double value = values.get(i);
+            Double value = displayTemperature(values.get(i));
             if (value != null && Double.isFinite(value)) {
                 finiteValues.add(value);
             }
@@ -144,7 +146,7 @@ public final class ForecastChartView extends View {
         Path path = new Path();
         boolean started = false;
         for (int i = 0; i < count; i++) {
-            Double value = values.get(i);
+            Double value = displayTemperature(values.get(i));
             if (value == null || !Double.isFinite(value)) {
                 continue;
             }
@@ -165,6 +167,11 @@ public final class ForecastChartView extends View {
         canvas.drawText(String.format(Locale.getDefault(), "%.0f°", min), bounds.left, bounds.bottom, textPaint);
         textPaint.setTextAlign(Paint.Align.CENTER);
         drawXAxisLabels(canvas, bounds, count);
+    }
+
+    @Nullable
+    private Double displayTemperature(@Nullable Double celsius) {
+        return WeatherFormatter.temperatureValue(celsius);
     }
 
     private void drawPrecipitation(Canvas canvas, int count) {
