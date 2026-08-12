@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="more_performance_release">Auto mode · adaptive FPS · hidden live previews pause automatically</string>
+    <string name="more_about_release">Live weather, forecasts, AQI, alerts, radar, widgets and the battery-aware Live Wallpaper share one cached weather + astronomy state.</string>
+    <string name="more_version_release">Version 1.0.0</string>
+    <string name="status_phase_fifteen">PHASE 15 · PRODUCTION POLISH COMPLETE</string>
+</resources>
