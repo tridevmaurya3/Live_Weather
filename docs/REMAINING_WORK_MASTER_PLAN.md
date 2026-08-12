@@ -49,14 +49,28 @@ Acceptance checkpoint: add Current + Forecast widgets, test active vs fixed city
 
 ## Phase 18 — Weather Intelligence 2.0
 
-- Better precipitation-now interpretation: probability vs measured/model precipitation kept distinct
-- “Rain likely later” vs “Raining now” consistency everywhere
-- Feels-like / humidity / heat / comfort explanation
-- Wind/gust interpretation
-- Visibility/fog interpretation
-- Pressure trend interpretation
-- Weather confidence/data-quality explanation
-- High-impact condition summary without exaggerating model certainty
+Status: IMPLEMENTED — device verification pending.
+
+Implemented:
+- Central WeatherIntelligence2 report shared by Home / Forecast details / Smart Risk wording
+- Current precipitation evidence kept separate from hourly/daily forecast probability
+- Rain likely/possible soon and later states without converting probability into Raining now
+- Weak precipitation signal remains explicitly unconfirmed
+- Adjacent previous/next 15-minute slots can corroborate but cannot independently become current rain/thunderstorm
+- Current rain/snow/thunderstorm semantics kept distinct
+- Feels-like / humidity / dew-point comfort explanation
+- Sustained wind vs gust interpretation
+- Visibility/fog interpretation without inventing an exact cause
+- Short pressure trend explanation with a warning that pressure alone does not determine weather
+- Higher / Standard / Limited model-consistency wording
+- Forecast data freshness and saved/offline context in Advanced Details
+- Forecast 24h wording changed to forecast rain-risk window
+- Smart Risk heavy-rain-now requires confirmed current rain/showers
+- Snowfall cannot trigger heavy-rain-now alert
+- Daily heavy-rain potential explicitly remains a forecast risk when current rain is not confirmed
+- Shared LiveConditionResolver accuracy improvement also protects app/Live Wallpaper current scene state
+
+Acceptance checkpoint: verify dry-now + rain-later, weak trace, confirmed rain, Forecast Advanced Details, units, offline freshness and Smart Risk wording on device.
 
 ## Phase 19 — Forecast Pro
 
