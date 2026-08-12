@@ -18,6 +18,8 @@
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
+            android:ellipsize="end"
+            android:maxLines="1"
             android:text="@string/widget_brand"
             android:textColor="#A9E9FF"
             android:textSize="11sp"
@@ -103,6 +105,7 @@
     </LinearLayout>
 
     <LinearLayout
+        android:id="@+id/widgetWideHoursRow"
         android:layout_width="match_parent"
         android:layout_height="0dp"
         android:layout_marginTop="8dp"
@@ -111,6 +114,7 @@
         android:weightSum="4">
 
         <LinearLayout
+            android:id="@+id/widgetHour1Card"
             android:layout_width="0dp"
             android:layout_height="match_parent"
             android:layout_weight="1"
@@ -118,31 +122,9 @@
             android:gravity="center"
             android:orientation="vertical"
             android:padding="6dp">
-
-            <TextView
-                android:id="@+id/widgetHour1Time"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="Now"
-                android:textColor="#BBD4E4"
-                android:textSize="10sp" />
-
-            <TextView
-                android:id="@+id/widgetHour1Symbol"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="•"
-                android:textColor="#FFF0B2"
-                android:textSize="18sp" />
-
-            <TextView
-                android:id="@+id/widgetHour1Temp"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="—°"
-                android:textColor="#FFFFFF"
-                android:textSize="13sp"
-                android:textStyle="bold" />
+            <TextView android:id="@+id/widgetHour1Time" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Now" android:textColor="#BBD4E4" android:textSize="10sp" />
+            <TextView android:id="@+id/widgetHour1Symbol" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="•" android:textColor="#FFF0B2" android:textSize="18sp" />
+            <TextView android:id="@+id/widgetHour1Temp" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="—°" android:textColor="#FFFFFF" android:textSize="13sp" android:textStyle="bold" />
         </LinearLayout>
 
         <LinearLayout
@@ -154,31 +136,9 @@
             android:gravity="center"
             android:orientation="vertical"
             android:padding="6dp">
-
-            <TextView
-                android:id="@+id/widgetHour2Time"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="+1h"
-                android:textColor="#BBD4E4"
-                android:textSize="10sp" />
-
-            <TextView
-                android:id="@+id/widgetHour2Symbol"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="•"
-                android:textColor="#FFF0B2"
-                android:textSize="18sp" />
-
-            <TextView
-                android:id="@+id/widgetHour2Temp"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="—°"
-                android:textColor="#FFFFFF"
-                android:textSize="13sp"
-                android:textStyle="bold" />
+            <TextView android:id="@+id/widgetHour2Time" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="+1h" android:textColor="#BBD4E4" android:textSize="10sp" />
+            <TextView android:id="@+id/widgetHour2Symbol" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="•" android:textColor="#FFF0B2" android:textSize="18sp" />
+            <TextView android:id="@+id/widgetHour2Temp" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="—°" android:textColor="#FFFFFF" android:textSize="13sp" android:textStyle="bold" />
         </LinearLayout>
 
         <LinearLayout
@@ -190,31 +150,9 @@
             android:gravity="center"
             android:orientation="vertical"
             android:padding="6dp">
-
-            <TextView
-                android:id="@+id/widgetHour3Time"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="+2h"
-                android:textColor="#BBD4E4"
-                android:textSize="10sp" />
-
-            <TextView
-                android:id="@+id/widgetHour3Symbol"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="•"
-                android:textColor="#FFF0B2"
-                android:textSize="18sp" />
-
-            <TextView
-                android:id="@+id/widgetHour3Temp"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="—°"
-                android:textColor="#FFFFFF"
-                android:textSize="13sp"
-                android:textStyle="bold" />
+            <TextView android:id="@+id/widgetHour3Time" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="+2h" android:textColor="#BBD4E4" android:textSize="10sp" />
+            <TextView android:id="@+id/widgetHour3Symbol" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="•" android:textColor="#FFF0B2" android:textSize="18sp" />
+            <TextView android:id="@+id/widgetHour3Temp" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="—°" android:textColor="#FFFFFF" android:textSize="13sp" android:textStyle="bold" />
         </LinearLayout>
 
         <LinearLayout
@@ -226,31 +164,9 @@
             android:gravity="center"
             android:orientation="vertical"
             android:padding="6dp">
-
-            <TextView
-                android:id="@+id/widgetHour4Time"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="+3h"
-                android:textColor="#BBD4E4"
-                android:textSize="10sp" />
-
-            <TextView
-                android:id="@+id/widgetHour4Symbol"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="•"
-                android:textColor="#FFF0B2"
-                android:textSize="18sp" />
-
-            <TextView
-                android:id="@+id/widgetHour4Temp"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="—°"
-                android:textColor="#FFFFFF"
-                android:textSize="13sp"
-                android:textStyle="bold" />
+            <TextView android:id="@+id/widgetHour4Time" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="+3h" android:textColor="#BBD4E4" android:textSize="10sp" />
+            <TextView android:id="@+id/widgetHour4Symbol" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="•" android:textColor="#FFF0B2" android:textSize="18sp" />
+            <TextView android:id="@+id/widgetHour4Temp" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="—°" android:textColor="#FFFFFF" android:textSize="13sp" android:textStyle="bold" />
         </LinearLayout>
     </LinearLayout>
 
