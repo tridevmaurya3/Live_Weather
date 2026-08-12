@@ -164,11 +164,15 @@
             android:orientation="horizontal">
 
             <LinearLayout
+                android:id="@+id/moreWidgetsAction"
                 android:layout_width="0dp"
                 android:layout_height="104dp"
                 android:layout_marginEnd="@dimen/space_4"
                 android:layout_weight="1"
                 android:background="@drawable/bg_weather_card_compact"
+                android:clickable="true"
+                android:focusable="true"
+                android:foreground="?attr/selectableItemBackground"
                 android:gravity="center_vertical"
                 android:orientation="vertical"
                 android:padding="@dimen/space_14">
