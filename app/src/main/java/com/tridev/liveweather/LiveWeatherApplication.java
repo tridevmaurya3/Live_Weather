@@ -10,14 +10,10 @@ import androidx.annotation.Nullable;
 import com.tridev.liveweather.data.local.UnitPreferences;
 import com.tridev.liveweather.ui.settings.SettingsCardBinder;
 import com.tridev.liveweather.ui.weather.WeatherFormatter;
+import com.tridev.liveweather.widget.WeatherWidgetUpdater;
+import com.tridev.liveweather.widget.WidgetRefreshScheduler;
 
-/**
- * Application-level presentation configuration for Phase 16.
- *
- * Unit formatting is configured before Activities, widgets, or background work
- * render cached weather. MainActivity's existing More-page cards are then bound
- * when the Activity becomes visible, avoiding a large risky Activity rewrite.
- */
+/** Shared presentation + lightweight widget startup configuration. */
 public final class LiveWeatherApplication extends Application
         implements Application.ActivityLifecycleCallbacks {
 
@@ -25,6 +21,8 @@ public final class LiveWeatherApplication extends Application
     public void onCreate() {
         super.onCreate();
         WeatherFormatter.configure(new UnitPreferences(this).load());
+        WidgetRefreshScheduler.schedule(this);
+        WeatherWidgetUpdater.updateAll(this);
         registerActivityLifecycleCallbacks(this);
     }
 
