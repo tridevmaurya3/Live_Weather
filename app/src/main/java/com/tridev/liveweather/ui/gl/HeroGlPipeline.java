@@ -9,17 +9,19 @@ import com.tridev.liveweather.data.local.WallpaperPreferences;
  * Shared GPU composition pipeline used by both the in-app live scene and
  * Android system Live Wallpaper.
  *
- * Device Consistency Pass:
- * Sky/Sun/Moon are analytic and hash-free. Stars, clouds, world, rain and storm
- * use deterministic texture-backed passes so emulator, Adreno and Mali receive
- * the same source patterns and timing family.
+ * Final stable visual rebuild:
+ * - analytic hash-free sky/Sun/Moon
+ * - fixed Java-generated GL-point stars
+ * - analytic soft cloud banks with aspect-locked UVs
+ * - smooth analytic hills/forest with no texture/profile spikes
+ * - portable storm and rain overlays retained after the stable base scene
  */
 public final class HeroGlPipeline {
 
     private final HeroGlSkyCelestialRenderer sceneRenderer = new HeroGlSkyCelestialRenderer();
-    private final HeroGlPortableStarRenderer starRenderer = new HeroGlPortableStarRenderer();
-    private final HeroGlPortableCloudRenderer cloudRenderer = new HeroGlPortableCloudRenderer();
-    private final HeroGlWorldLayerRendererV4 worldRenderer = new HeroGlWorldLayerRendererV4();
+    private final HeroGlFixedStarRenderer starRenderer = new HeroGlFixedStarRenderer();
+    private final HeroGlAnalyticCloudRenderer cloudRenderer = new HeroGlAnalyticCloudRenderer();
+    private final HeroGlAnalyticWorldRenderer worldRenderer = new HeroGlAnalyticWorldRenderer();
     private final HeroGlAtmosphereOverlayRenderer atmosphereRenderer = new HeroGlAtmosphereOverlayRenderer();
     private final HeroGlPortableStormRenderer stormRenderer = new HeroGlPortableStormRenderer();
     private final HeroGlPortableRainRenderer rainRenderer = new HeroGlPortableRainRenderer();
