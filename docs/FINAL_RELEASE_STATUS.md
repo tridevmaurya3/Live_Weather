@@ -1,8 +1,14 @@
-# Live Weather — Final Release Status
+# Live Weather — Development Status Correction
 
-Release line: 1.0.0
+Current line: 1.0.0 development branch
 
-## Completed product phases
+## Important correction
+
+The project is NOT final and is NOT release-ready yet.
+
+Phase 15 completed only a production-foundation pass: release build configuration, privacy/backup hardening, accessibility cleanup and status/resource cleanup. It did not complete all user-facing product work.
+
+## Completed foundations
 
 - Phase 0 — Foundation
 - Phase 1 — Professional UI system
@@ -12,32 +18,31 @@ Release line: 1.0.0
 - Phase 5 — Forecast & astronomy
 - Phase 6 — Accuracy & celestial timeline
 - Phase 7 — AQI + Sun/Moon intelligence
-- Phase 8 — Alerts
-- Phase 9 — Radar
-- Phase 10 — Home-screen widgets
-- Hero Live Nature / Android Live Wallpaper engine
-- Phase 14 — Performance, battery & reliability
-- Phase 15 — Production polish
+- Phase 8 — Alerts foundation
+- Phase 9 — Radar foundation
+- Phase 10 — Home-screen widgets foundation
+- Hero Live Nature / Android Live Wallpaper engine foundation
+- Phase 14 — Performance, battery & reliability foundation
+- Phase 15 — Production foundation only
 
-Phases 11–13 were absorbed into the Hero Live Nature/OpenGL work and are not separate pending phases.
+## Confirmed work still remaining
 
-## Frozen visual branch
+- Functional Units settings (temperature, wind, pressure, precipitation and related formatting)
+- Functional Performance mode selector (Auto / Smooth / Battery)
+- Advanced Settings surface instead of static More cards
+- Widget configuration/polish and per-widget options
+- Additional weather-intelligence polish and deeper interaction flows
+- Radar UX/intelligence polish
+- Alerts UX/settings polish
+- Accessibility and responsive-layout audit across all pages
+- Offline/error/empty/loading-state consistency audit
+- End-to-end real-device QA across different screen sizes and Android launchers
+- Release validation only after the user explicitly accepts the product as complete
 
-The Live Wallpaper visual-art branch is frozen at the stable cross-device analytic renderer. Future changes should address confirmed functional defects only unless a separate redesign is intentionally started.
+## Live Wallpaper status
 
-## Production candidate status
+The current cross-device analytic renderer is kept stable. It should not be repeatedly redesigned without a deliberate decision, but confirmed functional/quality issues may still be addressed later.
 
-Source implementation is complete for the planned 1.0.0 scope. Final acceptance still requires local Android Studio verification because this repository does not currently provide a GitHub Actions Android build status.
+## Completion rule
 
-Required final checks:
-
-1. Debug Clean/Rebuild and real-device smoke test.
-2. Release build with R8/resource shrinking.
-3. Weather, city search, AQI and forecast network test.
-4. Radar load/lazy-WebView test.
-5. Official/Smart Risk alerts test.
-6. Compact and Forecast widget add/refresh test.
-7. Live Wallpaper apply/visibility/Power Saver test.
-8. Offline cached-weather test.
-
-Once both debug and release candidates pass these checks, the planned 1.0.0 development roadmap can be treated as release-ready.
+Do not label this project Final, Production Ready, Release Candidate or Complete until the remaining-work master plan is finished and the user explicitly approves finalization.
