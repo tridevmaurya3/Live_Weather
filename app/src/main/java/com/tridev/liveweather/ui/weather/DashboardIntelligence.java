@@ -14,6 +14,9 @@ import java.util.Locale;
 
 /**
  * Converts raw weather values into compact, useful dashboard interpretations.
+ *
+ * Intelligence thresholds stay on provider metric values. Phase 16 converts
+ * only the displayed units through WeatherFormatter.
  */
 public final class DashboardIntelligence {
 
@@ -109,7 +112,7 @@ public final class DashboardIntelligence {
         } else {
             level = "Good";
         }
-        return String.format(Locale.getDefault(), "%.1f km · %s", kilometres, level);
+        return WeatherFormatter.visibilityDistance(meters) + " · " + level;
     }
 
     @NonNull
@@ -121,7 +124,7 @@ public final class DashboardIntelligence {
 
         double currentPressure = response.getCurrent().getPressureMsl();
         String trend = pressureTrend(response, currentPressure);
-        return String.format(Locale.getDefault(), "%.0f hPa · %s", currentPressure, trend);
+        return WeatherFormatter.pressure(currentPressure) + " · " + trend;
     }
 
     @NonNull
@@ -203,7 +206,7 @@ public final class DashboardIntelligence {
         } else {
             level = "Very strong";
         }
-        return String.format(Locale.getDefault(), "%.0f km/h · %s", value, level);
+        return WeatherFormatter.wind(value) + " · " + level;
     }
 
     @NonNull
