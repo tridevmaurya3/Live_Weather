@@ -6,6 +6,7 @@ import androidx.annotation.Nullable;
 import com.tridev.liveweather.data.remote.dto.WeatherResponse;
 import com.tridev.liveweather.domain.LiveConditionResolver;
 import com.tridev.liveweather.ui.weather.WeatherFormatter;
+import com.tridev.liveweather.ui.weather.WeatherIntelligence2;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -24,22 +25,24 @@ public final class SmartAlertEngine {
         WeatherResponse.CurrentWeather current = weather.getCurrent();
         WeatherResponse.DailyWeather daily = weather.getDaily();
         long now = System.currentTimeMillis();
-        LiveConditionResolver.ResolvedCondition condition = LiveConditionResolver.resolve(weather);
+        WeatherIntelligence2.Report intelligence = WeatherIntelligence2.analyze(weather);
+        LiveConditionResolver.ResolvedCondition condition = intelligence.getResolvedCondition();
         int code = condition.getWeatherCode() == null ? 0 : condition.getWeatherCode();
 
-        if (code >= 95) {
+        if (code >= 95 && intelligence.isPrecipitationNowConfirmed()) {
             WeatherAlert.Severity severity = code >= 97
                     ? WeatherAlert.Severity.RED
                     : WeatherAlert.Severity.ORANGE;
             add(alerts, "smart-thunderstorm", "Thunderstorm risk now",
-                    "Live weather signals indicate thunderstorm conditions. Check official local warnings and avoid exposed outdoor areas during lightning.",
+                    "The current weather model classifies thunderstorm conditions now. Check official local warnings and Radar for local context.",
                     severity, "Right now", now, now + 3 * 60 * 60 * 1000L);
         }
 
         double precip = condition.getPrecipitationSignalMm();
-        if (precip >= 1.5d) {
-            add(alerts, "smart-heavy-rain-now", "Heavy rain signal",
-                    "Current precipitation signal is " + WeatherFormatter.precipitation(precip)
+        if (intelligence.isPrecipitationNowConfirmed() && precip >= 1.5d) {
+            add(alerts, "smart-heavy-rain-now", "Heavy rain signal now",
+                    "Current/corroborated precipitation signal is "
+                            + WeatherFormatter.precipitation(precip)
                             + " in the active model interval.",
                     precip >= 3.0d ? WeatherAlert.Severity.ORANGE : WeatherAlert.Severity.YELLOW,
                     "Current conditions", now, now + 2 * 60 * 60 * 1000L);
@@ -57,7 +60,8 @@ public final class SmartAlertEngine {
             double visibility = value(current.getVisibility());
             if (visibility > 0d && visibility <= 1000d) {
                 add(alerts, "smart-visibility", "Very low visibility",
-                        "Visibility is about " + WeatherFormatter.visibilityDistance(visibility) + ".",
+                        "Visibility is about " + WeatherFormatter.visibilityDistance(visibility)
+                                + ". The model does not by itself prove the exact cause of the reduction.",
                         visibility <= 500d ? WeatherAlert.Severity.ORANGE : WeatherAlert.Severity.YELLOW,
                         "Current conditions", now, now + 3 * 60 * 60 * 1000L);
             }
@@ -67,12 +71,16 @@ public final class SmartAlertEngine {
             Double rainProbability = at(daily.getPrecipitationProbabilityMax(), 0);
             Double rainSum = at(daily.getPrecipitationSum(), 0);
             if (value(rainProbability) >= 80d && value(rainSum) >= 25d) {
+                String nowQualifier = intelligence.isPrecipitationNowConfirmed()
+                        ? " Current precipitation is also indicated now."
+                        : " This is a forecast risk for today, not a claim that rain is falling now.";
                 add(alerts, "smart-rain-today", "Heavy rain potential today",
                         String.format(
                                 Locale.getDefault(),
-                                "Forecast precipitation %s with %.0f%% peak probability.",
+                                "Forecast precipitation %s with %.0f%% peak probability.%s",
                                 WeatherFormatter.precipitation(value(rainSum)),
-                                value(rainProbability)
+                                value(rainProbability),
+                                nowQualifier
                         ),
                         value(rainSum) >= 50d ? WeatherAlert.Severity.ORANGE : WeatherAlert.Severity.YELLOW,
                         "Today", now, endOfRiskWindow(now, 24));
