@@ -39,7 +39,9 @@ public final class SmartAlertEngine {
         }
 
         double precip = condition.getPrecipitationSignalMm();
-        if (intelligence.isPrecipitationNowConfirmed() && precip >= 1.5d) {
+        if (intelligence.isPrecipitationNowConfirmed()
+                && isRainOrShowerCode(code)
+                && precip >= 1.5d) {
             add(alerts, "smart-heavy-rain-now", "Heavy rain signal now",
                     "Current/corroborated precipitation signal is "
                             + WeatherFormatter.precipitation(precip)
@@ -72,7 +74,8 @@ public final class SmartAlertEngine {
             Double rainSum = at(daily.getPrecipitationSum(), 0);
             if (value(rainProbability) >= 80d && value(rainSum) >= 25d) {
                 String nowQualifier = intelligence.isPrecipitationNowConfirmed()
-                        ? " Current precipitation is also indicated now."
+                        && isRainOrShowerCode(code)
+                        ? " Current rain/showers are also indicated now."
                         : " This is a forecast risk for today, not a claim that rain is falling now.";
                 add(alerts, "smart-rain-today", "Heavy rain potential today",
                         String.format(
@@ -113,6 +116,10 @@ public final class SmartAlertEngine {
         }
 
         return alerts;
+    }
+
+    private static boolean isRainOrShowerCode(int code) {
+        return (code >= 51 && code <= 67) || (code >= 80 && code <= 82);
     }
 
     private static void add(
