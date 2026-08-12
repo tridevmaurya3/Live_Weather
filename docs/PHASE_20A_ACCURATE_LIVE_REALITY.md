@@ -59,3 +59,14 @@ not visual acceptance.
 - Real wind direction, sustained speed and gust response control motion.
 - Day/night brightness and storm intensity tint the same physical cloud assets.
 - Atlas background is removed in the shader before alpha blending.
+
+
+## Checkpoint 20A.4 — recording-driven atlas correction
+
+- Corrected the vertically inverted Android/OpenGL atlas row mapping.
+- Overcast now selects layered stratus; confirmed rain selects dark rain cloud;
+  confirmed storm selects the shelf-cloud texture.
+- Increased cloud-bank scale and overcast coverage.
+- Added minimum direction-preserving lateral drift so north/south winds do not
+  appear completely static in the 2D scene.
+- Increased visible motion while retaining wind/gust control.
