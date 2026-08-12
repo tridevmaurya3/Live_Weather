@@ -16,7 +16,9 @@ import java.util.Locale;
  * Converts raw weather values into compact, useful dashboard interpretations.
  *
  * Intelligence thresholds stay on provider metric values. Phase 16 converts
- * only the displayed units through WeatherFormatter.
+ * only the displayed units through WeatherFormatter. Phase 18 routes the main
+ * insight through WeatherIntelligence2 so precipitation-now wording is shared
+ * with advanced details and Smart Risk behavior.
  */
 public final class DashboardIntelligence {
 
@@ -28,52 +30,7 @@ public final class DashboardIntelligence {
 
     @NonNull
     public static String insight(@Nullable WeatherResponse response) {
-        if (response == null || response.getCurrent() == null) {
-            return "Live weather intelligence will appear after the next successful sync.";
-        }
-
-        WeatherResponse.CurrentWeather current = response.getCurrent();
-        WeatherResponse.DailyWeather daily = response.getDaily();
-        LiveConditionResolver.ResolvedCondition resolved = LiveConditionResolver.resolve(response);
-        Integer code = resolved.getWeatherCode();
-        Double rainChance = daily == null
-                ? null
-                : WeatherFormatter.valueAt(daily.getPrecipitationProbabilityMax(), 0);
-        Double uv = daily == null ? null : WeatherFormatter.valueAt(daily.getUvIndexMax(), 0);
-        Double gusts = current.getWindGusts10m();
-        Double visibility = current.getVisibility();
-
-        if (code != null && code >= 95) {
-            return "Thunderstorm conditions are active or nearby. Radar and short-term forecast are the most useful views right now.";
-        }
-        if (isRainCode(code) || resolved.getPrecipitationSignalMm() > 0.02d) {
-            return "Live precipitation signals indicate rain or showers now. The dashboard is prioritising the short-term precipitation signal over a conflicting clear-sky model code.";
-        }
-        if (rainChance != null && rainChance >= 70d) {
-            return "Rain is likely today. The hourly strip shows when the risk changes through the next several hours.";
-        }
-        if (gusts != null && gusts >= 45d) {
-            return "Wind gusts are elevated. Check the wind details before outdoor plans and watch for forecast changes.";
-        }
-        if (visibility != null && visibility < 3000d) {
-            return "Visibility is reduced. Fog, haze or precipitation may be affecting how far you can see.";
-        }
-        if (uv != null && uv >= 8d && current.getIsDay() != null && current.getIsDay() == 1) {
-            return "UV is very high during daylight hours. Sun protection is especially useful around the strongest part of the day.";
-        }
-        if (code != null && code <= 1) {
-            return current.getIsDay() != null && current.getIsDay() == 0
-                    ? "Skies are mostly clear tonight. The live atmosphere can use a calmer night scene with lighter cloud activity."
-                    : "Skies are mostly clear. Conditions look settled, with the detail cards highlighting any wind, UV or rain changes.";
-        }
-        if (current.getCloudCover() != null && current.getCloudCover() >= 75d) {
-            return "Cloud cover is extensive. Watch the hourly rain probability to see whether the cloud layer becomes active weather.";
-        }
-        return "Conditions are fairly balanced right now. Use the hourly forecast for the next change and the 10-day view for the larger trend.";
-    }
-
-    private static boolean isRainCode(@Nullable Integer code) {
-        return code != null && ((code >= 51 && code <= 67) || (code >= 80 && code <= 82));
+        return WeatherIntelligence2.analyze(response).getHeadline();
     }
 
     @NonNull
