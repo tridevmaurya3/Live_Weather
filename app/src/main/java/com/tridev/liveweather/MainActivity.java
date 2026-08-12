@@ -650,8 +650,17 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void handleLaunchIntent(Intent intent) {
-        if (intent != null && intent.getBooleanExtra("open_weather_alerts", false)) {
+        if (intent == null) return;
+        if (intent.getBooleanExtra("open_weather_alerts", false)) {
             bottomNavigation.post(this::openAlertsCenter);
+            return;
+        }
+
+        String destination = intent.getStringExtra(WeatherWidgetUpdater.EXTRA_OPEN_DESTINATION);
+        if (WeatherWidgetUpdater.DESTINATION_FORECAST.equals(destination)) {
+            bottomNavigation.post(() -> bottomNavigation.setSelectedItemId(R.id.nav_forecast));
+        } else if (WeatherWidgetUpdater.DESTINATION_HOME.equals(destination)) {
+            bottomNavigation.post(() -> bottomNavigation.setSelectedItemId(R.id.nav_home));
         }
     }
 
