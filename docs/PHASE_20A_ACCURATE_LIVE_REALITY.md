@@ -22,6 +22,15 @@ Live Wallpaper. The project is not Final or Production Ready.
 - Preserved astronomical Sun/Moon positions, lunar phase geometry and real
   cloud/weather occlusion.
 
+## Checkpoint 20A.2 — screenshot correction
+
+- Fixed aspect-normalized cloud coordinates before periodic distance evaluation.
+- Connected overlapping cloud masses instead of selecting isolated maximum puffs.
+- Added cloud-cover-driven continuous overcast sheet; ordinary overcast no longer
+  depends on a thunderstorm ceiling.
+- Softened field thresholds and corrected edge-light calculation to remove the
+  polygon/stone-like islands visible in the first device screenshot.
+
 ## Acceptance required
 
 Test on a real phone in clear, partly cloudy, overcast, rain, storm and night
