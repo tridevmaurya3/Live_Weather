@@ -7,10 +7,7 @@ import androidx.annotation.NonNull;
 
 /**
  * Persistent display-unit preferences shared by the app and home-screen widgets.
- *
- * Open-Meteo responses remain in their existing metric representation. Unit
- * conversion happens only at the formatting/presentation boundary so weather
- * intelligence thresholds and cached source data remain stable.
+ * Provider/cache values remain metric; conversion is presentation-only.
  */
 public final class UnitPreferences {
 
@@ -28,11 +25,14 @@ public final class UnitPreferences {
 
     public enum WindUnit {
         KMH,
-        MPH
+        MPH,
+        MPS,
+        KNOT
     }
 
     public enum PressureUnit {
         HPA,
+        MBAR,
         INHG
     }
 
@@ -93,11 +93,42 @@ public final class UnitPreferences {
         @NonNull
         private String customSummary() {
             return "Custom · "
-                    + (temperature == TemperatureUnit.CELSIUS ? "°C" : "°F") + " · "
-                    + (wind == WindUnit.KMH ? "km/h" : "mph") + " · "
-                    + (pressure == PressureUnit.HPA ? "hPa" : "inHg") + " · "
-                    + (precipitation == PrecipitationUnit.MM ? "mm" : "in") + " · "
-                    + (distance == DistanceUnit.KM ? "km" : "mi");
+                    + temperatureLabel() + " · "
+                    + windLabel() + " · "
+                    + pressureLabel() + " · "
+                    + precipitationLabel() + " · "
+                    + distanceLabel();
+        }
+
+        @NonNull public String temperatureLabel() {
+            return temperature == TemperatureUnit.CELSIUS ? "°C" : "°F";
+        }
+
+        @NonNull public String windLabel() {
+            switch (wind) {
+                case MPH: return "mph";
+                case MPS: return "m/s";
+                case KNOT: return "kn";
+                case KMH:
+                default: return "km/h";
+            }
+        }
+
+        @NonNull public String pressureLabel() {
+            switch (pressure) {
+                case MBAR: return "mbar";
+                case INHG: return "inHg";
+                case HPA:
+                default: return "hPa";
+            }
+        }
+
+        @NonNull public String precipitationLabel() {
+            return precipitation == PrecipitationUnit.MM ? "mm" : "in";
+        }
+
+        @NonNull public String distanceLabel() {
+            return distance == DistanceUnit.KM ? "km" : "mi";
         }
     }
 
