@@ -5,6 +5,7 @@ import android.graphics.Canvas;
 import android.graphics.Paint;
 import android.graphics.Path;
 import android.util.AttributeSet;
+import android.view.MotionEvent;
 import android.view.View;
 
 import androidx.annotation.Nullable;
@@ -19,9 +20,8 @@ import java.util.List;
 import java.util.Locale;
 
 /**
- * Lightweight native chart for forecast trends.
- * Supports a temperature line mode and precipitation probability bar mode.
- * Phase 16 converts temperature values at draw time using the shared unit setting.
+ * Lightweight native interactive forecast chart.
+ * Supports temperature line and precipitation-probability bar modes.
  */
 public final class ForecastChartView extends View {
 
@@ -30,15 +30,23 @@ public final class ForecastChartView extends View {
         PRECIPITATION
     }
 
+    public interface OnPointSelectedListener {
+        void onPointSelected(int index);
+    }
+
     private final Paint gridPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Paint linePaint = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Paint pointPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Paint barPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Paint textPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+    private final Paint selectionPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
 
     private final List<String> labels = new ArrayList<>();
     private final List<Double> values = new ArrayList<>();
     private Mode mode = Mode.TEMPERATURE;
+    private int selectedIndex = -1;
+    private String emptyMessage = "Waiting for forecast data";
+    private OnPointSelectedListener onPointSelectedListener;
 
     public ForecastChartView(Context context) {
         super(context);
@@ -78,7 +86,13 @@ public final class ForecastChartView extends View {
         textPaint.setTextSize(10f * scaledDensity);
         textPaint.setTextAlign(Paint.Align.CENTER);
 
+        selectionPaint.setColor(ContextCompat.getColor(getContext(), R.color.weather_aqua));
+        selectionPaint.setStyle(Paint.Style.STROKE);
+        selectionPaint.setStrokeWidth(Math.max(1.5f, 1.4f * density));
+
         setMinimumHeight(Math.round(180f * density));
+        setClickable(true);
+        setFocusable(true);
     }
 
     public void setMode(Mode mode) {
@@ -89,41 +103,70 @@ public final class ForecastChartView extends View {
     public void setData(@Nullable List<String> newLabels, @Nullable List<Double> newValues) {
         labels.clear();
         values.clear();
-
-        if (newLabels != null) {
-            labels.addAll(newLabels);
-        }
-        if (newValues != null) {
-            values.addAll(newValues);
-        }
-
+        if (newLabels != null) labels.addAll(newLabels);
+        if (newValues != null) values.addAll(newValues);
+        if (selectedIndex >= Math.min(labels.size(), values.size())) selectedIndex = -1;
         invalidate();
+    }
+
+    public void setSelectedIndex(int index) {
+        int count = Math.min(labels.size(), values.size());
+        selectedIndex = index >= 0 && index < count ? index : -1;
+        invalidate();
+    }
+
+    public void setEmptyMessage(@Nullable String message) {
+        emptyMessage = message == null || message.trim().isEmpty()
+                ? "Waiting for forecast data"
+                : message;
+        invalidate();
+    }
+
+    public void setOnPointSelectedListener(@Nullable OnPointSelectedListener listener) {
+        onPointSelectedListener = listener;
+    }
+
+    @Override
+    public boolean onTouchEvent(MotionEvent event) {
+        if (event.getAction() == MotionEvent.ACTION_UP) {
+            int count = Math.min(labels.size(), values.size());
+            if (count > 0) {
+                ChartBounds bounds = chartBounds();
+                float x = Math.max(bounds.left, Math.min(bounds.right, event.getX()));
+                float fraction = (x - bounds.left) / Math.max(1f, bounds.width());
+                int index = Math.round(fraction * Math.max(0, count - 1));
+                setSelectedIndex(index);
+                if (onPointSelectedListener != null) onPointSelectedListener.onPointSelected(index);
+                performClick();
+                return true;
+            }
+        }
+        return true;
+    }
+
+    @Override
+    public boolean performClick() {
+        super.performClick();
+        return true;
     }
 
     @Override
     protected void onDraw(Canvas canvas) {
         super.onDraw(canvas);
-
         int count = Math.min(labels.size(), values.size());
         if (count < 2) {
             drawEmpty(canvas);
             return;
         }
-
-        if (mode == Mode.PRECIPITATION) {
-            drawPrecipitation(canvas, count);
-        } else {
-            drawTemperature(canvas, count);
-        }
+        if (mode == Mode.PRECIPITATION) drawPrecipitation(canvas, count);
+        else drawTemperature(canvas, count);
     }
 
     private void drawTemperature(Canvas canvas, int count) {
         List<Double> finiteValues = new ArrayList<>();
         for (int i = 0; i < count; i++) {
             Double value = displayTemperature(values.get(i));
-            if (value != null && Double.isFinite(value)) {
-                finiteValues.add(value);
-            }
+            if (value != null && Double.isFinite(value)) finiteValues.add(value);
         }
         if (finiteValues.size() < 2) {
             drawEmpty(canvas);
@@ -140,17 +183,15 @@ public final class ForecastChartView extends View {
         min -= padding;
         max += padding;
 
-        ChartBounds bounds = new ChartBounds(getWidth(), getHeight(), dp(26), dp(18), dp(22), dp(30));
+        ChartBounds bounds = chartBounds();
         drawGrid(canvas, bounds);
 
         Path path = new Path();
         boolean started = false;
         for (int i = 0; i < count; i++) {
             Double value = displayTemperature(values.get(i));
-            if (value == null || !Double.isFinite(value)) {
-                continue;
-            }
-            float x = bounds.left + (bounds.width() * i / (float) (count - 1));
+            if (value == null || !Double.isFinite(value)) continue;
+            float x = pointX(bounds, count, i);
             float y = mapY(value, min, max, bounds);
             if (!started) {
                 path.moveTo(x, y);
@@ -158,7 +199,8 @@ public final class ForecastChartView extends View {
             } else {
                 path.lineTo(x, y);
             }
-            canvas.drawCircle(x, y, dp(2.4f), pointPaint);
+            canvas.drawCircle(x, y, dp(i == selectedIndex ? 4.2f : 2.4f), pointPaint);
+            if (i == selectedIndex) drawSelection(canvas, bounds, x, y, value, false);
         }
         canvas.drawPath(path, linePaint);
 
@@ -175,9 +217,8 @@ public final class ForecastChartView extends View {
     }
 
     private void drawPrecipitation(Canvas canvas, int count) {
-        ChartBounds bounds = new ChartBounds(getWidth(), getHeight(), dp(26), dp(18), dp(22), dp(30));
+        ChartBounds bounds = chartBounds();
         drawGrid(canvas, bounds);
-
         float slot = bounds.width() / count;
         float barWidth = Math.max(dp(3), slot * 0.58f);
 
@@ -197,6 +238,7 @@ public final class ForecastChartView extends View {
                     dp(3),
                     barPaint
             );
+            if (i == selectedIndex) drawSelection(canvas, bounds, xCenter, y, value, true);
         }
 
         textPaint.setTextAlign(Paint.Align.LEFT);
@@ -204,6 +246,22 @@ public final class ForecastChartView extends View {
         canvas.drawText("0%", bounds.left, bounds.bottom, textPaint);
         textPaint.setTextAlign(Paint.Align.CENTER);
         drawXAxisLabels(canvas, bounds, count);
+    }
+
+    private void drawSelection(
+            Canvas canvas,
+            ChartBounds bounds,
+            float x,
+            float y,
+            double value,
+            boolean percent
+    ) {
+        canvas.drawLine(x, bounds.top, x, bounds.bottom, selectionPaint);
+        String valueText = percent
+                ? String.format(Locale.getDefault(), "%.0f%%", value)
+                : String.format(Locale.getDefault(), "%.0f°", value);
+        textPaint.setTextAlign(Paint.Align.CENTER);
+        canvas.drawText(valueText, x, Math.max(bounds.top + sp(11), y - dp(8)), textPaint);
     }
 
     private void drawGrid(Canvas canvas, ChartBounds bounds) {
@@ -214,10 +272,10 @@ public final class ForecastChartView extends View {
     }
 
     private void drawXAxisLabels(Canvas canvas, ChartBounds bounds, int count) {
-        int step = count <= 8 ? 2 : 4;
+        int availableLabels = Math.max(3, getWidth() / Math.max(dp(64), 1));
+        int step = Math.max(1, (int) Math.ceil(count / (double) availableLabels));
         for (int i = 0; i < count; i += step) {
-            float x = bounds.left + (bounds.width() * i / (float) Math.max(1, count - 1));
-            canvas.drawText(shortLabel(labels.get(i)), x, getHeight() - dp(7), textPaint);
+            canvas.drawText(shortLabel(labels.get(i)), pointX(bounds, count, i), getHeight() - dp(7), textPaint);
         }
         if ((count - 1) % step != 0) {
             canvas.drawText(shortLabel(labels.get(count - 1)), bounds.right, getHeight() - dp(7), textPaint);
@@ -226,25 +284,26 @@ public final class ForecastChartView extends View {
 
     private void drawEmpty(Canvas canvas) {
         textPaint.setTextAlign(Paint.Align.CENTER);
-        canvas.drawText(
-                "Waiting for forecast data",
-                getWidth() / 2f,
-                getHeight() / 2f,
-                textPaint
-        );
+        canvas.drawText(emptyMessage, getWidth() / 2f, getHeight() / 2f, textPaint);
     }
 
     private String shortLabel(String label) {
-        if (label == null || label.trim().isEmpty()) {
-            return "—";
-        }
+        if (label == null || label.trim().isEmpty()) return "—";
         return label.replace(" ", "");
+    }
+
+    private float pointX(ChartBounds bounds, int count, int index) {
+        return bounds.left + (bounds.width() * index / (float) Math.max(1, count - 1));
     }
 
     private float mapY(double value, double min, double max, ChartBounds bounds) {
         double fraction = (value - min) / Math.max(0.0001, max - min);
         fraction = Math.max(0.0, Math.min(1.0, fraction));
         return (float) (bounds.bottom - fraction * bounds.height());
+    }
+
+    private ChartBounds chartBounds() {
+        return new ChartBounds(getWidth(), getHeight(), dp(26), dp(18), dp(22), dp(30));
     }
 
     private int dp(float value) {
@@ -268,12 +327,7 @@ public final class ForecastChartView extends View {
             this.bottom = Math.max(top + 1f, height - bottomPadding);
         }
 
-        float width() {
-            return right - left;
-        }
-
-        float height() {
-            return bottom - top;
-        }
+        float width() { return right - left; }
+        float height() { return bottom - top; }
     }
 }
