@@ -3,6 +3,9 @@
     <string name="widget_brand">LIVE WEATHER</string>
     <string name="widget_compact_name">Live Weather · Current</string>
     <string name="widget_wide_name">Live Weather · Forecast</string>
+    <string name="widget_choose_title">Add weather widget</string>
+    <string name="widget_pin_not_supported">Your launcher does not support direct widget pinning. Long-press the Home screen → Widgets → Live Weather.</string>
+    <string name="widget_pin_request_failed">Widget add request could not be opened. Use Home screen → Widgets → Live Weather.</string>
     <string name="widget_waiting">Waiting for weather</string>
     <string name="widget_tap_refresh">Tap ↻ to refresh</string>
     <string name="widget_refreshing">Updating…</string>
