@@ -74,13 +74,26 @@ Acceptance checkpoint: verify dry-now + rain-later, weak trace, confirmed rain, 
 
 ## Phase 19 — Forecast Pro
 
-- Rich hourly detail interaction
-- Better rain timeline
-- Day-detail expansion
-- Min/max/feels-like/wind/gust/UV/precipitation detail
-- Sun/Moon events synchronized with daily forecast
-- Chart readability/responsive audit
-- Forecast empty/offline/loading states
+Status: IMPLEMENTED — device verification pending.
+
+Implemented:
+- Interactive 24-hour forecast strip with selected-hour state
+- Rich selected-hour details: condition, temperature, feels-like, humidity, dew point, forecast precipitation probability/amount, wind/gust, clouds, visibility and pressure
+- Interactive temperature and precipitation charts synchronized with selected hour
+- Responsive chart label density and selected-value guide/highlight
+- 12-hour forecast rain-risk timeline showing probability and model amount without implying rain-now
+- Rain timeline, hourly strip and charts share one selection
+- Expand/collapse 10-day forecast cards
+- Daily H/L and feels-like H/L
+- Daily precipitation probability/totals/wet hours
+- Daily wind/gust/UV details
+- Daily sunrise/sunset, sunshine/daylight duration
+- Daily Moon phase/illumination/moonrise/moonset from CelestialForecastEngine
+- Live / refreshing / saved-offline / stale / unavailable / waiting forecast states
+- Forecast-only binder architecture without rewriting Home or Live Wallpaper renderer
+- Weak activity binding marker to avoid static renderer retention
+
+Acceptance checkpoint: test hourly chip/chart/timeline synchronization, daily expansion, Sun/Moon events, Phase 16 units, small-screen chart readability and offline/loading states.
 
 ## Phase 20 — Radar Pro
 
