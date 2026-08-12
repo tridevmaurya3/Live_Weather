@@ -21,10 +21,11 @@ import java.util.List;
 import java.util.Locale;
 
 /**
- * Phase 6 overlay renderer. It intentionally runs after the main renderer so
- * precipitation-first condition resolution can correct a conflicting raw WMO
- * clear-sky state without destabilising the forecast/chart renderer.
- * Phase 16 routes all user-facing units through WeatherFormatter.
+ * Advanced current-condition overlay renderer.
+ *
+ * Phase 18 routes user-facing interpretation through WeatherIntelligence2 so
+ * probability, current precipitation evidence, comfort, wind, visibility,
+ * pressure and confidence are described consistently across the app.
  */
 public final class Phase6Renderer {
 
@@ -97,16 +98,17 @@ public final class Phase6Renderer {
         }
 
         WeatherResponse response = state.getWeather();
-        LiveConditionResolver.ResolvedCondition resolved = LiveConditionResolver.resolve(response);
+        WeatherIntelligence2.Report intelligence = WeatherIntelligence2.analyze(response);
+        LiveConditionResolver.ResolvedCondition resolved = intelligence.getResolvedCondition();
         WeatherResponse.CurrentWeather current = response.getCurrent();
 
-        applyResolvedCurrentCondition(response, resolved);
+        applyResolvedCurrentCondition(response, resolved, intelligence);
 
         forecastLiveSkyView.setWeatherData(response, state.getLatitude(), state.getLongitude());
         wallpaperLiveSkyView.setWeatherData(response, state.getLatitude(), state.getLongitude());
 
         renderCelestialTimeline(response, state.getLatitude(), state.getLongitude());
-        renderAdvancedDetails(response, resolved, state);
+        renderAdvancedDetails(response, resolved, intelligence, state);
 
         if (current != null) {
             String symbol = WeatherFormatter.symbol(resolved.getWeatherCode(), current.getIsDay());
@@ -132,7 +134,8 @@ public final class Phase6Renderer {
 
     private void applyResolvedCurrentCondition(
             @NonNull WeatherResponse response,
-            @NonNull LiveConditionResolver.ResolvedCondition resolved
+            @NonNull LiveConditionResolver.ResolvedCondition resolved,
+            @NonNull WeatherIntelligence2.Report intelligence
     ) {
         WeatherResponse.CurrentWeather current = response.getCurrent();
         Integer isDay = current == null ? resolved.getIsDay() : current.getIsDay();
@@ -140,9 +143,10 @@ public final class Phase6Renderer {
                 WeatherFormatter.symbol(resolved.getWeatherCode(), isDay)
                         + "  " + resolved.getLabel()
         );
-        homeWeatherInsight.setText(DashboardIntelligence.insight(response));
+        homeWeatherInsight.setText(intelligence.getHeadline());
 
-        if (resolved.getPrecipitationSignalMm() > 0.02d) {
+        if (intelligence.isPrecipitationNowConfirmed()
+                && resolved.getPrecipitationSignalMm() > 0.02d) {
             homeRainValue.setText(
                     WeatherFormatter.precipitation(resolved.getPrecipitationSignalMm()) + " signal"
             );
@@ -259,6 +263,7 @@ public final class Phase6Renderer {
     private void renderAdvancedDetails(
             @NonNull WeatherResponse response,
             @NonNull LiveConditionResolver.ResolvedCondition resolved,
+            @NonNull WeatherIntelligence2.Report intelligence,
             @NonNull WeatherUiState state
     ) {
         WeatherResponse.CurrentWeather current = response.getCurrent();
@@ -269,45 +274,33 @@ public final class Phase6Renderer {
 
         forecastConditionSourceValue.setText(String.format(
                 Locale.getDefault(),
-                "NOW · %s\nSignal source: %s",
+                "NOW · %s · %s\nSignal source: %s",
                 resolved.getLabel(),
+                precipitationStateLabel(intelligence.getPrecipitationState()),
                 resolved.getSource()
         ));
 
         forecastPrecipBreakdownValue.setText(String.format(
                 Locale.getDefault(),
-                "PRECIPITATION · Total %s · Rain %s · Showers %s · Snow %.2f cm · resolved signal %s",
+                "%s\nRaw model · Total %s · Rain %s · Showers %s · Snow %.2f cm",
+                intelligence.getPrecipitationSummary(),
                 WeatherFormatter.precipitation(current.getPrecipitation()),
                 WeatherFormatter.precipitation(current.getRain()),
                 WeatherFormatter.precipitation(current.getShowers()),
-                current.getSnowfall() == null ? 0d : current.getSnowfall(),
-                WeatherFormatter.precipitation(resolved.getPrecipitationSignalMm())
+                current.getSnowfall() == null ? 0d : current.getSnowfall()
         ));
 
-        forecastWindDetailValue.setText(String.format(
-                Locale.getDefault(),
-                "WIND · %s %s · Gusts %s",
-                WeatherFormatter.wind(current.getWindSpeed10m()),
-                WeatherFormatter.windDirection(current.getWindDirection10m()),
-                WeatherFormatter.wind(current.getWindGusts10m())
-        ));
+        forecastWindDetailValue.setText(intelligence.getWindSummary());
 
         forecastAtmosphereDetailValue.setText(String.format(
                 Locale.getDefault(),
-                "ATMOSPHERE · MSL %s · Surface %s · Clouds %s · Visibility %s",
-                WeatherFormatter.pressure(current.getPressureMsl()),
-                WeatherFormatter.pressure(current.getSurfacePressure()),
-                WeatherFormatter.percent(current.getCloudCover()),
-                DashboardIntelligence.visibility(current.getVisibility())
+                "%s\n%s\nCloud cover %s",
+                intelligence.getVisibilitySummary(),
+                intelligence.getPressureSummary(),
+                WeatherFormatter.percent(current.getCloudCover())
         ));
 
-        forecastComfortDetailValue.setText(String.format(
-                Locale.getDefault(),
-                "COMFORT · Feels %s · Humidity %s · Dew point %s",
-                WeatherFormatter.temperature(current.getApparentTemperature()),
-                WeatherFormatter.percent(current.getRelativeHumidity2m()),
-                DashboardIntelligence.dewPoint(current.getDewPoint2m())
-        ));
+        forecastComfortDetailValue.setText(intelligence.getComfortSummary());
 
         String locationQuality;
         if (Float.isNaN(locationAccuracyMeters)) {
@@ -323,11 +316,50 @@ public final class Phase6Renderer {
 
         forecastDataQualityValue.setText(String.format(
                 Locale.getDefault(),
-                "DATA QUALITY · %s · current + nearest 15-minute model cross-check (may be interpolated by region) · updated %s%s",
+                "%s\nLocation: %s · %s · updated %s%s",
+                intelligence.getConfidenceSummary(),
                 locationQuality,
+                freshnessLabel(state.getUpdatedAt()),
                 WeatherFormatter.updatedTime(state.getUpdatedAt()),
                 state.isFromCache() ? " · saved/offline snapshot" : ""
         ));
+    }
+
+    @NonNull
+    private static String precipitationStateLabel(
+            @NonNull WeatherIntelligence2.PrecipitationState state
+    ) {
+        switch (state) {
+            case THUNDERSTORM_NOW:
+                return "thunderstorm now";
+            case RAIN_NOW_CONFIRMED:
+                return "precipitation now";
+            case WEAK_SIGNAL_UNCONFIRMED:
+                return "weak signal unconfirmed";
+            case RAIN_LIKELY_SOON:
+                return "rain likely soon";
+            case RAIN_POSSIBLE_SOON:
+                return "rain possible soon";
+            case RAIN_LIKELY_LATER:
+                return "rain likely later";
+            case RAIN_POSSIBLE_LATER:
+                return "rain possible later";
+            case DRY_NOW:
+                return "dry now";
+            case UNKNOWN:
+            default:
+                return "timing unavailable";
+        }
+    }
+
+    @NonNull
+    private static String freshnessLabel(long updatedAt) {
+        if (updatedAt <= 0L) return "unknown age";
+        long ageMinutes = Math.max(0L, (System.currentTimeMillis() - updatedAt) / 60_000L);
+        if (ageMinutes <= 30L) return "fresh data";
+        if (ageMinutes <= 90L) return "recent data";
+        if (ageMinutes <= 180L) return "aging data";
+        return "stale data";
     }
 
     private void renderWaiting() {
