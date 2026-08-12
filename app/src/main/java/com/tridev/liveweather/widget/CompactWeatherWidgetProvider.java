@@ -3,7 +3,7 @@ package com.tridev.liveweather.widget;
 import android.appwidget.AppWidgetManager;
 import android.appwidget.AppWidgetProvider;
 import android.content.Context;
-import android.content.Intent;
+import android.os.Bundle;
 
 import androidx.annotation.NonNull;
 
@@ -18,23 +18,38 @@ public final class CompactWeatherWidgetProvider extends AppWidgetProvider {
             @NonNull AppWidgetManager appWidgetManager,
             @NonNull int[] appWidgetIds
     ) {
-        WeatherWidgetUpdater.updateCompact(context);
+        for (int id : appWidgetIds) WeatherWidgetUpdater.updateOne(context, id);
+        WidgetRefreshScheduler.schedule(context);
     }
 
     @Override
     public void onEnabled(@NonNull Context context) {
         super.onEnabled(context);
         WallpaperWeatherScheduler.schedule(context);
+        WidgetRefreshScheduler.schedule(context);
         WeatherWidgetUpdater.updateCompact(context);
-        WidgetRefreshWorker.enqueue(context);
     }
 
     @Override
-    public void onReceive(@NonNull Context context, @NonNull Intent intent) {
-        super.onReceive(context, intent);
-        if (WeatherWidgetUpdater.ACTION_REFRESH_WIDGETS.equals(intent.getAction())) {
-            WeatherWidgetUpdater.showRefreshing(context);
-            WidgetRefreshWorker.enqueue(context);
-        }
+    public void onAppWidgetOptionsChanged(
+            @NonNull Context context,
+            @NonNull AppWidgetManager appWidgetManager,
+            int appWidgetId,
+            @NonNull Bundle newOptions
+    ) {
+        WeatherWidgetUpdater.updateOne(context, appWidgetId);
+    }
+
+    @Override
+    public void onDeleted(@NonNull Context context, @NonNull int[] appWidgetIds) {
+        WidgetPreferences preferences = new WidgetPreferences(context);
+        for (int id : appWidgetIds) preferences.delete(id);
+        WidgetRefreshScheduler.cancelIfNoWidgets(context);
+    }
+
+    @Override
+    public void onDisabled(@NonNull Context context) {
+        super.onDisabled(context);
+        WidgetRefreshScheduler.cancelIfNoWidgets(context);
     }
 }
