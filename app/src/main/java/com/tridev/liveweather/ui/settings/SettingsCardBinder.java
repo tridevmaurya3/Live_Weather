@@ -1,7 +1,6 @@
 package com.tridev.liveweather.ui.settings;
 
 import android.app.Activity;
-import android.content.Context;
 import android.view.HapticFeedbackConstants;
 import android.view.View;
 import android.view.ViewGroup;
@@ -18,14 +17,7 @@ import com.tridev.liveweather.data.local.UnitPreferences;
 import com.tridev.liveweather.ui.weather.WeatherFormatter;
 import com.tridev.liveweather.widget.WeatherWidgetUpdater;
 
-/**
- * Phase 16 binder for the existing More-page Units and Performance cards.
- *
- * The cards predate their functional settings behavior and do not have stable
- * view IDs. To avoid a risky large layout/MainActivity rewrite, the binder
- * locates each card by its localized title TextView and attaches behavior to
- * the parent card container when MainActivity becomes visible.
- */
+/** Functional Phase 16 binder for the existing More-page Units and Performance cards. */
 public final class SettingsCardBinder {
 
     private static final int TAG_BOUND = 0x6c697665;
@@ -36,7 +28,6 @@ public final class SettingsCardBinder {
     public static void bind(@NonNull Activity activity) {
         View root = activity.findViewById(android.R.id.content);
         if (!(root instanceof ViewGroup)) return;
-
         bindUnitsCard(activity, (ViewGroup) root);
         bindPerformanceCard(activity, (ViewGroup) root);
     }
@@ -84,9 +75,7 @@ public final class SettingsCardBinder {
     }
 
     private static void showUnitsDialog(@NonNull Activity activity) {
-        UnitPreferences preferences = new UnitPreferences(activity);
-        UnitPreferences.Units current = preferences.load();
-
+        UnitPreferences.Units current = new UnitPreferences(activity).load();
         String[] options = {
                 activity.getString(R.string.phase16_units_metric),
                 activity.getString(R.string.phase16_units_imperial),
@@ -97,13 +86,9 @@ public final class SettingsCardBinder {
                 .setTitle(R.string.phase16_units_title)
                 .setMessage(current.summary())
                 .setItems(options, (dialog, which) -> {
-                    if (which == 0) {
-                        applyUnits(activity, UnitPreferences.metric());
-                    } else if (which == 1) {
-                        applyUnits(activity, UnitPreferences.imperial());
-                    } else {
-                        showCustomCategoryDialog(activity);
-                    }
+                    if (which == 0) applyUnits(activity, UnitPreferences.metric());
+                    else if (which == 1) applyUnits(activity, UnitPreferences.imperial());
+                    else showCustomCategoryDialog(activity);
                 })
                 .setNegativeButton(android.R.string.cancel, null)
                 .show();
@@ -112,16 +97,11 @@ public final class SettingsCardBinder {
     private static void showCustomCategoryDialog(@NonNull Activity activity) {
         UnitPreferences.Units current = new UnitPreferences(activity).load();
         String[] categories = {
-                activity.getString(R.string.phase16_temperature_row,
-                        current.getTemperature() == UnitPreferences.TemperatureUnit.CELSIUS ? "°C" : "°F"),
-                activity.getString(R.string.phase16_wind_row,
-                        current.getWind() == UnitPreferences.WindUnit.KMH ? "km/h" : "mph"),
-                activity.getString(R.string.phase16_pressure_row,
-                        current.getPressure() == UnitPreferences.PressureUnit.HPA ? "hPa" : "inHg"),
-                activity.getString(R.string.phase16_precip_row,
-                        current.getPrecipitation() == UnitPreferences.PrecipitationUnit.MM ? "mm" : "in"),
-                activity.getString(R.string.phase16_distance_row,
-                        current.getDistance() == UnitPreferences.DistanceUnit.KM ? "km" : "mi")
+                activity.getString(R.string.phase16_temperature_row, current.temperatureLabel()),
+                activity.getString(R.string.phase16_wind_row, current.windLabel()),
+                activity.getString(R.string.phase16_pressure_row, current.pressureLabel()),
+                activity.getString(R.string.phase16_precip_row, current.precipitationLabel()),
+                activity.getString(R.string.phase16_distance_row, current.distanceLabel())
         };
 
         new AlertDialog.Builder(activity)
@@ -132,8 +112,7 @@ public final class SettingsCardBinder {
     }
 
     private static void showUnitChoiceDialog(@NonNull Activity activity, int category) {
-        UnitPreferences preferences = new UnitPreferences(activity);
-        UnitPreferences.Units current = preferences.load();
+        UnitPreferences.Units current = new UnitPreferences(activity).load();
 
         String title;
         String[] choices;
@@ -147,13 +126,22 @@ public final class SettingsCardBinder {
                 break;
             case 1:
                 title = activity.getString(R.string.phase16_wind_title);
-                choices = new String[]{"Kilometres/hour (km/h)", "Miles/hour (mph)"};
-                checked = current.getWind() == UnitPreferences.WindUnit.KMH ? 0 : 1;
+                choices = new String[]{
+                        "Kilometres/hour (km/h)",
+                        "Miles/hour (mph)",
+                        "Metres/second (m/s)",
+                        "Knots (kn)"
+                };
+                checked = windChoiceIndex(current.getWind());
                 break;
             case 2:
                 title = activity.getString(R.string.phase16_pressure_title);
-                choices = new String[]{"Hectopascal (hPa)", "Inches of mercury (inHg)"};
-                checked = current.getPressure() == UnitPreferences.PressureUnit.HPA ? 0 : 1;
+                choices = new String[]{
+                        "Hectopascal (hPa)",
+                        "Millibar (mbar)",
+                        "Inches of mercury (inHg)"
+                };
+                checked = pressureChoiceIndex(current.getPressure());
                 break;
             case 3:
                 title = activity.getString(R.string.phase16_precipitation_title);
@@ -179,6 +167,25 @@ public final class SettingsCardBinder {
                 .show();
     }
 
+    private static int windChoiceIndex(@NonNull UnitPreferences.WindUnit unit) {
+        switch (unit) {
+            case MPH: return 1;
+            case MPS: return 2;
+            case KNOT: return 3;
+            case KMH:
+            default: return 0;
+        }
+    }
+
+    private static int pressureChoiceIndex(@NonNull UnitPreferences.PressureUnit unit) {
+        switch (unit) {
+            case MBAR: return 1;
+            case INHG: return 2;
+            case HPA:
+            default: return 0;
+        }
+    }
+
     @NonNull
     private static UnitPreferences.Units withChoice(
             @NonNull UnitPreferences.Units current,
@@ -198,14 +205,20 @@ public final class SettingsCardBinder {
                         : UnitPreferences.TemperatureUnit.FAHRENHEIT;
                 break;
             case 1:
-                wind = choice == 0
-                        ? UnitPreferences.WindUnit.KMH
-                        : UnitPreferences.WindUnit.MPH;
+                wind = choice == 1
+                        ? UnitPreferences.WindUnit.MPH
+                        : choice == 2
+                        ? UnitPreferences.WindUnit.MPS
+                        : choice == 3
+                        ? UnitPreferences.WindUnit.KNOT
+                        : UnitPreferences.WindUnit.KMH;
                 break;
             case 2:
-                pressure = choice == 0
-                        ? UnitPreferences.PressureUnit.HPA
-                        : UnitPreferences.PressureUnit.INHG;
+                pressure = choice == 1
+                        ? UnitPreferences.PressureUnit.MBAR
+                        : choice == 2
+                        ? UnitPreferences.PressureUnit.INHG
+                        : UnitPreferences.PressureUnit.HPA;
                 break;
             case 3:
                 precipitation = choice == 0
@@ -223,10 +236,7 @@ public final class SettingsCardBinder {
         return new UnitPreferences.Units(temperature, wind, pressure, precipitation, distance);
     }
 
-    private static void applyUnits(
-            @NonNull Activity activity,
-            @NonNull UnitPreferences.Units units
-    ) {
+    private static void applyUnits(@NonNull Activity activity, @NonNull UnitPreferences.Units units) {
         new UnitPreferences(activity).save(units);
         WeatherFormatter.configure(units);
         WeatherWidgetUpdater.updateAll(activity);
@@ -282,13 +292,10 @@ public final class SettingsCardBinder {
     @NonNull
     private static String performanceLabel(@NonNull PerformancePreferences.Mode mode) {
         switch (mode) {
-            case SMOOTH:
-                return "Smooth";
-            case BATTERY:
-                return "Battery";
+            case SMOOTH: return "Smooth";
+            case BATTERY: return "Battery";
             case AUTO:
-            default:
-                return "Auto";
+            default: return "Auto";
         }
     }
 
