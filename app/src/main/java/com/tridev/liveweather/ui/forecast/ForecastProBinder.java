@@ -8,10 +8,10 @@ import com.tridev.liveweather.ui.weather.WeatherViewModel;
 
 import java.util.WeakHashMap;
 
-/** Binds the Phase 19 renderer once per MainActivity instance. */
+/** Binds the Phase 19 renderer once per MainActivity instance without retaining it. */
 public final class ForecastProBinder {
 
-    private static final WeakHashMap<MainActivity, ForecastProRenderer> BOUND = new WeakHashMap<>();
+    private static final WeakHashMap<MainActivity, Boolean> BOUND = new WeakHashMap<>();
 
     private ForecastProBinder() {
     }
@@ -22,6 +22,6 @@ public final class ForecastProBinder {
         ForecastProRenderer renderer = new ForecastProRenderer(activity);
         WeatherViewModel weatherViewModel = new ViewModelProvider(activity).get(WeatherViewModel.class);
         weatherViewModel.getWeatherState().observe(activity, renderer::render);
-        BOUND.put(activity, renderer);
+        BOUND.put(activity, Boolean.TRUE);
     }
 }
