@@ -28,6 +28,7 @@ public final class WidgetRefreshWorker extends Worker {
 
     private static final String INPUT_WIDGET_ID = "widget_id";
     private static final int MAX_PERIODIC_FIXED_LOCATIONS = 4;
+    private static final long FIXED_CACHE_REUSE_MILLIS = 45L * 60L * 1000L;
 
     public WidgetRefreshWorker(
             @NonNull Context appContext,
@@ -132,8 +133,18 @@ public final class WidgetRefreshWorker extends Worker {
 
         WeatherCache cache = new WeatherCache(context);
         WeatherRepository repository = new WeatherRepository();
+        long now = System.currentTimeMillis();
         int refreshed = 0;
         for (WidgetPreferences.Config config : uniqueTargets.values()) {
+            WeatherCache.CachedWeather existing = cache.load(
+                    config.getLatitude(),
+                    config.getLongitude()
+            );
+            if (existing != null
+                    && existing.getSavedAt() > 0L
+                    && now - existing.getSavedAt() <= FIXED_CACHE_REUSE_MILLIS) {
+                continue;
+            }
             if (refreshed >= MAX_PERIODIC_FIXED_LOCATIONS) break;
             try {
                 WeatherResponse weather = repository.loadWeatherBlocking(
