@@ -15,10 +15,9 @@ import java.util.List;
  * Resolves the most useful "right now" weather condition from multiple model
  * signals without treating every trace precipitation value as confirmed rain.
  *
- * Open-Meteo current/minutely values are model-derived. A single weak 15-minute
- * value can be spatially nearby or temporally displaced, so precipitation must
- * be corroborated by persistence, a precipitation WMO code, or a stronger
- * amount before it overrides a clear/cloudy current condition.
+ * Phase 18 accuracy rule: adjacent previous/next 15-minute slots may corroborate
+ * the current/nearest interval, but an adjacent slot alone must never be promoted
+ * into a claim that precipitation or a thunderstorm is happening right now.
  */
 public final class LiveConditionResolver {
 
@@ -49,20 +48,20 @@ public final class LiveConditionResolver {
         );
         SignalWindow window = minutelyWindow(response);
 
-        // Thunderstorm WMO codes remain authoritative because this is a discrete
-        // weather-state classification rather than an isolated trace amount.
+        // Current WMO thunderstorm is authoritative. The nearest 15-minute slot
+        // may also support a current classification, but previous/next slots are
+        // future/past context only and cannot independently become "now".
         Integer severeCode = severeCode(currentCode, window);
         if (severeCode != null) {
             return build(
                     severeCode,
                     isDay,
                     "Thunderstorm weather code",
-                    Math.max(currentSignal.maxWet(), window.maxWet())
+                    Math.max(currentSignal.maxWet(), window.center.maxWet())
             );
         }
 
         // If the provider's CURRENT WMO state itself says precipitation, keep it.
-        // This avoids suppressing real drizzle/rain merely because amounts round low.
         if (isPrecipitationCode(currentCode)) {
             return build(
                     currentCode,
@@ -72,8 +71,6 @@ public final class LiveConditionResolver {
             );
         }
 
-        // Snow, showers and rain can still override a non-precipitation current
-        // code, but only when the quantitative signal has enough confidence.
         if (confirmed(
                 currentSignal.snowfall,
                 window.previous.snowfall,
@@ -81,12 +78,7 @@ public final class LiveConditionResolver {
                 window.next.snowfall,
                 isSnowCode(window.center.code)
         )) {
-            double snow = max4(
-                    currentSignal.snowfall,
-                    window.previous.snowfall,
-                    window.center.snowfall,
-                    window.next.snowfall
-            );
+            double snow = Math.max(currentSignal.snowfall, window.center.snowfall);
             int code = snow >= 0.8d ? 75 : snow >= 0.25d ? 73 : 71;
             return build(code, isDay, "Corroborated snow signal", snow);
         }
@@ -98,12 +90,7 @@ public final class LiveConditionResolver {
                 window.next.showers,
                 isShowerCode(window.center.code)
         )) {
-            double showers = max4(
-                    currentSignal.showers,
-                    window.previous.showers,
-                    window.center.showers,
-                    window.next.showers
-            );
+            double showers = Math.max(currentSignal.showers, window.center.showers);
             int code = showers >= 1.5d ? 82 : showers >= 0.4d ? 81 : 80;
             return build(code, isDay, "Corroborated shower signal", showers);
         }
@@ -120,7 +107,7 @@ public final class LiveConditionResolver {
                 nextRainWet,
                 isRainOrDrizzleCode(window.center.code)
         )) {
-            double wet = max4(currentRainWet, previousRainWet, centerRainWet, nextRainWet);
+            double wet = Math.max(currentRainWet, centerRainWet);
             int code;
             if (isRainOrDrizzleCode(window.center.code)) {
                 code = window.center.code;
@@ -130,8 +117,8 @@ public final class LiveConditionResolver {
             return build(code, isDay, "Corroborated short-term rain signal", wet);
         }
 
-        // A weak isolated model value is useful context, but it is not enough to
-        // claim that rain is physically falling at the user's exact location.
+        // Weak/adjacent model values remain context only. They must not switch
+        // the current condition or Live Wallpaper into a rain state.
         double rawWet = Math.max(currentSignal.maxWet(), window.maxWet());
         String source = rawWet > TRACE_MM
                 ? "Current weather model · weak precipitation signal unconfirmed"
@@ -146,29 +133,30 @@ public final class LiveConditionResolver {
             double next,
             boolean centerWeatherCodeSupportsPrecipitation
     ) {
-        double strongest = max4(current, previous, center, next);
-        if (strongest >= STRONG_ISOLATED_MM) {
+        // A strong amount is allowed to establish NOW only when it belongs to
+        // current or the nearest 15-minute interval. A future/past slot alone
+        // cannot establish current precipitation.
+        if (Math.max(current, center) >= STRONG_ISOLATED_MM) {
             return true;
         }
 
-        int persistentSlots = 0;
-        if (previous >= PERSISTENT_SLOT_MM) persistentSlots++;
-        if (center >= PERSISTENT_SLOT_MM) persistentSlots++;
-        if (next >= PERSISTENT_SLOT_MM) persistentSlots++;
+        boolean centerPersistent = center >= PERSISTENT_SLOT_MM;
+        boolean adjacentPersistent = previous >= PERSISTENT_SLOT_MM
+                || next >= PERSISTENT_SLOT_MM;
+        double relevantStrongest = Math.max(current, center);
 
-        if (persistentSlots >= 2 && strongest >= CORROBORATED_MM) {
+        if (centerPersistent && adjacentPersistent
+                && Math.max(relevantStrongest, Math.max(previous, next)) >= CORROBORATED_MM) {
             return true;
         }
 
         if (current >= CORROBORATED_MM
-                && (center >= PERSISTENT_SLOT_MM
-                || previous >= PERSISTENT_SLOT_MM
-                || next >= PERSISTENT_SLOT_MM)) {
+                && (centerPersistent || adjacentPersistent)) {
             return true;
         }
 
         return centerWeatherCodeSupportsPrecipitation
-                && strongest >= PERSISTENT_SLOT_MM;
+                && center >= PERSISTENT_SLOT_MM;
     }
 
     @NonNull
@@ -249,8 +237,6 @@ public final class LiveConditionResolver {
     private static Integer severeCode(@Nullable Integer currentCode, @NonNull SignalWindow window) {
         if (currentCode != null && currentCode >= 95) return currentCode;
         if (window.center.code != null && window.center.code >= 95) return window.center.code;
-        if (window.previous.code != null && window.previous.code >= 95) return window.previous.code;
-        if (window.next.code != null && window.next.code >= 95) return window.next.code;
         return null;
     }
 
@@ -280,10 +266,6 @@ public final class LiveConditionResolver {
     private static double valueAt(@Nullable List<Double> values, int index) {
         Double value = WeatherFormatter.valueAt(values, index);
         return value(value);
-    }
-
-    private static double max4(double a, double b, double c, double d) {
-        return Math.max(Math.max(a, b), Math.max(c, d));
     }
 
     private static final class Signal {
