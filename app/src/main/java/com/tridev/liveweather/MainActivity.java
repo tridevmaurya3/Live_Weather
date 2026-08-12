@@ -2,6 +2,7 @@ package com.tridev.liveweather;
 
 import android.Manifest;
 import android.app.WallpaperManager;
+import android.appwidget.AppWidgetManager;
 import android.content.ActivityNotFoundException;
 import android.content.ComponentName;
 import android.content.Context;
@@ -13,10 +14,12 @@ import android.os.Bundle;
 import android.view.HapticFeedbackConstants;
 import android.view.View;
 import android.widget.TextView;
+import android.widget.Toast;
 
 import androidx.activity.EdgeToEdge;
 import androidx.activity.result.ActivityResultLauncher;
 import androidx.activity.result.contract.ActivityResultContracts;
+import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.appcompat.widget.SwitchCompat;
 import androidx.core.graphics.Insets;
@@ -44,6 +47,9 @@ import com.tridev.liveweather.ui.weather.WeatherFormatter;
 import com.tridev.liveweather.ui.weather.WeatherScreenRenderer;
 import com.tridev.liveweather.ui.weather.WeatherViewModel;
 import com.tridev.liveweather.wallpaper.LiveWeatherWallpaperService;
+import com.tridev.liveweather.widget.CompactWeatherWidgetProvider;
+import com.tridev.liveweather.widget.WeatherWidgetUpdater;
+import com.tridev.liveweather.widget.WideWeatherWidgetProvider;
 import com.tridev.liveweather.worker.WallpaperWeatherScheduler;
 import com.tridev.liveweather.worker.WeatherAlertScheduler;
 
@@ -113,6 +119,7 @@ public class MainActivity extends AppCompatActivity {
         applySystemInsets();
         setupBottomNavigation(savedInstanceState);
         setupQuickActions();
+        setupWidgetEngine();
         setupWallpaperEngine();
         setupAirQualityEngine();
         setupAlertEngine();
@@ -211,6 +218,43 @@ public class MainActivity extends AppCompatActivity {
                 refreshAlertsManually();
             });
         }
+    }
+
+    private void setupWidgetEngine() {
+        View widgetsAction = findViewById(R.id.moreWidgetsAction);
+        if (widgetsAction == null) return;
+        widgetsAction.setOnClickListener(view -> {
+            performLightHaptic(view);
+            String[] options = {
+                    getString(R.string.widget_compact_name),
+                    getString(R.string.widget_wide_name)
+            };
+            new AlertDialog.Builder(this)
+                    .setTitle(R.string.widget_choose_title)
+                    .setItems(options, (dialog, which) -> {
+                        if (which == 0) requestPinWeatherWidget(CompactWeatherWidgetProvider.class);
+                        else requestPinWeatherWidget(WideWeatherWidgetProvider.class);
+                    })
+                    .setNegativeButton(android.R.string.cancel, null)
+                    .show();
+        });
+    }
+
+    private void requestPinWeatherWidget(Class<?> providerClass) {
+        AppWidgetManager manager = AppWidgetManager.getInstance(this);
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O
+                && manager.isRequestPinAppWidgetSupported()) {
+            boolean requested = manager.requestPinAppWidget(
+                    new ComponentName(this, providerClass),
+                    null,
+                    null
+            );
+            if (!requested) {
+                Toast.makeText(this, R.string.widget_pin_request_failed, Toast.LENGTH_LONG).show();
+            }
+            return;
+        }
+        Toast.makeText(this, R.string.widget_pin_not_supported, Toast.LENGTH_LONG).show();
     }
 
     private void setupWallpaperEngine() {
@@ -366,6 +410,7 @@ public class MainActivity extends AppCompatActivity {
                         state.getWeather(), state.getLatitude(), state.getLongitude()
                 );
                 airQualityViewModel.refresh(state.getLatitude(), state.getLongitude(), false);
+                WeatherWidgetUpdater.updateAll(this);
             } else {
                 appLiveNatureBackground.clearWeatherData();
             }
