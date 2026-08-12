@@ -5,12 +5,13 @@ import androidx.annotation.Nullable;
 
 import com.tridev.liveweather.data.remote.dto.WeatherResponse;
 import com.tridev.liveweather.ui.weather.WeatherFormatter;
+import com.tridev.liveweather.ui.weather.WeatherIntelligence2;
 
-import java.util.List;
 import java.util.Locale;
 
 /**
  * Converts raw hourly/daily arrays into concise forecast decisions and summaries.
+ * Phase 18 keeps forecast probability distinct from current-condition evidence.
  */
 public final class ForecastIntelligence {
 
@@ -32,7 +33,6 @@ public final class ForecastIntelligence {
         Double maxRainChance = null;
         String maxRainTime = null;
         Double maxWind = null;
-
         int rainStart = -1;
         int rainEnd = -1;
 
@@ -45,13 +45,11 @@ public final class ForecastIntelligence {
 
             Double chance = WeatherFormatter.valueAt(hourly.getPrecipitationProbability(), index);
             Double precipitation = WeatherFormatter.valueAt(hourly.getPrecipitation(), index);
-            boolean wetHour = (chance != null && chance >= 40.0)
+            boolean forecastWetHour = (chance != null && chance >= 40.0)
                     || (precipitation != null && precipitation >= 0.1);
 
-            if (wetHour) {
-                if (rainStart < 0) {
-                    rainStart = index;
-                }
+            if (forecastWetHour) {
+                if (rainStart < 0) rainStart = index;
                 rainEnd = index;
             }
 
@@ -81,20 +79,22 @@ public final class ForecastIntelligence {
                     WeatherFormatter.valueAt(hourly.getTime(), rainEnd)
             );
             rainPart = rainStart == rainEnd
-                    ? "rain signal near " + startLabel
-                    : "rain window " + startLabel + "–" + endLabel;
+                    ? "forecast rain-risk near " + startLabel
+                    : "forecast rain-risk window " + startLabel + "–" + endLabel;
             if (maxRainChance != null && maxRainTime != null) {
-                rainPart += " · peak " + Math.round(maxRainChance) + "% at " + maxRainTime;
+                rainPart += " · peak probability " + Math.round(maxRainChance) + "% at " + maxRainTime;
             }
         } else {
-            rainPart = "no strong rain window detected";
+            rainPart = "no strong forecast rain-risk window detected";
         }
 
         String windPart = maxWind == null
                 ? "wind peak unavailable"
                 : "wind up to " + WeatherFormatter.wind(maxWind);
 
-        return "Next 24h · " + temperaturePart + " · " + rainPart + " · " + windPart + ".";
+        WeatherIntelligence2.Report intelligence = WeatherIntelligence2.analyze(response);
+        return intelligence.getPrecipitationSummary()
+                + " Next 24h · " + temperaturePart + " · " + rainPart + " · " + windPart + ".";
     }
 
     @NonNull
@@ -145,7 +145,7 @@ public final class ForecastIntelligence {
         }
 
         if (strongestRainChance != null && strongestRainIndex >= 0) {
-            summary.append(" · highest rain chance ")
+            summary.append(" · highest precipitation probability ")
                     .append(Math.round(strongestRainChance))
                     .append("% on ")
                     .append(WeatherFormatter.dayLabel(
@@ -176,7 +176,7 @@ public final class ForecastIntelligence {
 
         return String.format(
                 Locale.getDefault(),
-                "Feels H %s · L %s\nPrecip %s · Wet hours %s\nSunrise %s · Sunset %s\nSunshine %s · Daylight %s\nUV %s · Gusts %s %s",
+                "Feels H %s · L %s\nForecast precip %s · Wet hours %s\nSunrise %s · Sunset %s\nSunshine %s · Daylight %s\nUV %s · Gusts %s %s",
                 WeatherFormatter.temperature(feelsHigh),
                 WeatherFormatter.temperature(feelsLow),
                 WeatherFormatter.precipitation(precipitation),
@@ -193,16 +193,12 @@ public final class ForecastIntelligence {
 
     @NonNull
     public static String formatSecondsAsHours(@Nullable Double seconds) {
-        if (seconds == null) {
-            return "—";
-        }
+        if (seconds == null) return "—";
         return String.format(Locale.getDefault(), "%.1f h", Math.max(0.0, seconds) / 3600.0);
     }
 
     private static String formatHours(@Nullable Double hours) {
-        if (hours == null) {
-            return "—";
-        }
+        if (hours == null) return "—";
         return String.format(Locale.getDefault(), "%.1f h", Math.max(0.0, hours));
     }
 
@@ -211,9 +207,7 @@ public final class ForecastIntelligence {
     }
 
     private static String shortTime(@Nullable String isoTime) {
-        if (isoTime == null || isoTime.trim().isEmpty()) {
-            return "—";
-        }
+        if (isoTime == null || isoTime.trim().isEmpty()) return "—";
         int separator = isoTime.indexOf('T');
         if (separator >= 0 && isoTime.length() >= separator + 6) {
             return isoTime.substring(separator + 1, separator + 6);
