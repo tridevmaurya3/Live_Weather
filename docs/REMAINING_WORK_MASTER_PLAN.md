@@ -1,0 +1,138 @@
+# Live Weather — Remaining Work Master Plan
+
+Status: ACTIVE DEVELOPMENT
+
+This document is the forward roadmap after the Phase 15 production-foundation pass. The project must not be called Final / Production Ready / Release Candidate until this roadmap is completed and the user explicitly approves finalization.
+
+## Phase 16 — Settings & Units Pro
+
+Confirmed pending work:
+- Temperature unit: Celsius / Fahrenheit
+- Wind unit: km/h / mph / m/s / knots
+- Pressure unit: hPa / mbar / inHg
+- Precipitation unit: mm / inch
+- Visibility unit: km / miles
+- Persistent unit preferences
+- Apply units consistently across Home, Forecast, Details, Widgets, Alerts and Radar labels
+- Functional Performance selector: Auto / Smooth / Battery
+- Real current-mode summary on More page
+- Settings UI instead of static cards
+
+Acceptance: changing one unit must update every relevant screen/widget consistently without changing provider data internally.
+
+## Phase 17 — Widget Pro
+
+- Per-widget Current / Forecast configuration
+- Optional selected city vs current active location
+- Compact / wide layout polish across launchers
+- Resize-state handling
+- Transparent / glass appearance options where RemoteViews permits
+- Clear stale/offline/refreshing state
+- Widget tap destinations
+- Battery-safe update contract audit
+
+## Phase 18 — Weather Intelligence 2.0
+
+- Better precipitation-now interpretation: probability vs measured/model precipitation kept distinct
+- “Rain likely later” vs “Raining now” consistency everywhere
+- Feels-like / humidity / heat / comfort explanation
+- Wind/gust interpretation
+- Visibility/fog interpretation
+- Pressure trend interpretation
+- Weather confidence/data-quality explanation
+- High-impact condition summary without exaggerating model certainty
+
+## Phase 19 — Forecast Pro
+
+- Rich hourly detail interaction
+- Better rain timeline
+- Day-detail expansion
+- Min/max/feels-like/wind/gust/UV/precipitation detail
+- Sun/Moon events synchronized with daily forecast
+- Chart readability/responsive audit
+- Forecast empty/offline/loading states
+
+## Phase 20 — Radar Pro
+
+- Layer controls polish
+- Clear legend for Rain / Clouds / Wind / Temperature
+- Timeline/playback UX polish
+- Recenter/current-location action
+- Data timestamp/source visibility
+- Loading/error/offline state
+- WebView lifecycle/memory audit
+- Radar vs model-field distinction remains explicit
+
+## Phase 21 — Alerts Pro
+
+- Alert settings surface
+- Official IMD vs Smart Risk filtering
+- Severity preferences
+- Notification preferences and clear source labels
+- Alert detail/navigation polish
+- Cached/stale warning state
+- No false implication that “no alert” means “no danger”
+
+## Phase 22 — App UX, Responsive & Accessibility Audit
+
+- Home / Forecast / Radar / Wallpaper / More full visual consistency
+- Tablet/small-phone/large-phone layout audit
+- Text scaling audit
+- Touch-target audit
+- TalkBack/content-description audit
+- Contrast/readability audit over live backgrounds
+- Loading/empty/error/retry consistency
+- Navigation-state consistency
+
+## Phase 23 — Offline, Cache & Data Reliability 2.0
+
+- Cache age visibility
+- Stale-data rules
+- Active-city/cache identity audit
+- Widget/app/wallpaper cache consistency
+- Network-off behavior
+- Retry/backoff review
+- Location fallback behavior
+- Data diagnostics page/section for troubleshooting provider/time/location mismatches
+
+## Phase 24 — Live Wallpaper Quality Backlog
+
+Current cross-device analytic renderer is stable and should not be repeatedly redesigned casually.
+
+Only address this phase deliberately. Backlog includes:
+- Rain depth/naturalness
+- Wet-glass and surface-reflection quality
+- Storm/lightning quality
+- Cloud realism
+- Background-world realism
+- App preview vs applied wallpaper parity
+
+The existing stable renderer remains the fallback checkpoint.
+
+## Phase 25 — Product Completeness Audit
+
+- Compare every implemented page/feature against the original Live Weather design reference
+- Identify missing pages/actions/settings
+- Remove placeholder/static cards
+- Remove stale phase/development wording from user-facing UI only after all work is complete
+- Full real-device regression test
+
+## Phase 26 — Final Release Gate
+
+This phase may start ONLY after explicit user approval that feature development is complete.
+
+Required:
+- Debug build pass
+- Release/R8 build pass
+- Real-device smoke test
+- Widgets test
+- Live Wallpaper test
+- Radar test
+- Alerts test
+- Offline/cache test
+- Final version/code decision
+- Play Store/release preparation if requested
+
+## Rule
+
+Do not call the project Final, Complete, Production Ready or Release Candidate before Phase 26 and explicit user approval.
