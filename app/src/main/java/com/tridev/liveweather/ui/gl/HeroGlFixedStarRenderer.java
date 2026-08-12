@@ -1,0 +1,185 @@
+package com.tridev.liveweather.ui.gl;
+
+import android.opengl.GLES20;
+
+import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
+
+import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
+import java.nio.FloatBuffer;
+
+/**
+ * Cross-device stable star field.
+ *
+ * Star positions are generated once in Java with deterministic integer math and
+ * rendered as GL points. No fragment hash/noise texture is involved, so the
+ * same app build produces the same star layout on emulator, Adreno and Mali.
+ */
+public final class HeroGlFixedStarRenderer {
+
+    private static final int STAR_COUNT = 92;
+    private static final int FLOATS_PER_STAR = 4;
+
+    private static final String VERTEX_SHADER = String.join("\n",
+            "attribute vec4 aStar;", // x, y(top-origin), brightness, size
+            "uniform float uStarVis;",
+            "uniform float uPixelScale;",
+            "varying float vAlpha;",
+            "void main(){",
+            "  vec2 clip=vec2(aStar.x*2.0-1.0,1.0-aStar.y*2.0);",
+            "  gl_Position=vec4(clip,0.0,1.0);",
+            "  gl_PointSize=clamp(aStar.w*uPixelScale,1.2,4.2);",
+            "  vAlpha=aStar.z*uStarVis;",
+            "}"
+    );
+
+    private static final String FRAGMENT_SHADER = String.join("\n",
+            "#ifdef GL_FRAGMENT_PRECISION_HIGH",
+            "precision highp float;",
+            "#else",
+            "precision mediump float;",
+            "#endif",
+            "varying float vAlpha;",
+            "void main(){",
+            "  vec2 q=gl_PointCoord-0.5;",
+            "  float d=length(q);",
+            "  float core=1.0-smoothstep(0.18,0.50,d);",
+            "  float halo=1.0-smoothstep(0.05,0.50,d);",
+            "  float alpha=clamp((core*0.78+halo*0.22)*vAlpha,0.0,0.90);",
+            "  vec3 color=mix(vec3(0.78,0.87,1.0),vec3(1.0),clamp(vAlpha,0.0,1.0));",
+            "  gl_FragColor=vec4(color,alpha);",
+            "}"
+    );
+
+    private final FloatBuffer starBuffer;
+    private int program;
+    private int aStar;
+    private int uStarVis;
+    private int uPixelScale;
+    private float pixelScale = 1f;
+
+    @Nullable
+    private volatile GlSceneSnapshot snapshot;
+
+    public HeroGlFixedStarRenderer() {
+        float[] stars = new float[STAR_COUNT * FLOATS_PER_STAR];
+        int seed = 0x4C495645;
+        for (int i = 0; i < STAR_COUNT; i++) {
+            seed = next(seed);
+            float x = ((seed >>> 8) & 0x00FFFFFF) / 16777215f;
+            seed = next(seed);
+            float y = 0.035f + (((seed >>> 8) & 0x00FFFFFF) / 16777215f) * 0.63f;
+            seed = next(seed);
+            float b = 0.42f + (((seed >>> 8) & 0x00FFFFFF) / 16777215f) * 0.58f;
+            seed = next(seed);
+            float size = 1.45f + (((seed >>> 8) & 0x00FFFFFF) / 16777215f) * 1.75f;
+
+            int base = i * FLOATS_PER_STAR;
+            stars[base] = x;
+            stars[base + 1] = y;
+            stars[base + 2] = b;
+            stars[base + 3] = size;
+        }
+
+        ByteBuffer bytes = ByteBuffer.allocateDirect(stars.length * 4).order(ByteOrder.nativeOrder());
+        starBuffer = bytes.asFloatBuffer();
+        starBuffer.put(stars).position(0);
+    }
+
+    public void setSnapshot(@Nullable GlSceneSnapshot snapshot) {
+        this.snapshot = snapshot;
+    }
+
+    public void onSurfaceCreated() {
+        program = createProgram(VERTEX_SHADER, FRAGMENT_SHADER);
+        aStar = GLES20.glGetAttribLocation(program, "aStar");
+        uStarVis = GLES20.glGetUniformLocation(program, "uStarVis");
+        uPixelScale = GLES20.glGetUniformLocation(program, "uPixelScale");
+        GLES20.glDisable(GLES20.GL_DEPTH_TEST);
+        GLES20.glDisable(GLES20.GL_CULL_FACE);
+    }
+
+    public void onSurfaceChanged(int width, int height) {
+        GLES20.glViewport(0, 0, Math.max(1, width), Math.max(1, height));
+        pixelScale = Math.max(0.78f, Math.min(1.65f, Math.max(1, height) / 800f));
+    }
+
+    public void drawFrame() {
+        GlSceneSnapshot state = snapshot;
+        if (program == 0 || state == null || state.starVisibility <= 0.002f) return;
+
+        float weatherGate = (1f - state.fogIntensity * 0.82f)
+                * (1f - state.airHazeIntensity * 0.55f)
+                * (1f - state.rainIntensity * 0.78f)
+                * (1f - state.drizzleIntensity * 0.48f)
+                * (1f - state.stormIntensity * 0.96f);
+        float cloudGate = 1f - Math.max(0f, Math.min(0.88f, state.cloudCover * 0.88f));
+        float visibility = Math.max(0f, Math.min(1f, state.starVisibility * weatherGate * cloudGate));
+        if (visibility <= 0.002f) return;
+
+        GLES20.glEnable(GLES20.GL_BLEND);
+        GLES20.glBlendFunc(GLES20.GL_SRC_ALPHA, GLES20.GL_ONE_MINUS_SRC_ALPHA);
+        GLES20.glUseProgram(program);
+        GLES20.glUniform1f(uStarVis, visibility);
+        GLES20.glUniform1f(uPixelScale, pixelScale);
+
+        starBuffer.position(0);
+        GLES20.glEnableVertexAttribArray(aStar);
+        GLES20.glVertexAttribPointer(
+                aStar,
+                FLOATS_PER_STAR,
+                GLES20.GL_FLOAT,
+                false,
+                FLOATS_PER_STAR * 4,
+                starBuffer
+        );
+        GLES20.glDrawArrays(GLES20.GL_POINTS, 0, STAR_COUNT);
+        GLES20.glDisableVertexAttribArray(aStar);
+        GLES20.glDisable(GLES20.GL_BLEND);
+    }
+
+    public void release() {
+        if (program != 0) {
+            GLES20.glDeleteProgram(program);
+            program = 0;
+        }
+    }
+
+    private static int next(int value) {
+        return value * 1664525 + 1013904223;
+    }
+
+    private static int createProgram(String vertexSource, String fragmentSource) {
+        int vertex = compileShader(GLES20.GL_VERTEX_SHADER, vertexSource);
+        int fragment = compileShader(GLES20.GL_FRAGMENT_SHADER, fragmentSource);
+        int result = GLES20.glCreateProgram();
+        GLES20.glAttachShader(result, vertex);
+        GLES20.glAttachShader(result, fragment);
+        GLES20.glLinkProgram(result);
+        int[] status = new int[1];
+        GLES20.glGetProgramiv(result, GLES20.GL_LINK_STATUS, status, 0);
+        GLES20.glDeleteShader(vertex);
+        GLES20.glDeleteShader(fragment);
+        if (status[0] == 0) {
+            String log = GLES20.glGetProgramInfoLog(result);
+            GLES20.glDeleteProgram(result);
+            throw new IllegalStateException("OpenGL fixed star program link failed: " + log);
+        }
+        return result;
+    }
+
+    private static int compileShader(int type, String source) {
+        int shader = GLES20.glCreateShader(type);
+        GLES20.glShaderSource(shader, source);
+        GLES20.glCompileShader(shader);
+        int[] status = new int[1];
+        GLES20.glGetShaderiv(shader, GLES20.GL_COMPILE_STATUS, status, 0);
+        if (status[0] == 0) {
+            String log = GLES20.glGetShaderInfoLog(shader);
+            GLES20.glDeleteShader(shader);
+            throw new IllegalStateException("OpenGL fixed star shader compile failed: " + log);
+        }
+        return shader;
+    }
+}
