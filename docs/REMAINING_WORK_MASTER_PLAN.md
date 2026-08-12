@@ -27,14 +27,25 @@ Acceptance checkpoint: clean/rebuild and real-device verification of Metric, Imp
 
 ## Phase 17 — Widget Pro
 
-- Per-widget Current / Forecast configuration
-- Optional selected city vs current active location
-- Compact / wide layout polish across launchers
-- Resize-state handling
-- Transparent / glass appearance options where RemoteViews permits
-- Clear stale/offline/refreshing state
-- Widget tap destinations
-- Battery-safe update contract audit
+Status: IMPLEMENTED — device / launcher verification pending.
+
+Implemented:
+- Independent per-widget configuration
+- Follow active weather or fixed saved-city source
+- Fixed-city weather refresh without changing the app / wallpaper active-location pointer
+- Glass and transparent widget appearance modes
+- Compact and Forecast responsive resize-state handling
+- Fresh / Saved / Stale / Refreshing / Offline status presentation
+- Current body → Home, Forecast strip → Forecast, brand → reconfigure
+- Manual refresh targets only the tapped widget source
+- Widget-only refresh no longer fetches unused AQI data
+- 30-minute network-constrained fixed-city scheduler
+- Coordinate deduplication, 45-minute cache reuse and capped stale fixed-city refresh work
+- Existing widget backward compatibility
+- Per-widget preference cleanup and no-widget periodic-work cancellation
+- Application-start recovery for previously placed widgets
+
+Acceptance checkpoint: add Current + Forecast widgets, test active vs fixed city, appearance modes, resize, tap destinations, offline refresh, units repaint and removal cleanup.
 
 ## Phase 18 — Weather Intelligence 2.0
 
