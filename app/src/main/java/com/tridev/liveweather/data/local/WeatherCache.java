@@ -15,8 +15,9 @@ import java.util.Locale;
 /**
  * Persistent weather cache with per-location snapshots.
  *
- * Phase 3 keeps separate saved weather for multiple locations so switching
- * cities can display useful data immediately before the live refresh returns.
+ * Active app weather updates the last-location pointer. Background consumers
+ * such as fixed-city widgets may refresh another location without changing the
+ * app's currently active weather identity.
  */
 public final class WeatherCache {
 
@@ -28,7 +29,6 @@ public final class WeatherCache {
     private static final String PREFIX_LONGITUDE = "longitude_";
     private static final String PREFIX_SAVED_AT = "saved_at_";
 
-    // Phase 2 legacy keys retained for one-time migration.
     private static final String LEGACY_WEATHER_JSON = "weather_json";
     private static final String LEGACY_LATITUDE = "latitude";
     private static final String LEGACY_LONGITUDE = "longitude";
@@ -44,28 +44,52 @@ public final class WeatherCache {
         migrateLegacyCacheIfNeeded();
     }
 
+    /** Save weather and make this location the active app/wallpaper location. */
     public void save(
             @NonNull WeatherResponse weather,
             double latitude,
             double longitude,
             long savedAt
     ) {
+        saveInternal(weather, latitude, longitude, savedAt, true);
+    }
+
+    /**
+     * Save a per-location snapshot without moving the active-location pointer.
+     * Used by fixed-city widgets and other background location consumers.
+     */
+    public void saveSnapshot(
+            @NonNull WeatherResponse weather,
+            double latitude,
+            double longitude,
+            long savedAt
+    ) {
+        saveInternal(weather, latitude, longitude, savedAt, false);
+    }
+
+    private void saveInternal(
+            @NonNull WeatherResponse weather,
+            double latitude,
+            double longitude,
+            long savedAt,
+            boolean makeActive
+    ) {
         String key = locationKey(latitude, longitude);
-        preferences.edit()
+        SharedPreferences.Editor editor = preferences.edit()
                 .putString(PREFIX_WEATHER + key, gson.toJson(weather))
                 .putString(PREFIX_LATITUDE + key, Double.toString(latitude))
                 .putString(PREFIX_LONGITUDE + key, Double.toString(longitude))
-                .putLong(PREFIX_SAVED_AT + key, savedAt)
-                .putString(KEY_LAST_LOCATION, key)
-                .apply();
+                .putLong(PREFIX_SAVED_AT + key, savedAt);
+        if (makeActive) {
+            editor.putString(KEY_LAST_LOCATION, key);
+        }
+        editor.apply();
     }
 
     @Nullable
     public CachedWeather load() {
         String lastKey = preferences.getString(KEY_LAST_LOCATION, null);
-        if (lastKey == null) {
-            return null;
-        }
+        if (lastKey == null) return null;
         return loadByKey(lastKey);
     }
 
@@ -80,19 +104,14 @@ public final class WeatherCache {
         String latitudeValue = preferences.getString(PREFIX_LATITUDE + key, null);
         String longitudeValue = preferences.getString(PREFIX_LONGITUDE + key, null);
 
-        if (json == null || latitudeValue == null || longitudeValue == null) {
-            return null;
-        }
+        if (json == null || latitudeValue == null || longitudeValue == null) return null;
 
         try {
             WeatherResponse weather = gson.fromJson(json, WeatherResponse.class);
             double latitude = Double.parseDouble(latitudeValue);
             double longitude = Double.parseDouble(longitudeValue);
             long savedAt = preferences.getLong(PREFIX_SAVED_AT + key, 0L);
-
-            if (weather == null) {
-                return null;
-            }
+            if (weather == null) return null;
             return new CachedWeather(weather, latitude, longitude, savedAt);
         } catch (JsonSyntaxException | NumberFormatException exception) {
             clearLocationKey(key);
@@ -101,16 +120,12 @@ public final class WeatherCache {
     }
 
     private void migrateLegacyCacheIfNeeded() {
-        if (preferences.getString(KEY_LAST_LOCATION, null) != null) {
-            return;
-        }
+        if (preferences.getString(KEY_LAST_LOCATION, null) != null) return;
 
         String json = preferences.getString(LEGACY_WEATHER_JSON, null);
         String latitudeValue = preferences.getString(LEGACY_LATITUDE, null);
         String longitudeValue = preferences.getString(LEGACY_LONGITUDE, null);
-        if (json == null || latitudeValue == null || longitudeValue == null) {
-            return;
-        }
+        if (json == null || latitudeValue == null || longitudeValue == null) return;
 
         try {
             double latitude = Double.parseDouble(latitudeValue);
@@ -130,7 +145,6 @@ public final class WeatherCache {
                     .remove(LEGACY_SAVED_AT)
                     .apply();
         } catch (NumberFormatException ignored) {
-            // Invalid legacy coordinates are simply discarded.
         }
     }
 
@@ -142,9 +156,7 @@ public final class WeatherCache {
                 .remove(PREFIX_SAVED_AT + key);
 
         String lastKey = preferences.getString(KEY_LAST_LOCATION, null);
-        if (key.equals(lastKey)) {
-            editor.remove(KEY_LAST_LOCATION);
-        }
+        if (key.equals(lastKey)) editor.remove(KEY_LAST_LOCATION);
         editor.apply();
     }
 
@@ -171,21 +183,9 @@ public final class WeatherCache {
             this.savedAt = savedAt;
         }
 
-        @NonNull
-        public WeatherResponse getWeather() {
-            return weather;
-        }
-
-        public double getLatitude() {
-            return latitude;
-        }
-
-        public double getLongitude() {
-            return longitude;
-        }
-
-        public long getSavedAt() {
-            return savedAt;
-        }
+        @NonNull public WeatherResponse getWeather() { return weather; }
+        public double getLatitude() { return latitude; }
+        public double getLongitude() { return longitude; }
+        public long getSavedAt() { return savedAt; }
     }
 }
