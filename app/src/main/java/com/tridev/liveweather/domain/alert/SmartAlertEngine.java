@@ -5,6 +5,7 @@ import androidx.annotation.Nullable;
 
 import com.tridev.liveweather.data.remote.dto.WeatherResponse;
 import com.tridev.liveweather.domain.LiveConditionResolver;
+import com.tridev.liveweather.ui.weather.WeatherFormatter;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -38,7 +39,8 @@ public final class SmartAlertEngine {
         double precip = condition.getPrecipitationSignalMm();
         if (precip >= 1.5d) {
             add(alerts, "smart-heavy-rain-now", "Heavy rain signal",
-                    String.format(Locale.getDefault(), "Current precipitation signal is %.1f mm in the active model interval.", precip),
+                    "Current precipitation signal is " + WeatherFormatter.precipitation(precip)
+                            + " in the active model interval.",
                     precip >= 3.0d ? WeatherAlert.Severity.ORANGE : WeatherAlert.Severity.YELLOW,
                     "Current conditions", now, now + 2 * 60 * 60 * 1000L);
         }
@@ -47,7 +49,7 @@ public final class SmartAlertEngine {
             double gust = value(current.getWindGusts10m());
             if (gust >= 60d) {
                 add(alerts, "smart-wind", "Strong wind risk",
-                        String.format(Locale.getDefault(), "Wind gusts are around %.0f km/h.", gust),
+                        "Wind gusts are around " + WeatherFormatter.wind(gust) + ".",
                         gust >= 90d ? WeatherAlert.Severity.RED : WeatherAlert.Severity.ORANGE,
                         "Current conditions", now, now + 3 * 60 * 60 * 1000L);
             }
@@ -55,7 +57,7 @@ public final class SmartAlertEngine {
             double visibility = value(current.getVisibility());
             if (visibility > 0d && visibility <= 1000d) {
                 add(alerts, "smart-visibility", "Very low visibility",
-                        String.format(Locale.getDefault(), "Visibility is about %.1f km.", visibility / 1000d),
+                        "Visibility is about " + WeatherFormatter.visibilityDistance(visibility) + ".",
                         visibility <= 500d ? WeatherAlert.Severity.ORANGE : WeatherAlert.Severity.YELLOW,
                         "Current conditions", now, now + 3 * 60 * 60 * 1000L);
             }
@@ -66,7 +68,12 @@ public final class SmartAlertEngine {
             Double rainSum = at(daily.getPrecipitationSum(), 0);
             if (value(rainProbability) >= 80d && value(rainSum) >= 25d) {
                 add(alerts, "smart-rain-today", "Heavy rain potential today",
-                        String.format(Locale.getDefault(), "Forecast precipitation %.0f mm with %.0f%% peak probability.", value(rainSum), value(rainProbability)),
+                        String.format(
+                                Locale.getDefault(),
+                                "Forecast precipitation %s with %.0f%% peak probability.",
+                                WeatherFormatter.precipitation(value(rainSum)),
+                                value(rainProbability)
+                        ),
                         value(rainSum) >= 50d ? WeatherAlert.Severity.ORANGE : WeatherAlert.Severity.YELLOW,
                         "Today", now, endOfRiskWindow(now, 24));
             }
@@ -74,7 +81,7 @@ public final class SmartAlertEngine {
             Double maxGust = at(daily.getWindGusts10mMax(), 0);
             if (value(maxGust) >= 70d) {
                 add(alerts, "smart-gust-today", "Strong gust potential today",
-                        String.format(Locale.getDefault(), "Forecast peak gusts may reach %.0f km/h.", value(maxGust)),
+                        "Forecast peak gusts may reach " + WeatherFormatter.wind(value(maxGust)) + ".",
                         value(maxGust) >= 90d ? WeatherAlert.Severity.ORANGE : WeatherAlert.Severity.YELLOW,
                         "Today", now, endOfRiskWindow(now, 24));
             }
@@ -90,7 +97,8 @@ public final class SmartAlertEngine {
             Double maxTemp = at(daily.getTemperature2mMax(), 0);
             if (value(maxTemp) >= 40d) {
                 add(alerts, "smart-heat", "High heat risk today",
-                        String.format(Locale.getDefault(), "Forecast maximum temperature is around %.0f°C.", value(maxTemp)),
+                        "Forecast maximum temperature is around "
+                                + WeatherFormatter.temperature(value(maxTemp)) + ".",
                         value(maxTemp) >= 45d ? WeatherAlert.Severity.ORANGE : WeatherAlert.Severity.YELLOW,
                         "Today", now, endOfRiskWindow(now, 24));
             }
