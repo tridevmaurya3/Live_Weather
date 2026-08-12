@@ -332,7 +332,7 @@ public final class Phase6Renderer {
         switch (state) {
             case THUNDERSTORM_NOW:
                 return "thunderstorm now";
-            case RAIN_NOW_CONFIRMED:
+            case PRECIPITATION_NOW_CONFIRMED:
                 return "precipitation now";
             case WEAK_SIGNAL_UNCONFIRMED:
                 return "weak signal unconfirmed";
