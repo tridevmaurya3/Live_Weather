@@ -6,18 +6,14 @@ import androidx.annotation.Nullable;
 import com.tridev.liveweather.data.remote.dto.WeatherResponse;
 import com.tridev.liveweather.domain.LiveConditionResolver;
 
-import java.util.List;
 import java.util.Locale;
 
 /**
  * Phase 18 Weather Intelligence 2.0.
  *
- * This class deliberately separates CURRENT condition evidence from FORECAST
- * probability. A probability value never becomes a claim that precipitation
- * is physically falling at the user's exact location right now.
- *
- * Provider/cache values remain metric. WeatherFormatter is used only at the
- * final presentation boundary so Phase 16 unit preferences remain consistent.
+ * CURRENT evidence and FORECAST probability are intentionally separate. A
+ * probability value never becomes a claim that precipitation is physically
+ * falling at the user's exact location right now.
  */
 public final class WeatherIntelligence2 {
 
@@ -30,7 +26,7 @@ public final class WeatherIntelligence2 {
 
     public enum PrecipitationState {
         THUNDERSTORM_NOW,
-        RAIN_NOW_CONFIRMED,
+        PRECIPITATION_NOW_CONFIRMED,
         WEAK_SIGNAL_UNCONFIRMED,
         RAIN_LIKELY_SOON,
         RAIN_POSSIBLE_SOON,
@@ -54,19 +50,20 @@ public final class WeatherIntelligence2 {
 
         WeatherResponse.CurrentWeather current = response.getCurrent();
         LiveConditionResolver.ResolvedCondition resolved = LiveConditionResolver.resolve(response);
-        ForecastPrecipitation forecast = findForecastPrecipitation(response);
+        ForecastPrecipitation forecast = findForecastRain(response);
 
         boolean thunderstormNow = resolved.getWeatherCode() != null
                 && resolved.getWeatherCode() >= 95;
-        boolean precipitationNow = isPrecipitationCode(resolved.getWeatherCode())
-                && resolved.getPrecipitationSignalMm() > 0d;
-        boolean weakSignal = resolved.getSource().toLowerCase(Locale.US).contains("weak precipitation signal");
+        boolean precipitationNow = isAnyPrecipitationCode(resolved.getWeatherCode())
+                && (resolved.getPrecipitationSignalMm() > 0d || isCurrentPrecipitationCode(resolved));
+        boolean weakSignal = resolved.getSource().toLowerCase(Locale.US)
+                .contains("weak precipitation signal");
 
         PrecipitationState precipitationState;
         if (thunderstormNow) {
             precipitationState = PrecipitationState.THUNDERSTORM_NOW;
-        } else if (precipitationNow || isCurrentPrecipitationCode(resolved)) {
-            precipitationState = PrecipitationState.RAIN_NOW_CONFIRMED;
+        } else if (precipitationNow) {
+            precipitationState = PrecipitationState.PRECIPITATION_NOW_CONFIRMED;
         } else if (weakSignal) {
             precipitationState = PrecipitationState.WEAK_SIGNAL_UNCONFIRMED;
         } else if (forecast.likely && forecast.hoursFromNow <= 2) {
@@ -126,7 +123,7 @@ public final class WeatherIntelligence2 {
             @NonNull LiveConditionResolver.ResolvedCondition resolved
     ) {
         Integer code = resolved.getWeatherCode();
-        if (!isPrecipitationCode(code)) return false;
+        if (!isAnyPrecipitationCode(code)) return false;
         String source = resolved.getSource().toLowerCase(Locale.US);
         return source.contains("current precipitation weather code")
                 || source.contains("corroborated")
@@ -146,25 +143,22 @@ public final class WeatherIntelligence2 {
     ) {
         switch (precipitationState) {
             case THUNDERSTORM_NOW:
-            case RAIN_NOW_CONFIRMED:
+            case PRECIPITATION_NOW_CONFIRMED:
             case WEAK_SIGNAL_UNCONFIRMED:
             case RAIN_LIKELY_SOON:
             case RAIN_POSSIBLE_SOON:
             case RAIN_LIKELY_LATER:
+            case RAIN_POSSIBLE_LATER:
                 return precipitationSummary;
             default:
                 break;
         }
 
         double gust = value(current.getWindGusts10m());
-        if (gust >= 45d) {
-            return windSummary;
-        }
+        if (gust >= 45d) return windSummary;
 
         double visibility = value(current.getVisibility());
-        if (visibility > 0d && visibility < 3000d) {
-            return visibilitySummary;
-        }
+        if (visibility > 0d && visibility < 3000d) return visibilitySummary;
 
         double apparent = nullableValue(current.getApparentTemperature(), Double.NaN);
         if (!Double.isNaN(apparent) && (apparent >= 38d || apparent <= 5d)) {
@@ -172,11 +166,8 @@ public final class WeatherIntelligence2 {
         }
 
         if (resolved.getWeatherCode() != null && resolved.getWeatherCode() <= 1) {
-            return current.getIsDay() != null && current.getIsDay() == 0
-                    ? "Mostly clear now. " + pressureSummary
-                    : "Mostly clear now. " + pressureSummary;
+            return "Mostly clear now. " + pressureSummary;
         }
-
         return "Current conditions are fairly steady. " + pressureSummary;
     }
 
@@ -190,14 +181,19 @@ public final class WeatherIntelligence2 {
         switch (state) {
             case THUNDERSTORM_NOW:
                 return "Thunderstorm classification is active now in the weather model. Check official alerts and Radar for local context.";
-            case RAIN_NOW_CONFIRMED:
-                if (resolved.getPrecipitationSignalMm() > 0d) {
-                    return "Rain/showers are indicated now by the current or corroborated short-term model signal ("
-                            + WeatherFormatter.precipitation(resolved.getPrecipitationSignalMm()) + ").";
+            case PRECIPITATION_NOW_CONFIRMED:
+                if (isSnowCode(resolved.getWeatherCode())) {
+                    return resolved.getPrecipitationSignalMm() > 0d
+                            ? "Snow is indicated now by the current or corroborated short-term model signal ("
+                            + WeatherFormatter.precipitation(resolved.getPrecipitationSignalMm()) + " water-equivalent signal)."
+                            : "Snow is classified now by the current weather model.";
                 }
-                return "Rain/showers are classified now by the current weather model.";
+                return resolved.getPrecipitationSignalMm() > 0d
+                        ? "Rain/showers are indicated now by the current or corroborated short-term model signal ("
+                        + WeatherFormatter.precipitation(resolved.getPrecipitationSignalMm()) + ")."
+                        : "Rain/showers are classified now by the current weather model.";
             case WEAK_SIGNAL_UNCONFIRMED:
-                return "A weak precipitation signal exists near the current model interval, but it is not strong enough to say rain is falling at your exact location now.";
+                return "A weak precipitation signal exists near the current model interval, but it is not strong enough to say precipitation is falling at your exact location now.";
             case RAIN_LIKELY_SOON:
                 return "It is not confirmed raining now. Rain becomes likely "
                         + relativeTime(forecast) + probabilitySuffix(forecast) + ".";
@@ -211,9 +207,8 @@ public final class WeatherIntelligence2 {
                 return "No confirmed rain now. There is a possible rain window later "
                         + relativeTime(forecast) + probabilitySuffix(forecast) + ".";
             case DRY_NOW:
-                double currentPrecip = value(current.getPrecipitation());
-                return currentPrecip > 0d
-                        ? "No confirmed rain at the current location; a small model precipitation amount is present but is not corroborated as rain now."
+                return value(current.getPrecipitation()) > 0d
+                        ? "No confirmed precipitation at the current location; a small model amount is present but is not corroborated as precipitation now."
                         : "No confirmed precipitation now and no strong rain window is detected in the next several hours.";
             case UNKNOWN:
             default:
@@ -256,15 +251,10 @@ public final class WeatherIntelligence2 {
         }
 
         if (dewPoint != null) {
-            if (dewPoint >= 24d) {
-                builder.append(" · very muggy moisture level");
-            } else if (dewPoint >= 20d) {
-                builder.append(" · humid/muggy moisture level");
-            } else if (dewPoint >= 16d) {
-                builder.append(" · moderately humid");
-            } else if (dewPoint < 10d) {
-                builder.append(" · relatively dry air");
-            }
+            if (dewPoint >= 24d) builder.append(" · very muggy moisture level");
+            else if (dewPoint >= 20d) builder.append(" · humid/muggy moisture level");
+            else if (dewPoint >= 16d) builder.append(" · moderately humid");
+            else if (dewPoint < 10d) builder.append(" · relatively dry air");
         } else if (humidity != null && humidity >= 80d) {
             builder.append(" · high relative humidity");
         }
@@ -280,26 +270,20 @@ public final class WeatherIntelligence2 {
     private static String windSummary(@NonNull WeatherResponse.CurrentWeather current) {
         Double speedValue = current.getWindSpeed10m();
         Double gustValue = current.getWindGusts10m();
-        String speed = WeatherFormatter.wind(speedValue);
-        String gust = WeatherFormatter.wind(gustValue);
-        String direction = WeatherFormatter.windDirection(current.getWindDirection10m());
-
         double speedRaw = value(speedValue);
         double gustRaw = value(gustValue);
-        String character;
-        if (gustRaw >= 60d) {
-            character = "Strong gusts";
-        } else if (gustRaw - speedRaw >= 20d || (speedRaw > 0d && gustRaw / speedRaw >= 1.7d)) {
-            character = "Gusty wind";
-        } else if (speedRaw >= 30d) {
-            character = "Strong/breezy wind";
-        } else if (speedRaw >= 15d) {
-            character = "Breezy";
-        } else {
-            character = "Light wind";
-        }
 
-        return character + " from " + direction + " · sustained " + speed + " · gusts " + gust + ".";
+        String character;
+        if (gustRaw >= 60d) character = "Strong gusts";
+        else if (gustRaw - speedRaw >= 20d || (speedRaw > 0d && gustRaw / speedRaw >= 1.7d)) {
+            character = "Gusty wind";
+        } else if (speedRaw >= 30d) character = "Strong/breezy wind";
+        else if (speedRaw >= 15d) character = "Breezy";
+        else character = "Light wind";
+
+        return character + " from " + WeatherFormatter.windDirection(current.getWindDirection10m())
+                + " · sustained " + WeatherFormatter.wind(speedValue)
+                + " · gusts " + WeatherFormatter.wind(gustValue) + ".";
     }
 
     @NonNull
@@ -308,20 +292,13 @@ public final class WeatherIntelligence2 {
             @Nullable Integer resolvedCode
     ) {
         Double meters = current.getVisibility();
-        if (meters == null) {
-            return "Visibility interpretation is unavailable.";
-        }
+        if (meters == null) return "Visibility interpretation is unavailable.";
 
         String level;
-        if (meters <= 1000d) {
-            level = "Very low visibility";
-        } else if (meters <= 3000d) {
-            level = "Low visibility";
-        } else if (meters <= 10000d) {
-            level = "Moderate visibility";
-        } else {
-            level = "Good visibility";
-        }
+        if (meters <= 1000d) level = "Very low visibility";
+        else if (meters <= 3000d) level = "Low visibility";
+        else if (meters <= 10000d) level = "Moderate visibility";
+        else level = "Good visibility";
 
         boolean fogCode = resolvedCode != null && (resolvedCode == 45 || resolvedCode == 48);
         if (fogCode) {
@@ -393,12 +370,8 @@ public final class WeatherIntelligence2 {
             @NonNull WeatherResponse response
     ) {
         String source = resolved.getSource().toLowerCase(Locale.US);
-        if (source.contains("weak precipitation signal unconfirmed")) {
-            return ConfidenceLevel.LIMITED;
-        }
-        if (source.contains("corroborated")) {
-            return ConfidenceLevel.HIGHER;
-        }
+        if (source.contains("weak precipitation signal unconfirmed")) return ConfidenceLevel.LIMITED;
+        if (source.contains("corroborated")) return ConfidenceLevel.HIGHER;
         if (source.contains("current precipitation weather code")
                 && response.getMinutely15() != null
                 && response.getMinutely15().getTime() != null
@@ -409,9 +382,7 @@ public final class WeatherIntelligence2 {
     }
 
     @NonNull
-    private static ForecastPrecipitation findForecastPrecipitation(
-            @NonNull WeatherResponse response
-    ) {
+    private static ForecastPrecipitation findForecastRain(@NonNull WeatherResponse response) {
         WeatherResponse.HourlyWeather hourly = response.getHourly();
         if (hourly == null || hourly.getTime() == null || hourly.getTime().isEmpty()) {
             return ForecastPrecipitation.NONE;
@@ -429,12 +400,12 @@ public final class WeatherIntelligence2 {
 
             double chance = value(probability);
             double precip = value(amount);
-            boolean codeWet = isPrecipitationCode(code);
+            boolean codeWet = isRainForecastCode(code);
             boolean likely = chance >= LIKELY_RAIN_PROBABILITY
                     && (codeWet || precip >= 0.05d || chance >= 75d);
             boolean possible = chance >= POSSIBLE_RAIN_PROBABILITY
                     || (codeWet && precip >= 0.05d)
-                    || precip >= MEANINGFUL_HOURLY_PRECIP_MM;
+                    || (codeWet && precip >= MEANINGFUL_HOURLY_PRECIP_MM);
 
             if (!possible) continue;
 
@@ -473,13 +444,25 @@ public final class WeatherIntelligence2 {
         return "";
     }
 
-    private static boolean isPrecipitationCode(@Nullable Integer code) {
+    private static boolean isAnyPrecipitationCode(@Nullable Integer code) {
         return code != null && (
                 (code >= 51 && code <= 67)
                         || (code >= 71 && code <= 77)
                         || (code >= 80 && code <= 86)
                         || code >= 95
         );
+    }
+
+    private static boolean isRainForecastCode(@Nullable Integer code) {
+        return code != null && (
+                (code >= 51 && code <= 67)
+                        || (code >= 80 && code <= 82)
+                        || code >= 95
+        );
+    }
+
+    private static boolean isSnowCode(@Nullable Integer code) {
+        return code != null && ((code >= 71 && code <= 77) || code == 85 || code == 86);
     }
 
     private static double value(@Nullable Double value) {
@@ -604,7 +587,7 @@ public final class WeatherIntelligence2 {
         @NonNull public LiveConditionResolver.ResolvedCondition getResolvedCondition() { return resolvedCondition; }
 
         public boolean isPrecipitationNowConfirmed() {
-            return precipitationState == PrecipitationState.RAIN_NOW_CONFIRMED
+            return precipitationState == PrecipitationState.PRECIPITATION_NOW_CONFIRMED
                     || precipitationState == PrecipitationState.THUNDERSTORM_NOW;
         }
     }
