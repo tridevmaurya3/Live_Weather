@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="phase16_units_title">Weather units</string>
+    <string name="phase16_units_metric">Metric · °C · km/h · hPa · mm · km</string>
+    <string name="phase16_units_imperial">Imperial · °F · mph · inHg · in · mi</string>
+    <string name="phase16_units_custom">Customize individual units…</string>
+    <string name="phase16_custom_units_title">Customize units</string>
+    <string name="phase16_temperature_row">Temperature · %1$s</string>
+    <string name="phase16_wind_row">Wind · %1$s</string>
+    <string name="phase16_pressure_row">Pressure · %1$s</string>
+    <string name="phase16_precip_row">Rain / precipitation · %1$s</string>
+    <string name="phase16_distance_row">Visibility / distance · %1$s</string>
+    <string name="phase16_temperature_title">Temperature unit</string>
+    <string name="phase16_wind_title">Wind unit</string>
+    <string name="phase16_pressure_title">Pressure unit</string>
+    <string name="phase16_precipitation_title">Precipitation unit</string>
+    <string name="phase16_distance_title">Visibility / distance unit</string>
+    <string name="phase16_units_applied">Units updated · %1$s</string>
+    <string name="phase16_units_accessibility">Open weather unit settings</string>
+
+    <string name="phase16_performance_title">Performance mode</string>
+    <string name="phase16_performance_auto">Auto · balances smoothness and battery automatically</string>
+    <string name="phase16_performance_smooth">Smooth · prefers the highest supported animation rate</string>
+    <string name="phase16_performance_battery">Battery · reduces live-scene frame rate</string>
+    <string name="phase16_performance_summary">%1$s mode · tap to change</string>
+    <string name="phase16_performance_applied">Performance mode · %1$s</string>
+    <string name="phase16_performance_accessibility">Open live-scene performance settings</string>
+</resources>
