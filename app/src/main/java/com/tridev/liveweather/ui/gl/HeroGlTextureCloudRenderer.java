@@ -94,11 +94,11 @@ public final class HeroGlTextureCloudRenderer {
             "  over(color,alpha,sprite(p,vec2(fract(0.72+drift*0.52),0.29),vec2(0.67,0.24),farCell,(0.16+cover*0.24)*smoothstep(0.12,0.36,cover)),tint*1.04);",
             "  over(color,alpha,sprite(p,vec2(fract(0.33+drift*0.82),0.37),vec2(0.94,0.40),cell,(0.30+cover*0.48)*smoothstep(0.18,0.52,cover)),tint);",
             "  over(color,alpha,sprite(p,vec2(fract(0.86+drift*0.88),0.43),vec2(0.88,0.38),cell,(0.28+cover*0.46)*smoothstep(0.30,0.62,cover)),tint*0.94);",
-            "  over(color,alpha,sprite(p,vec2(fract(0.55+drift*1.18),0.51),vec2(1.02,0.46),cell,(0.26+cover*0.54)*smoothstep(0.45,0.76,cover)),tint*0.88);"
+            "  over(color,alpha,sprite(p,vec2(fract(0.55+drift*1.18),0.51),vec2(1.02,0.46),cell,(0.26+cover*0.54)*smoothstep(0.45,0.76,cover)),tint*0.88);",
             "  float overcast=smoothstep(0.76,0.94,cover);",
             "  float sheet=(0.22+0.12*sin(p.x*10.0+uTime*0.026)+0.06*sin(p.x*23.0-uTime*0.017))*overcast;",
             "  color=mix(color,vec3(0.43,0.48,0.54)*shade,clamp(sheet,0.0,0.34));",
-            "  alpha=1.0-(1.0-alpha)*(1.0-clamp(sheet,0.0,0.34));"
+            "  alpha=1.0-(1.0-alpha)*(1.0-clamp(sheet,0.0,0.34));",
             "  gl_FragColor=vec4(clamp(color,0.0,1.0),clamp(alpha,0.0,0.94));",
             "}");
 
