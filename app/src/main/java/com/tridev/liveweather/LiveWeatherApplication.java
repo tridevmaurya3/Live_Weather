@@ -8,12 +8,13 @@ import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
 import com.tridev.liveweather.data.local.UnitPreferences;
+import com.tridev.liveweather.ui.forecast.ForecastProBinder;
 import com.tridev.liveweather.ui.settings.SettingsCardBinder;
 import com.tridev.liveweather.ui.weather.WeatherFormatter;
 import com.tridev.liveweather.widget.WeatherWidgetUpdater;
 import com.tridev.liveweather.widget.WidgetRefreshScheduler;
 
-/** Shared presentation + lightweight widget startup configuration. */
+/** Shared presentation + lightweight widget / forecast startup configuration. */
 public final class LiveWeatherApplication extends Application
         implements Application.ActivityLifecycleCallbacks {
 
@@ -30,6 +31,7 @@ public final class LiveWeatherApplication extends Application
     public void onActivityResumed(@NonNull Activity activity) {
         if (activity instanceof MainActivity) {
             SettingsCardBinder.bind(activity);
+            ForecastProBinder.bind((MainActivity) activity);
         }
     }
 
