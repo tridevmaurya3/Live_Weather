@@ -95,7 +95,18 @@ Implemented:
 
 Acceptance checkpoint: test hourly chip/chart/timeline synchronization, daily expansion, Sun/Moon events, Phase 16 units, small-screen chart readability and offline/loading states.
 
-## Phase 20 — Radar Pro
+## Phase 20A — Accurate Live Weather Reality Foundation
+
+Status: IMPLEMENTATION STARTED — real-device visual verification pending.
+
+- Accurate current-condition truth remains the authority for every visual layer
+- Organic multi-scale cloud renderer shared by app and Live Wallpaper
+- Real wind direction plus bounded gust response for atmospheric motion
+- Cloud/rain/storm/Sun/Moon/stars/fog/snow/haze acceptance on real devices
+- No square/grid cloud artifacts and no future probability presented as current weather
+- See PHASE_20A_ACCURATE_LIVE_REALITY.md for checkpoint and acceptance details
+
+## Phase 20B — Radar Pro
 
 - Layer controls polish
 - Clear legend for Rain / Clouds / Wind / Temperature

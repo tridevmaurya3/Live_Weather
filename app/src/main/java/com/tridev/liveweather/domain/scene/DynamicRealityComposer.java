@@ -57,10 +57,21 @@ public final class DynamicRealityComposer {
         double windSpeed = current == null || current.getWindSpeed10m() == null
                 ? 0d
                 : Math.max(0d, current.getWindSpeed10m());
+        double windGust = current == null || current.getWindGusts10m() == null
+                ? windSpeed
+                : Math.max(windSpeed, current.getWindGusts10m());
         double windDirection = current == null || current.getWindDirection10m() == null
                 ? 0d
                 : current.getWindDirection10m();
-        double windStrength = clamp(windSpeed / 65d, 0d, 1d);
+
+        /*
+         * Phase 20A motion contract: sustained wind owns the basic drift while
+         * real gusts add limited turbulence. A gust cannot invent a storm, but
+         * visible cloud/rain motion must not stay calm during a verified squall.
+         */
+        double sustainedMotion = clamp(windSpeed / 58d, 0d, 1d);
+        double gustMotion = clamp((windGust - windSpeed) / 42d, 0d, 1d);
+        double windStrength = clamp(sustainedMotion * 0.82d + gustMotion * 0.28d, 0d, 1d);
 
         double precipSignal = Math.max(0d, condition.getPrecipitationSignalMm());
         double currentRain = current == null || current.getRain() == null ? 0d : current.getRain();
