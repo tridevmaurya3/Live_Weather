@@ -2,9 +2,11 @@
 <appwidget-provider xmlns:android="http://schemas.android.com/apk/res/android"
     android:minWidth="300dp"
     android:minHeight="150dp"
-    android:minResizeWidth="260dp"
-    android:minResizeHeight="130dp"
+    android:minResizeWidth="240dp"
+    android:minResizeHeight="112dp"
     android:updatePeriodMillis="0"
     android:initialLayout="@layout/widget_weather_wide"
+    android:configure="com.tridev.liveweather.widget.WidgetConfigActivity"
     android:resizeMode="horizontal|vertical"
+    android:widgetFeatures="reconfigurable"
     android:widgetCategory="home_screen" />
