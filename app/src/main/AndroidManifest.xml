@@ -36,6 +36,15 @@
             </intent-filter>
         </activity>
 
+        <activity
+            android:name=".widget.WidgetConfigActivity"
+            android:excludeFromRecents="true"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_CONFIGURE" />
+            </intent-filter>
+        </activity>
+
         <service
             android:name=".wallpaper.LiveWeatherWallpaperService"
             android:exported="true"
@@ -49,6 +58,10 @@
                 android:name="android.service.wallpaper"
                 android:resource="@xml/live_weather_wallpaper" />
         </service>
+
+        <receiver
+            android:name=".widget.WeatherWidgetActionReceiver"
+            android:exported="false" />
 
         <receiver
             android:name=".widget.CompactWeatherWidgetProvider"
