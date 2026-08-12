@@ -1,7 +1,9 @@
 package com.tridev.liveweather.ui.weather;
 
+import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
+import com.tridev.liveweather.data.local.UnitPreferences;
 import com.tridev.liveweather.data.remote.dto.WeatherResponse;
 
 import java.time.Instant;
@@ -14,7 +16,11 @@ import java.util.List;
 import java.util.Locale;
 
 /**
- * Formatting and WMO weather interpretation helpers used by Phase 2 screens.
+ * Shared weather formatting and WMO interpretation helpers.
+ *
+ * Phase 16 keeps provider/cache values metric and converts only at the final
+ * presentation boundary. The active unit set is configured once by the
+ * Application and refreshed immediately when the user changes Units settings.
  */
 public final class WeatherFormatter {
 
@@ -25,27 +31,111 @@ public final class WeatherFormatter {
     private static final DateTimeFormatter UPDATED_FORMATTER =
             DateTimeFormatter.ofPattern("h:mm a", Locale.getDefault());
 
+    @NonNull
+    private static volatile UnitPreferences.Units activeUnits = UnitPreferences.metric();
+
     private WeatherFormatter() {
     }
 
+    public static void configure(@NonNull UnitPreferences.Units units) {
+        activeUnits = units;
+    }
+
+    @NonNull
+    public static UnitPreferences.Units getActiveUnits() {
+        return activeUnits;
+    }
+
+    @Nullable
+    public static Double temperatureValue(@Nullable Double celsius) {
+        if (celsius == null) return null;
+        return activeUnits.getTemperature() == UnitPreferences.TemperatureUnit.FAHRENHEIT
+                ? celsius * 9d / 5d + 32d
+                : celsius;
+    }
+
     public static String temperature(@Nullable Double value) {
-        return value == null ? "—°" : Math.round(value) + "°";
+        Double converted = temperatureValue(value);
+        return converted == null ? "—°" : Math.round(converted) + "°";
+    }
+
+    public static String temperatureUnitSymbol() {
+        return activeUnits.getTemperature() == UnitPreferences.TemperatureUnit.FAHRENHEIT
+                ? "°F"
+                : "°C";
     }
 
     public static String percent(@Nullable Double value) {
         return value == null ? "—" : Math.round(value) + "%";
     }
 
+    @Nullable
+    public static Double windValue(@Nullable Double kilometresPerHour) {
+        if (kilometresPerHour == null) return null;
+        return activeUnits.getWind() == UnitPreferences.WindUnit.MPH
+                ? kilometresPerHour * 0.6213711922d
+                : kilometresPerHour;
+    }
+
     public static String wind(@Nullable Double value) {
-        return value == null
-                ? "—"
-                : String.format(Locale.getDefault(), "%.0f km/h", value);
+        Double converted = windValue(value);
+        if (converted == null) return "—";
+        String suffix = activeUnits.getWind() == UnitPreferences.WindUnit.MPH
+                ? "mph"
+                : "km/h";
+        return String.format(Locale.getDefault(), "%.0f %s", converted, suffix);
+    }
+
+    @Nullable
+    public static Double precipitationValue(@Nullable Double millimetres) {
+        if (millimetres == null) return null;
+        return activeUnits.getPrecipitation() == UnitPreferences.PrecipitationUnit.INCH
+                ? millimetres / 25.4d
+                : millimetres;
     }
 
     public static String precipitation(@Nullable Double value) {
-        return value == null
-                ? "—"
-                : String.format(Locale.getDefault(), "%.1f mm", value);
+        Double converted = precipitationValue(value);
+        if (converted == null) return "—";
+        if (activeUnits.getPrecipitation() == UnitPreferences.PrecipitationUnit.INCH) {
+            return String.format(Locale.getDefault(), "%.2f in", converted);
+        }
+        return String.format(Locale.getDefault(), "%.1f mm", converted);
+    }
+
+    @Nullable
+    public static Double pressureValue(@Nullable Double hectopascals) {
+        if (hectopascals == null) return null;
+        return activeUnits.getPressure() == UnitPreferences.PressureUnit.INHG
+                ? hectopascals * 0.0295299830714d
+                : hectopascals;
+    }
+
+    public static String pressure(@Nullable Double hectopascals) {
+        Double converted = pressureValue(hectopascals);
+        if (converted == null) return "—";
+        if (activeUnits.getPressure() == UnitPreferences.PressureUnit.INHG) {
+            return String.format(Locale.getDefault(), "%.2f inHg", converted);
+        }
+        return String.format(Locale.getDefault(), "%.0f hPa", converted);
+    }
+
+    @Nullable
+    public static Double distanceValueFromMeters(@Nullable Double meters) {
+        if (meters == null) return null;
+        double kilometres = meters / 1000d;
+        return activeUnits.getDistance() == UnitPreferences.DistanceUnit.MILE
+                ? kilometres * 0.6213711922d
+                : kilometres;
+    }
+
+    public static String visibilityDistance(@Nullable Double meters) {
+        Double converted = distanceValueFromMeters(meters);
+        if (converted == null) return "—";
+        String suffix = activeUnits.getDistance() == UnitPreferences.DistanceUnit.MILE
+                ? "mi"
+                : "km";
+        return String.format(Locale.getDefault(), "%.1f %s", converted, suffix);
     }
 
     public static String coordinates(double latitude, double longitude) {
