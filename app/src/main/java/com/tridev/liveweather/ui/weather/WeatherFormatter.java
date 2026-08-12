@@ -17,10 +17,7 @@ import java.util.Locale;
 
 /**
  * Shared weather formatting and WMO interpretation helpers.
- *
- * Phase 16 keeps provider/cache values metric and converts only at the final
- * presentation boundary. The active unit set is configured once by the
- * Application and refreshed immediately when the user changes Units settings.
+ * Provider/cache values remain metric; Phase 16 converts only at presentation.
  */
 public final class WeatherFormatter {
 
@@ -72,18 +69,34 @@ public final class WeatherFormatter {
     @Nullable
     public static Double windValue(@Nullable Double kilometresPerHour) {
         if (kilometresPerHour == null) return null;
-        return activeUnits.getWind() == UnitPreferences.WindUnit.MPH
-                ? kilometresPerHour * 0.6213711922d
-                : kilometresPerHour;
+        switch (activeUnits.getWind()) {
+            case MPH:
+                return kilometresPerHour * 0.6213711922d;
+            case MPS:
+                return kilometresPerHour / 3.6d;
+            case KNOT:
+                return kilometresPerHour * 0.539956803d;
+            case KMH:
+            default:
+                return kilometresPerHour;
+        }
     }
 
     public static String wind(@Nullable Double value) {
         Double converted = windValue(value);
         if (converted == null) return "—";
-        String suffix = activeUnits.getWind() == UnitPreferences.WindUnit.MPH
-                ? "mph"
-                : "km/h";
-        return String.format(Locale.getDefault(), "%.0f %s", converted, suffix);
+
+        switch (activeUnits.getWind()) {
+            case MPH:
+                return String.format(Locale.getDefault(), "%.0f mph", converted);
+            case MPS:
+                return String.format(Locale.getDefault(), "%.1f m/s", converted);
+            case KNOT:
+                return String.format(Locale.getDefault(), "%.0f kn", converted);
+            case KMH:
+            default:
+                return String.format(Locale.getDefault(), "%.0f km/h", converted);
+        }
     }
 
     @Nullable
@@ -114,10 +127,15 @@ public final class WeatherFormatter {
     public static String pressure(@Nullable Double hectopascals) {
         Double converted = pressureValue(hectopascals);
         if (converted == null) return "—";
-        if (activeUnits.getPressure() == UnitPreferences.PressureUnit.INHG) {
-            return String.format(Locale.getDefault(), "%.2f inHg", converted);
+        switch (activeUnits.getPressure()) {
+            case INHG:
+                return String.format(Locale.getDefault(), "%.2f inHg", converted);
+            case MBAR:
+                return String.format(Locale.getDefault(), "%.0f mbar", converted);
+            case HPA:
+            default:
+                return String.format(Locale.getDefault(), "%.0f hPa", converted);
         }
-        return String.format(Locale.getDefault(), "%.0f hPa", converted);
     }
 
     @Nullable
