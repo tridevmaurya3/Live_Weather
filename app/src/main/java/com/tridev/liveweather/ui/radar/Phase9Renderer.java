@@ -23,6 +23,7 @@ import com.google.gson.Gson;
 import com.tridev.liveweather.R;
 import com.tridev.liveweather.data.remote.dto.RadarFieldPointResponse;
 import com.tridev.liveweather.data.remote.dto.RainViewerResponse;
+import com.tridev.liveweather.ui.weather.WeatherFormatter;
 
 import java.time.Instant;
 import java.time.ZoneOffset;
@@ -102,9 +103,6 @@ public final class Phase9Renderer {
         recenterButton = activity.findViewById(R.id.radarRecenterButton);
         timelineSeek = activity.findViewById(R.id.radarTimelineSeek);
 
-        // Important performance contract: the XML contains no WebView. Chromium is
-        // created only when this renderer is constructed after the Radar tab becomes
-        // visible. This keeps app startup/Home free from WebView process + GPU cost.
         mapWebView = new WebView(activity);
         FrameLayout.LayoutParams mapParams = new FrameLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
@@ -427,9 +425,13 @@ public final class Phase9Renderer {
             item.put("lat", point.getLatitude());
             item.put("lon", point.getLongitude());
             RadarFieldPointResponse.Current current = point.getCurrent();
-            item.put("temperature", current == null ? null : current.getTemperature2m());
+            Double temperature = current == null ? null : current.getTemperature2m();
+            Double windSpeed = current == null ? null : current.getWindSpeed10m();
+            item.put("temperature", temperature);
+            item.put("temperatureLabel", temperature == null ? "--" : WeatherFormatter.temperature(temperature));
             item.put("cloud", current == null ? null : current.getCloudCover());
-            item.put("windSpeed", current == null ? null : current.getWindSpeed10m());
+            item.put("windSpeed", windSpeed);
+            item.put("windLabel", windSpeed == null ? "--" : WeatherFormatter.wind(windSpeed));
             item.put("windDirection", current == null ? null : current.getWindDirection10m());
             field.add(item);
         }
