@@ -6,19 +6,24 @@ This document is the forward roadmap after the Phase 15 production-foundation pa
 
 ## Phase 16 — Settings & Units Pro
 
-Confirmed pending work:
-- Temperature unit: Celsius / Fahrenheit
-- Wind unit: km/h / mph / m/s / knots
-- Pressure unit: hPa / mbar / inHg
-- Precipitation unit: mm / inch
-- Visibility unit: km / miles
-- Persistent unit preferences
-- Apply units consistently across Home, Forecast, Details, Widgets, Alerts and Radar labels
-- Functional Performance selector: Auto / Smooth / Battery
-- Real current-mode summary on More page
-- Settings UI instead of static cards
+Status: IMPLEMENTED — device verification pending.
 
-Acceptance: changing one unit must update every relevant screen/widget consistently without changing provider data internally.
+Implemented:
+- Temperature: Celsius / Fahrenheit
+- Wind: km/h / mph / m/s / knots
+- Pressure: hPa / mbar / inHg
+- Precipitation: mm / inch
+- Visibility: km / miles
+- Persistent UnitPreferences
+- Metric and Imperial presets
+- Custom per-category unit selection
+- Consistent display conversion across Home, Forecast, Details, Widgets, Radar labels and Smart Risk messages
+- Forecast temperature chart unit conversion
+- Functional Performance selector: Auto / Smooth / Battery
+- Current Unit and Performance summaries on More page
+- Provider/cache/risk thresholds remain metric internally
+
+Acceptance checkpoint: clean/rebuild and real-device verification of Metric, Imperial, custom units, widget repaint, Radar labels and Performance modes.
 
 ## Phase 17 — Widget Pro
 
