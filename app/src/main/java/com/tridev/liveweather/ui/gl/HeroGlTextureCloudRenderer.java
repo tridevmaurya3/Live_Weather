@@ -85,7 +85,7 @@ public final class HeroGlTextureCloudRenderer {
             "  // Android bitmap upload flips the generated atlas rows in GL space.",
             "  // Indices below deliberately map visual bottom row to logical weather types.",
             "  float cell=uStorm>0.08?2.0:(uRain>0.06?1.0:(uCloud>0.78?0.0:(uCloud>0.52?7.0:(uCloud>0.25?6.0:5.0))));",
-            "  float farCell=uCloud>0.68?0.0:(uCloud>0.32?7.0:4.0);"
+            "  float farCell=uCloud>0.68?0.0:(uCloud>0.32?7.0:4.0);",
             "  float shade=mix(1.0,0.48,clamp(uStorm*0.82+uRain*0.25+(1.0-uBrightness)*0.20,0.0,1.0));",
             "  vec3 tint=vec3(shade*0.96,shade*0.99,shade*1.03);",
             "  vec3 color=vec3(0.0);float alpha=0.0;",
