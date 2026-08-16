@@ -22,6 +22,8 @@ import java.util.List;
 
 public final class WeatherAlertRefreshWorker extends Worker {
 
+    private static final long SMART_WEATHER_MAX_AGE_MILLIS = 90L * 60L * 1000L;
+
     public WeatherAlertRefreshWorker(
             @NonNull Context appContext,
             @NonNull WorkerParameters workerParams
@@ -33,6 +35,17 @@ public final class WeatherAlertRefreshWorker extends Worker {
     @Override
     public Result doWork() {
         Context context = getApplicationContext();
+        AlertPreferences preferences = new AlertPreferences(context);
+        AlertNotificationManager notificationManager = new AlertNotificationManager(context);
+
+        // The periodic worker exists only for background notification delivery.
+        // Exit before cache parsing/network work when delivery is disabled or blocked.
+        if (!preferences.isNotificationsEnabled()
+                || !preferences.isAnyNotificationSourceEnabled()
+                || !notificationManager.canPostNotifications()) {
+            return Result.success();
+        }
+
         WeatherCache.CachedWeather cachedWeather = new WeatherCache(context).load();
         if (cachedWeather == null || cachedWeather.getWeather() == null) {
             return Result.success();
@@ -40,15 +53,31 @@ public final class WeatherAlertRefreshWorker extends Worker {
 
         try {
             long now = System.currentTimeMillis();
-            List<WeatherAlert> smart = SmartAlertEngine.build(cachedWeather.getWeather());
-            AlertPreferences preferences = new AlertPreferences(context);
+            long weatherAge = cachedWeather.getSavedAt() <= 0L
+                    ? Long.MAX_VALUE
+                    : Math.max(0L, now - cachedWeather.getSavedAt());
+
+            boolean smartDeliveryEnabled = preferences.isSmartRiskEnabled()
+                    && preferences.isSmartNotificationsEnabled()
+                    && notificationManager.isSmartChannelEnabled();
+            List<WeatherAlert> smart = smartDeliveryEnabled
+                    && weatherAge <= SMART_WEATHER_MAX_AGE_MILLIS
+                    ? SmartAlertEngine.build(cachedWeather.getWeather())
+                    : new ArrayList<>();
+
             AlertLocation alertLocation = preferences.loadLocation();
             List<WeatherAlert> official = new ArrayList<>();
             AlertTruthPolicy.OfficialDelivery officialDelivery =
                     AlertTruthPolicy.OfficialDelivery.UNAVAILABLE;
             long officialSavedAt = 0L;
 
-            if (alertLocation != null && !alertLocation.isIndia()) {
+            boolean officialDeliveryEnabled = preferences.isOfficialAlertsEnabled()
+                    && preferences.isOfficialNotificationsEnabled()
+                    && notificationManager.isOfficialChannelEnabled();
+
+            if (!officialDeliveryEnabled) {
+                officialDelivery = AlertTruthPolicy.OfficialDelivery.NOT_APPLICABLE;
+            } else if (alertLocation != null && !alertLocation.isIndia()) {
                 officialDelivery = AlertTruthPolicy.OfficialDelivery.NOT_APPLICABLE;
             } else if (alertLocation != null
                     && close(alertLocation.getLatitude(), cachedWeather.getLatitude())
@@ -65,15 +94,11 @@ public final class WeatherAlertRefreshWorker extends Worker {
                             ? cachedAlerts.getEtag()
                             : capResult.getEtag();
 
-                    if (capResult.isNotModified()) {
-                        official = cachedAlerts.getAlerts();
-                    } else {
-                        official = capResult.getAlerts();
-                    }
+                    official = capResult.isNotModified()
+                            ? cachedAlerts.getAlerts()
+                            : capResult.getAlerts();
 
-                    // A successful 200 or 304 is a fresh validation of the
-                    // provider state. Save the validation time even if alert
-                    // content itself did not change.
+                    // Both 200 and 304 are a current provider validation.
                     alertCache.saveOfficial(
                             cachedWeather.getLatitude(),
                             cachedWeather.getLongitude(),
@@ -101,7 +126,7 @@ public final class WeatherAlertRefreshWorker extends Worker {
                     officialSavedAt,
                     now
             );
-            new AlertNotificationManager(context).notifyNewAlerts(candidates);
+            notificationManager.notifyNewAlerts(candidates);
             return Result.success();
         } catch (RuntimeException exception) {
             return Result.failure();
