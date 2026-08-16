@@ -1,182 +1,172 @@
 # Phase 25 — Product Completeness Audit
 
-Status: SOURCE IMPLEMENTATION COMPLETE — build/full real-device regression pending.
+Status: SOURCE IMPLEMENTATION COMPLETE — current project debug build passed; full real-device regression pending.
 
 ## Scope
 
-Phase 25 audits the product shell after the feature phases. It checks whether implemented capabilities are actually reachable, whether summary cards are functional rather than decorative placeholders, whether internal phase/development wording leaks into the user UI, and whether the five primary destinations form a coherent product.
+Phase 25 audits the complete product shell after the feature phases. It verifies that implemented capabilities are reachable, that action-looking cards actually act, that internal development/phase wording does not leak into the active product UI, and that the five primary destinations form one coherent weather product.
 
-This phase does not start the Phase 26 release gate and does not claim release readiness.
+This phase does not start the Phase 26 release gate and does not claim Final / Production Ready / Release Candidate status.
 
-## 25.1 — Primary destination audit
+## Primary destination audit
 
-The main navigation contains five product destinations:
+The main navigation exposes five real destinations through `MainActivity.renderDestination(...)`:
+
 - Home
 - Forecast
 - Radar
 - Wallpaper
 - More
 
-Source inspection confirms each destination has a real screen implementation and is switched by `MainActivity.renderDestination(...)` rather than being a placeholder route.
-
 ### Home
-Confirmed:
-- current weather hero and refresh action;
-- hourly forecast strip;
-- current detail cards;
-- Forecast, Radar, Air quality and Wallpaper actions;
-- live weather insight;
-- dynamic alert card insertion when relevant;
-- shared LiveSky background.
 
-The Home Forecast/Radar/Wallpaper actions are explicitly bound in `MainActivity`. Air quality opens the More destination and scrolls to the live AQI section.
+Verified source wiring:
+- current/saved weather hero and refresh flow;
+- hourly forecast and current detail cards;
+- Forecast, Radar and Wallpaper actions navigate through BottomNavigation;
+- Air quality action opens More and scrolls to the Air Quality Intelligence section;
+- dynamic alert banner opens the Alerts Center;
+- shared `LiveSkyView` remains the animated background path.
 
 ### Forecast
-Confirmed:
-- smart outlook;
-- shared animated sky;
-- interactive temperature/precipitation charts;
-- 24-hour selection flow;
+
+Verified:
+- Smart Outlook;
+- interactive hourly selection;
+- temperature and precipitation charts;
 - 10-day expandable forecast;
 - advanced weather details;
 - Sun/Moon/sky reality;
-- `ForecastProBinder` activation from `LiveWeatherApplication`.
+- `ForecastProBinder` is activated from `LiveWeatherApplication`.
 
 ### Radar
-Confirmed:
+
+Verified:
 - observed RainViewer radar path;
-- model Clouds/Wind/Temperature layers;
+- model Clouds / Wind / Temperature layers;
 - refresh and recenter actions;
-- layer controls;
-- observed timeline/playback;
-- freshness/source state;
-- local bundled Leaflet runtime;
+- observed timeline/replay;
+- source/freshness state;
+- bundled local Leaflet runtime;
 - lazy WebView lifecycle and provider/network tile-health handling.
 
 ### Wallpaper
-Confirmed:
+
+Verified:
 - real `LiveSkyView` preview;
-- rain/cloud/lightning/snow/fog/stars toggles;
-- adaptive FPS/battery option;
-- Apply action opening the Android Live Wallpaper flow;
-- same shared OpenGL reality pipeline as the in-app scene.
+- rain/cloud/lightning/snow/fog/stars controls;
+- battery-adaptive rendering option;
+- Apply action opens Android's Live Wallpaper flow;
+- preview and applied wallpaper share `GlRealityAdapter -> GlSceneSnapshot -> HeroGlPipeline`.
 
 ### More
-Confirmed:
-- Locations & Cities controls;
+
+Verified:
+- Locations & Cities search/save/use/remove/current-location controls;
 - Widgets action;
-- full dynamic Alerts Center;
-- full dynamic Air Quality section;
-- Units and Performance dialogs through `SettingsCardBinder`;
-- Data Reliability diagnostics through `DataReliabilityBinder`;
+- Weather Alerts Center;
+- Air Quality Intelligence;
+- Units and Performance dialogs;
+- Data Reliability diagnostics;
 - About/version information.
 
-## 25.2 — Static/placeholder-looking More cards fixed
+## Runtime binder integration
 
-The compact `Alerts` and `Air quality` cards in the More tools grid previously looked like actions but were not themselves wired.
+`AndroidManifest.xml` registers:
 
-Added `MorePageActionBinder`:
-- Alerts card now scrolls to `Weather Alerts Center`;
-- Air quality card now scrolls to `Air Quality Intelligence`;
-- cards are clickable/focusable and receive useful accessibility descriptions;
-- no duplicate network request is triggered by the navigation itself.
+`android:name=".LiveWeatherApplication"`
 
-Widgets already had a real pin/configuration action. Units and Performance already become interactive through `SettingsCardBinder`, so Phase 25 deliberately does not duplicate those listeners.
+`LiveWeatherApplication.onActivityResumed(...)` binds the active MainActivity to:
 
-## 25.3 — Binder/runtime integration verified
-
-`LiveWeatherApplication` is registered in `AndroidManifest.xml` via `android:name=".LiveWeatherApplication"`.
-
-Its `onActivityResumed(...)` binding path now includes:
 - `SettingsCardBinder`;
 - `ForecastProBinder`;
 - `DataReliabilityBinder`;
 - `MorePageActionBinder`;
 - `UiQualityPolicy`.
 
-This confirms these features are not merely source files with no runtime entry point.
+This confirms these features have runtime entry points and are not orphan source files.
 
-## 25.4 — Internal development wording removed from active UI
+## More-page action completeness
 
-Updated More-page product copy:
-- removed `controls still in development` wording;
-- removed `under active advanced development` wording;
-- removed `Development build` wording;
-- removed `ADVANCED DEVELOPMENT · ROADMAP ACTIVE` wording;
-- retained the verified app version `1.0.0` from Gradle configuration.
+`MorePageActionBinder` makes the compact Alerts and Air quality summary cards actionable:
+- Alerts scrolls to `Weather Alerts Center`;
+- Air quality scrolls to `Air Quality Intelligence`;
+- actions are clickable/focusable and have accessibility descriptions;
+- scrolling itself does not trigger a duplicate network refresh.
 
-Legacy status resource names are kept for source compatibility, but `MorePageActionBinder` replaces active user-facing legacy labels with product language:
-- Home footer → `LIVE CONDITIONS · FORECAST · RADAR · ALERTS`;
-- initial Forecast legacy footer → `LIVE FORECAST · HOURLY · 10-DAY · SKY` until live status takes ownership;
-- Wallpaper footer → `APP + LIVE WALLPAPER · SHARED WEATHER REALITY`.
+Widgets already has a real pin/configuration flow. Units and Performance already have their real settings dialogs through `SettingsCardBinder`, so Phase 25 does not add competing listeners.
 
-Live Forecast status is not overwritten after `WeatherScreenRenderer` has published real loading/live/saved/error state.
+## Product wording cleanup
 
-## 25.5 — Placeholder-state classification
+Active user-facing UI no longer presents development-roadmap language such as:
+- `still in development`;
+- `under active advanced development`;
+- `Development build`;
+- `ROADMAP ACTIVE`.
 
-The following are retained because they are legitimate empty/loading states rather than unfinished product placeholders:
-- `—` metric values before weather data exists;
-- `Waiting for live weather` / location waiting states;
-- forecast waiting states before provider data arrives;
-- Radar waiting/freshness text before the Radar page becomes visible or data is available;
-- saved/offline/stale labels;
-- no-results / no-saved-cities text.
+The More footer still uses a legacy resource name for compatibility, but its displayed value is product-facing:
 
-These states communicate actual data availability and should not be removed merely to make the UI look finished.
+`LIVE WEATHER · WEATHER, RADAR, ALERTS, WIDGETS & WALLPAPER`
 
-## 25.6 — Source-level missing-feature audit
+Runtime product status labels are:
+- Home: `LIVE CONDITIONS · FORECAST · RADAR · ALERTS`;
+- initial Forecast status: `LIVE FORECAST · HOURLY · 10-DAY · SKY` until live state owns the label;
+- Wallpaper: `APP + LIVE WALLPAPER · SHARED WEATHER REALITY`.
 
-Against the current master roadmap and five-destination product shell, no additional unbound primary page was found during this audit.
+Legitimate data states such as `—`, waiting, saved/offline/stale, unavailable and no-results are intentionally retained; they describe actual data availability and are not unfinished-product placeholders.
 
-The repository does not contain a separate original mockup/image artifact that can prove pixel-level fidelity against an external design reference. Therefore screenshot-level visual comparison remains a real-device/manual acceptance task rather than a source claim.
+## Version / package checkpoint
 
-## 25.7 — Product invariants preserved
+Verified from `app/build.gradle.kts`:
+- applicationId: `com.tridev.liveweather`;
+- minSdk: 26;
+- targetSdk: 36;
+- versionCode: 1;
+- versionName: `1.0.0`.
+
+More/About displays Version 1.0.0.
+
+## Product invariants preserved
 
 Phase 25 does not change:
-- weather provider truth;
+- weather-provider truth;
 - current-vs-forecast precipitation semantics;
 - Alert truth policy;
-- Radar observation/model truth boundaries;
-- cache/location identity rules;
-- shared Hero/Live Wallpaper renderer truth;
-- widget source isolation;
+- Radar observed/model boundaries;
+- cache/location identity;
+- fixed-widget isolation;
+- shared Hero/Live Wallpaper weather truth;
 - Phase 24 visual weather gating.
 
-## Source preflight
+## Repository-status cleanup
 
-Checked:
-- `MorePageActionBinder` references existing string resources and framework APIs only;
-- `LiveWeatherApplication` import and binder call match the new class package;
-- Manifest application registration is present;
-- versionName remains `1.0.0` in `app/build.gradle.kts`;
-- More product strings are valid XML and escape the ampersand in the capability footer;
-- no new branch was created;
-- all writes are on `main`.
+During the final Phase 25 pass, stale project-status documentation was found: `PHASE_STATUS.md` still stopped after Phase 8 and pointed to Phase 9 as the next phase, and `FINAL_RELEASE_STATUS.md` still listed work from Phases 16–25 as future work. Those status documents are being synchronized to the actual current roadmap without marking Phase 26 complete.
 
-## Real-device regression gate still required
+## Build checkpoint
 
-After pull/build, verify:
+The latest successful user debug-build checkpoint occurred after the Phase 25 source commits were already ancestors of `main`. Therefore the current Phase 25 Java/XML/resource integration has passed the project debug build gate.
 
-1. Home opens and renders current/saved weather without a `PHASE` footer.
-2. Home Forecast/Radar/Air quality/Wallpaper actions navigate correctly.
-3. Forecast hourly/chart/day selection remains interactive.
-4. Forecast status shows loading/live/saved/error truth rather than old phase wording.
-5. Radar opens, local Leaflet starts, layers/replay/recenter/refresh remain functional.
-6. Wallpaper preview and Apply flow work; no `A+B+C+D ACTIVE` wording appears.
-7. More → Widgets opens widget choice.
-8. More → Alerts card scrolls to Weather Alerts Center.
-9. More → Air quality card scrolls to Air Quality Intelligence.
-10. More → Units opens unit settings and repaints formatted weather after apply.
-11. More → Performance opens Auto/Smooth/Battery selection.
-12. Data Reliability diagnostics card is present and refresh works locally.
-13. Locations search/save/use/remove/current-location controls still work.
-14. More About shows product wording and Version 1.0.0 without development/roadmap language.
-15. Narrow phone, large font and TalkBack behavior remain acceptable after the new clickable More cards.
-16. Widget, alert notification, offline/cache and Live Wallpaper flows receive one smoke pass before Phase 26.
+This does **not** prove full real-device behavior across all flows and does not replace Phase 26 release validation.
+
+## Full real-device regression still required
+
+Before Phase 26 release approval, verify:
+
+1. Home current/saved weather and all four quick actions.
+2. Forecast hourly/chart/day interactions and truthful loading/live/saved/error states.
+3. Radar local Leaflet startup, layers, replay, recenter, refresh and weak/offline delivery state.
+4. Wallpaper preview/apply and shared weather parity.
+5. More Widgets, Alerts, Air quality, Units, Performance and Data Reliability actions.
+6. City search/save/use/remove/current-location controls.
+7. About/version copy and absence of internal development wording.
+8. Widget, alert notification and offline/cache smoke flows.
+9. Narrow-screen, large-text and TalkBack behavior.
+10. Home/Wallpaper OpenGL runtime behavior on the real device.
 
 ## Verification boundary
 
 - Phase 25 source implementation is complete on `main`.
-- No local Android Studio build or real-device regression for these final Phase 25 writes has been run from this environment.
+- Current project debug build has passed with the Phase 25 source included.
+- Full real-device regression is still pending.
 - Phase 26 has not started.
-- The project must not be called Final, Production Ready or Release Candidate until Phase 26 and explicit user approval.
+- The project must not be called Final, Complete, Production Ready or Release Candidate until Phase 26 and explicit user approval.
