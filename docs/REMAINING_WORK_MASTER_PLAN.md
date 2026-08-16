@@ -214,17 +214,25 @@ Acceptance checkpoint: Gradle Sync/debug build, online-to-offline restart, selec
 
 ## Phase 24 — Live Wallpaper Quality Backlog
 
-Current cross-device analytic renderer is stable and should not be repeatedly redesigned casually.
+Status: SOURCE IMPLEMENTATION COMPLETE — build/real-device visual acceptance pending.
 
-Only address this phase deliberately. Backlog includes:
-- Rain depth/naturalness
-- Wet-glass and surface-reflection quality
-- Storm/lightning quality
-- Cloud realism
-- Background-world realism
-- App preview vs applied wallpaper parity
+Implemented source checkpoints:
+- Shared `HeroGlTextureCloudRenderer` now uses cloud density as rendered mass, seamless horizontal wrapping, richer far/mid/near depth and continuous overcast shaping
+- Cloud gust response adds bounded cross-drift/lift without changing current cloud truth
+- Shared `HeroGlDepthRainRenderer` adds per-streak variation, stronger perspective/depth separation and wind sway
+- Wet-glass response adds gravity-moving droplets, short trails and restrained lower-film ripple only during sufficient current precipitation
+- Shared analytic world gains richer atmospheric terrain depth, deterministic foreground breakup and generic non-location-specific settlement silhouettes
+- Rain/drizzle-gated wet-ground sheen/reflections improve surface realism without implying a real road/lake/landmark
+- Storm renderer gains less repetitive strike placement, multi-frequency bolt geometry, detail-gated forks/companion channels and cloud-local electrical illumination
+- Lightning remains gated by resolved current storm state and the user lightning visual option; forecast probability cannot create lightning
+- Home/app LiveSky surfaces and Android Live Wallpaper continue to share `GlRealityAdapter -> GlSceneSnapshot -> HeroGlPipeline`
+- `CinematicPerformanceGovernor` keeps the same shader detail scale for APP_HERO and LIVE_WALLPAPER within each tier; surface differences are frame pacing only
+- Adaptive performance may remove secondary samples under load but cannot change weather truth
+- Existing hidden-surface zero-frame rule, renderer fault isolation, bounded EGL recovery and network-free render hot path are preserved
+- Source preflight fixed a world-shader `smoothstep` equal-edge corner case before freeze
+- See `PHASE_24_LIVE_WALLPAPER_QUALITY.md` for the full renderer contract and visual acceptance matrix
 
-The existing stable renderer remains the fallback checkpoint.
+Acceptance checkpoint: Gradle Sync/debug build plus real-phone comparison of dry, drizzle, heavy rain, storm/lightning, partly cloudy, overcast, high wind, day/night/twilight, fog/haze and Home Hero / Wallpaper preview / applied Live Wallpaper parity across Auto/Smooth/Battery modes.
 
 ## Phase 25 — Product Completeness Audit
 
