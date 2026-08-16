@@ -13,12 +13,14 @@ import android.widget.LinearLayout;
 import android.widget.TextView;
 
 import androidx.annotation.NonNull;
+import androidx.core.content.ContextCompat;
 import androidx.core.view.ViewCompat;
 import androidx.core.widget.NestedScrollView;
 import androidx.core.widget.TextViewCompat;
 
 import com.tridev.liveweather.R;
 
+import java.util.Locale;
 import java.util.WeakHashMap;
 
 /**
@@ -58,6 +60,7 @@ public final class UiQualityPolicy {
         if (content == null) return;
         applyResponsivePageGeometry(activity);
         applyKnownSemantics(activity);
+        applyStatusPresentation(activity);
         auditTree(content);
     }
 
@@ -186,8 +189,6 @@ public final class UiQualityPolicy {
                 "Active weather location. Tap to change the saved city or request device location.");
         describe(activity, R.id.homeRefreshAction,
                 "Refresh current weather, air quality and weather alerts.");
-        describe(activity, R.id.homeSyncStatus,
-                "Weather data status. Tap to refresh current weather, air quality and alerts.");
         describe(activity, R.id.homeForecastAction,
                 "Open detailed hourly and ten day forecast.");
         describe(activity, R.id.homeRadarAction,
@@ -196,9 +197,6 @@ public final class UiQualityPolicy {
                 "Open air quality details.");
         describe(activity, R.id.homeWallpaperAction,
                 "Open live wallpaper controls.");
-
-        describe(activity, R.id.forecastStatus,
-                "Forecast data status. Tap to refresh forecast, air quality and alerts.");
 
         describe(activity, R.id.radarRefreshButton,
                 "Refresh observed radar metadata and current model overlay data.");
@@ -217,7 +215,6 @@ public final class UiQualityPolicy {
 
         describe(activity, R.id.applyWallpaperButton,
                 "Open Android live wallpaper preview and apply screen.");
-
         describe(activity, R.id.cityUseCurrentButton,
                 "Use current device location for weather.");
         describe(activity, R.id.citySearchButton,
@@ -233,6 +230,57 @@ public final class UiQualityPolicy {
         hideFromAccessibility(activity.findViewById(R.id.forecastLiveSkyView));
         hideFromAccessibility(activity.findViewById(R.id.wallpaperLiveSkyView));
         hideFromAccessibility(activity.findViewById(R.id.appLiveNatureBackground));
+    }
+
+    private static void applyStatusPresentation(@NonNull Activity activity) {
+        styleStatus(activity, R.id.homeSyncStatus, true,
+                "Weather data status. Tap to refresh current weather, air quality and alerts.");
+        styleStatus(activity, R.id.forecastStatus, true,
+                "Forecast data status. Tap to refresh forecast, air quality and alerts.");
+        styleStatus(activity, R.id.radarStatusValue, false,
+                "Radar data status.");
+        styleStatus(activity, R.id.radarFreshnessValue, false,
+                "Radar and model data freshness.");
+        styleStatus(activity, R.id.citySearchStatus, false,
+                "City search status.");
+    }
+
+    private static void styleStatus(
+            @NonNull Activity activity,
+            int id,
+            boolean retryAction,
+            @NonNull String prefix
+    ) {
+        View raw = activity.findViewById(id);
+        if (!(raw instanceof TextView)) return;
+        TextView view = (TextView) raw;
+        CharSequence text = view.getText();
+        String value = text == null ? "" : text.toString();
+        String lower = value.toLowerCase(Locale.ROOT);
+
+        int color;
+        if (containsAny(lower, "error", "issue", "retry", "unavailable", "failed", "stale", "delayed")) {
+            color = R.color.weather_warning;
+        } else if (containsAny(lower, "loading", "refreshing", "checking", "requesting", "waiting")) {
+            color = R.color.weather_sky_blue;
+        } else if (containsAny(lower, "live", "ready", "updated", "synchronized", "latest")) {
+            color = R.color.weather_aqua;
+        } else {
+            color = R.color.weather_text_secondary;
+        }
+        view.setTextColor(ContextCompat.getColor(activity, color));
+
+        StringBuilder description = new StringBuilder(prefix);
+        if (!TextUtils.isEmpty(text)) description.append(' ').append(text);
+        if (retryAction) description.append(" Tap to refresh.");
+        view.setContentDescription(description.toString());
+    }
+
+    private static boolean containsAny(@NonNull String value, @NonNull String... terms) {
+        for (String term : terms) {
+            if (value.contains(term)) return true;
+        }
+        return false;
     }
 
     private static void auditTree(@NonNull View view) {
@@ -264,9 +312,7 @@ public final class UiQualityPolicy {
             TextView textView = (TextView) view;
             CharSequence label = textView.getText();
             if (TextUtils.isEmpty(label)) label = textView.getHint();
-            if (!TextUtils.isEmpty(label)) {
-                view.setContentDescription(label);
-            }
+            if (!TextUtils.isEmpty(label)) view.setContentDescription(label);
         }
     }
 
