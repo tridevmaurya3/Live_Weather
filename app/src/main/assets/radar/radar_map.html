@@ -244,7 +244,7 @@
 
             const flowDirection = ((p.windDirection || 0) + 180) % 360;
             const windText = p.windLabel || '--';
-            const windHtml = '<div class="wind-arrow"><span class="arrow" style="transform:rotate(' + flowDirection + 'deg')">➜</span><span>' + windText + '</span></div>';
+            const windHtml = '<div class="wind-arrow"><span class="arrow" style="transform:rotate(' + flowDirection + 'deg)">➜</span><span>' + windText + '</span></div>';
             L.marker([p.lat,p.lon], {
                 interactive:false,
                 icon:L.divIcon({
