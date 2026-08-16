@@ -34,6 +34,13 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 
+/**
+ * Radar page renderer.
+ *
+ * Phase 20B keeps observed RainViewer radar frames separate from Open-Meteo
+ * model-field context. Only the sanitized observed timeline and safe tile host
+ * from RadarUiState are allowed into the WebView payload.
+ */
 public final class Phase9Renderer {
 
     private static final long PLAY_INTERVAL_MILLIS = 1_100L;
@@ -71,7 +78,7 @@ public final class Phase9Renderer {
         @Override
         public void run() {
             if (destroyed || !playing || latestState == null || !latestState.hasRadarFrames()) return;
-            int count = latestState.getRadar().getPastFrames().size();
+            int count = latestState.getObservedFrames().size();
             if (count <= 1 || frameIndex >= count - 1) {
                 stopPlayback();
                 return;
@@ -277,19 +284,19 @@ public final class Phase9Renderer {
 
     private void renderStatus(RadarUiState state) {
         if (state.isLoadingRadar() || state.isLoadingField()) {
-            statusValue.setText("Syncing radar and atmospheric layers…");
+            statusValue.setText("Syncing observed radar and atmospheric model field…");
             return;
         }
         if (state.hasRadarFrames() && state.hasField()) {
-            statusValue.setText("Radar + cloud/wind field ready");
+            statusValue.setText("Observed radar + model field ready");
             return;
         }
         if (state.hasRadarFrames()) {
-            statusValue.setText("Radar ready • model overlays unavailable");
+            statusValue.setText("Observed radar ready • model field unavailable");
             return;
         }
         if (state.hasField()) {
-            statusValue.setText("Model overlays ready • radar unavailable here");
+            statusValue.setText("Model field ready • observed radar unavailable here");
             return;
         }
         String radarError = state.getRadarError();
@@ -307,12 +314,15 @@ public final class Phase9Renderer {
 
     private void renderSource(RadarUiState state) {
         StringBuilder text = new StringBuilder(
-                "RainViewer radar • Open-Meteo cloud/wind/temp • OpenStreetMap base"
+                "RainViewer observed radar • Open-Meteo model field (cloud/wind/temp) • OpenStreetMap base"
         );
         if (state.isRadarFromCache() || state.isFieldFromCache()) {
             text.append(" • cached fallback");
         }
-        text.append("\nRadar timeline is observed past data; no future nowcast is fabricated.");
+        if (state.hasRadarFrames() && state.isRadarMetadataStale()) {
+            text.append(" • radar metadata delayed");
+        }
+        text.append("\nCloud/wind/temp points are model context, not radar observations. No future radar nowcast is fabricated.");
         sourceValue.setText(text.toString());
     }
 
@@ -322,13 +332,13 @@ public final class Phase9Renderer {
             timelineSeek.setMax(0);
             timelineSeek.setProgress(0);
             frameIndex = -1;
-            frameTimeValue.setText("No radar frames");
+            frameTimeValue.setText("No observed radar frames");
             playButton.setEnabled(false);
             stopPlayback();
             return;
         }
 
-        int count = state.getRadar().getPastFrames().size();
+        int count = state.getObservedFrames().size();
         timelineSeek.setEnabled(true);
         playButton.setEnabled(true);
         timelineSeek.setMax(Math.max(0, count - 1));
@@ -341,7 +351,7 @@ public final class Phase9Renderer {
 
     private void startPlayback() {
         if (latestState == null || !latestState.hasRadarFrames()) return;
-        int count = latestState.getRadar().getPastFrames().size();
+        int count = latestState.getObservedFrames().size();
         if (count <= 1) return;
 
         selectLayer("rain");
@@ -371,11 +381,11 @@ public final class Phase9Renderer {
 
     private void updateFrameTime() {
         if (latestState == null || !latestState.hasRadarFrames() || frameIndex < 0) return;
-        List<RainViewerResponse.Frame> frames = latestState.getRadar().getPastFrames();
+        List<RainViewerResponse.Frame> frames = latestState.getObservedFrames();
         if (frameIndex >= frames.size()) return;
         Long time = frames.get(frameIndex).getTime();
         if (time == null) {
-            frameTimeValue.setText("Radar frame");
+            frameTimeValue.setText("Observed radar frame");
         } else {
             frameTimeValue.setText(FRAME_TIME_FORMATTER.format(Instant.ofEpochSecond(time)));
         }
@@ -403,18 +413,16 @@ public final class Phase9Renderer {
         payload.put("latitude", latestState.getLatitude());
         payload.put("longitude", latestState.getLongitude());
         payload.put("zoom", 6);
-
-        RainViewerResponse radar = latestState.getRadar();
-        payload.put("radarHost", radar == null ? null : radar.getHost());
+        payload.put("radarHost", latestState.getSafeRadarHost());
+        payload.put("radarKind", "observed_past");
+        payload.put("fieldKind", "model_current");
 
         List<Map<String, Object>> frames = new ArrayList<>();
-        if (radar != null) {
-            for (RainViewerResponse.Frame frame : radar.getPastFrames()) {
-                Map<String, Object> item = new LinkedHashMap<>();
-                item.put("time", frame.getTime());
-                item.put("path", frame.getPath());
-                frames.add(item);
-            }
+        for (RainViewerResponse.Frame frame : latestState.getObservedFrames()) {
+            Map<String, Object> item = new LinkedHashMap<>();
+            item.put("time", frame.getTime());
+            item.put("path", frame.getPath());
+            frames.add(item);
         }
         payload.put("frames", frames);
 
