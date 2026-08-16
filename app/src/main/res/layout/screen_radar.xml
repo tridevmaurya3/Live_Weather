@@ -226,21 +226,23 @@
 
             <TextView
                 android:id="@+id/radarPlayButton"
-                android:layout_width="72dp"
+                android:layout_width="78dp"
                 android:layout_height="38dp"
                 android:background="@drawable/bg_weather_chip"
                 android:gravity="center"
-                android:text="Play"
+                android:text="Replay"
                 android:textColor="@color/weather_text_primary"
                 android:textSize="@dimen/text_body"
                 android:textStyle="bold" />
 
             <TextView
+                android:id="@+id/radarTimelineSummary"
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_marginStart="@dimen/space_10"
                 android:layout_weight="1"
-                android:text="Observed radar timeline · past 2 hours"
+                android:maxLines="2"
+                android:text="Latest observed frame"
                 android:textColor="@color/weather_text_secondary"
                 android:textSize="@dimen/text_caption" />
 
@@ -248,6 +250,7 @@
                 android:id="@+id/radarFrameTimeValue"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
+                android:layout_marginStart="@dimen/space_8"
                 android:text="--:-- UTC"
                 android:textColor="@color/weather_aqua"
                 android:textSize="@dimen/text_caption"
@@ -259,6 +262,7 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="@dimen/space_4"
+            android:contentDescription="Observed radar history timeline"
             android:max="0"
             android:progress="0" />
     </LinearLayout>
