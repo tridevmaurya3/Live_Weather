@@ -10,20 +10,24 @@ import android.widget.LinearLayout;
 import android.widget.TextView;
 
 import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
 import androidx.core.content.ContextCompat;
 import androidx.core.widget.NestedScrollView;
 
 import com.tridev.liveweather.R;
+import com.tridev.liveweather.data.local.AlertPreferences;
 import com.tridev.liveweather.domain.alert.AlertTruthPolicy;
 import com.tridev.liveweather.domain.alert.AlertUiState;
 import com.tridev.liveweather.domain.alert.WeatherAlert;
 import com.tridev.liveweather.ui.weather.WeatherFormatter;
 
+import java.util.ArrayList;
 import java.util.List;
 
 public final class Phase8Renderer {
 
     private final Activity activity;
+    private final AlertPreferences alertPreferences;
     private final LinearLayout homeAlertCard;
     private final TextView homeAlertBadge;
     private final TextView homeAlertTitle;
@@ -33,14 +37,20 @@ public final class Phase8Renderer {
     private final TextView alertsLocation;
     private final TextView alertsStatus;
     private final TextView notificationsAction;
+    private final TextView officialFilterAction;
+    private final TextView smartRiskFilterAction;
+    private final TextView severityFilterAction;
+    private final TextView filterSummary;
     private final LinearLayout alertsList;
 
     private Runnable openAlertsAction;
     private Runnable refreshAction;
     private Runnable notificationsActionCallback;
+    private AlertUiState lastState;
 
     public Phase8Renderer(@NonNull Activity activity) {
         this.activity = activity;
+        this.alertPreferences = new AlertPreferences(activity);
 
         View hero = activity.findViewById(R.id.homeHeroCard);
         LinearLayout homeRoot = (LinearLayout) hero.getParent();
@@ -93,7 +103,21 @@ public final class Phase8Renderer {
         actions.addView(refresh, weight(1f, 4, 0));
         alertsSection.addView(actions, top(-1, -2, 12));
 
-        alertsSection.addView(sectionWithTop("Active alerts", 16));
+        alertsSection.addView(sectionWithTop("Alert preferences", 14));
+        LinearLayout sourceFilters = new LinearLayout(activity);
+        sourceFilters.setOrientation(LinearLayout.HORIZONTAL);
+        officialFilterAction = actionChip("Official: On");
+        smartRiskFilterAction = actionChip("Smart Risk: On");
+        sourceFilters.addView(officialFilterAction, weight(1f, 0, 4));
+        sourceFilters.addView(smartRiskFilterAction, weight(1f, 4, 0));
+        alertsSection.addView(sourceFilters, top(-1, -2, 8));
+
+        severityFilterAction = actionChip("Minimum: Yellow+");
+        alertsSection.addView(severityFilterAction, top(-1, -2, 8));
+        filterSummary = caption("");
+        alertsSection.addView(filterSummary, top(-1, -2, 5));
+
+        alertsSection.addView(sectionWithTop("Active alerts", 14));
         alertsList = new LinearLayout(activity);
         alertsList.setOrientation(LinearLayout.VERTICAL);
         alertsSection.addView(alertsList, top(-1, -2, 8));
@@ -106,6 +130,26 @@ public final class Phase8Renderer {
             view.performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY);
             if (refreshAction != null) refreshAction.run();
         });
+        officialFilterAction.setOnClickListener(view -> {
+            view.performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY);
+            alertPreferences.setOfficialAlertsEnabled(!alertPreferences.isOfficialAlertsEnabled());
+            updateFilterControls();
+            rerenderLastState();
+        });
+        smartRiskFilterAction.setOnClickListener(view -> {
+            view.performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY);
+            alertPreferences.setSmartRiskEnabled(!alertPreferences.isSmartRiskEnabled());
+            updateFilterControls();
+            rerenderLastState();
+        });
+        severityFilterAction.setOnClickListener(view -> {
+            view.performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY);
+            alertPreferences.cycleMinimumSeverity();
+            updateFilterControls();
+            rerenderLastState();
+        });
+
+        updateFilterControls();
     }
 
     public void setCallbacks(
@@ -119,12 +163,21 @@ public final class Phase8Renderer {
     }
 
     public void setNotificationsEnabled(boolean enabled, boolean permissionGranted) {
-        notificationsAction.setText(enabled && permissionGranted
-                ? "Alerts: On"
-                : "Enable alerts");
+        boolean active = enabled && permissionGranted;
+        notificationsAction.setText(active ? "Notifications: On" : "Enable notifications");
+        notificationsAction.setBackgroundResource(active
+                ? R.drawable.bg_weather_chip_selected
+                : R.drawable.bg_weather_chip);
+        notificationsAction.setAlpha(active ? 1f : 0.90f);
+        notificationsAction.setContentDescription(active
+                ? "Weather alert notifications enabled"
+                : "Enable weather alert notifications");
     }
 
     public void render(@NonNull AlertUiState state) {
+        lastState = state;
+        updateFilterControls();
+
         if (state.getLocation() != null) {
             alertsLocation.setText("Alert location · " + state.getLocation().displayLabel());
         } else {
@@ -146,28 +199,37 @@ public final class Phase8Renderer {
                 warningStatus ? R.color.weather_warning : R.color.weather_text_tertiary
         ));
 
-        List<WeatherAlert> alerts = state.getAlerts();
+        List<WeatherAlert> allAlerts = state.getAlerts();
+        List<WeatherAlert> visibleAlerts = visibleAlerts(allAlerts);
         alertsList.removeAllViews();
-        if (alerts.isEmpty()) {
-            TextView empty = body(emptyStateMessage(state, now));
-            boolean confirmedEmpty = !state.isLoading() && state.canConfirmNoOfficialMatch(now);
-            empty.setTextColor(ContextCompat.getColor(
-                    activity,
-                    confirmedEmpty ? R.color.weather_success : R.color.weather_warning
-            ));
+        if (visibleAlerts.isEmpty()) {
+            TextView empty;
+            if (!allAlerts.isEmpty()) {
+                empty = body(
+                        "No alerts match the current source/severity filters. Source status above remains active; change the filters to show hidden alerts."
+                );
+                empty.setTextColor(ContextCompat.getColor(activity, R.color.weather_text_secondary));
+            } else {
+                empty = body(emptyStateMessage(state, now));
+                boolean confirmedEmpty = !state.isLoading() && state.canConfirmNoOfficialMatch(now);
+                empty.setTextColor(ContextCompat.getColor(
+                        activity,
+                        confirmedEmpty ? R.color.weather_success : R.color.weather_warning
+                ));
+            }
             alertsList.addView(empty);
             homeAlertCard.setVisibility(View.GONE);
             return;
         }
 
-        for (WeatherAlert alert : alerts) {
+        for (WeatherAlert alert : visibleAlerts) {
             alertsList.addView(
                     alertRow(alert, state, now),
                     top(-1, -2, alertsList.getChildCount() == 0 ? 0 : 8)
             );
         }
 
-        WeatherAlert highest = state.highestAlert();
+        WeatherAlert highest = highestAlert(visibleAlerts);
         if (highest != null) {
             homeAlertCard.setVisibility(View.VISIBLE);
             boolean staleOfficial = highest.isOfficial() && state.isOfficialStale(now);
@@ -182,6 +244,28 @@ public final class Phase8Renderer {
             }
             homeAlertMessage.setText(message);
         }
+    }
+
+    @NonNull
+    private List<WeatherAlert> visibleAlerts(@NonNull List<WeatherAlert> alerts) {
+        List<WeatherAlert> visible = new ArrayList<>();
+        for (WeatherAlert alert : alerts) {
+            if (alert != null && alertPreferences.shouldShow(alert)) {
+                visible.add(alert);
+            }
+        }
+        return visible;
+    }
+
+    @Nullable
+    private WeatherAlert highestAlert(@NonNull List<WeatherAlert> alerts) {
+        WeatherAlert highest = null;
+        for (WeatherAlert alert : alerts) {
+            if (highest == null || severityRank(alert.getSeverity()) > severityRank(highest.getSeverity())) {
+                highest = alert;
+            }
+        }
+        return highest;
     }
 
     @NonNull
@@ -238,6 +322,60 @@ public final class Phase8Renderer {
         return row;
     }
 
+    private void updateFilterControls() {
+        boolean officialEnabled = alertPreferences.isOfficialAlertsEnabled();
+        boolean smartEnabled = alertPreferences.isSmartRiskEnabled();
+        WeatherAlert.Severity minimum = alertPreferences.getMinimumSeverity();
+
+        officialFilterAction.setText(officialEnabled ? "Official: On" : "Official: Hidden");
+        officialFilterAction.setBackgroundResource(officialEnabled
+                ? R.drawable.bg_weather_chip_selected
+                : R.drawable.bg_weather_chip);
+        officialFilterAction.setAlpha(officialEnabled ? 1f : 0.72f);
+        officialFilterAction.setContentDescription(officialEnabled
+                ? "Official alert filter on. Tap to hide official alerts and notifications."
+                : "Official alerts hidden. Tap to show official alerts and allow notifications.");
+
+        smartRiskFilterAction.setText(smartEnabled ? "Smart Risk: On" : "Smart Risk: Hidden");
+        smartRiskFilterAction.setBackgroundResource(smartEnabled
+                ? R.drawable.bg_weather_chip_selected
+                : R.drawable.bg_weather_chip);
+        smartRiskFilterAction.setAlpha(smartEnabled ? 1f : 0.72f);
+        smartRiskFilterAction.setContentDescription(smartEnabled
+                ? "Smart Risk filter on. Tap to hide Smart Risk signals and notifications."
+                : "Smart Risk signals hidden. Tap to show Smart Risk signals and allow notifications.");
+
+        severityFilterAction.setText("Minimum severity: " + severityFilterLabel(minimum));
+        severityFilterAction.setBackgroundResource(R.drawable.bg_weather_chip_selected);
+        severityFilterAction.setContentDescription(
+                "Minimum alert severity " + severityFilterLabel(minimum)
+                        + ". Tap to change minimum severity."
+        );
+
+        filterSummary.setText(
+                "Filters apply instantly to the Alerts Center, Home alert card and notifications. "
+                        + "Smart Risk push notifications remain high-confidence Orange/Red even when lower severities are visible."
+        );
+    }
+
+    private void rerenderLastState() {
+        if (lastState != null) render(lastState);
+    }
+
+    @NonNull
+    private String severityFilterLabel(@NonNull WeatherAlert.Severity severity) {
+        switch (severity) {
+            case INFO:
+                return "All";
+            case ORANGE:
+                return "Orange+";
+            case RED:
+                return "Red only";
+            default:
+                return "Yellow+";
+        }
+    }
+
     private int severityColor(WeatherAlert.Severity severity) {
         switch (severity) {
             case RED: return ContextCompat.getColor(activity, R.color.weather_danger);
@@ -253,6 +391,15 @@ public final class Phase8Renderer {
             case ORANGE: return "ALERT";
             case YELLOW: return "WATCH";
             default: return "INFO";
+        }
+    }
+
+    private int severityRank(@NonNull WeatherAlert.Severity severity) {
+        switch (severity) {
+            case RED: return 4;
+            case ORANGE: return 3;
+            case YELLOW: return 2;
+            default: return 1;
         }
     }
 
