@@ -19,6 +19,7 @@ import android.widget.FrameLayout;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
+import com.tridev.liveweather.core.performance.AdaptiveFrameTimeGuard;
 import com.tridev.liveweather.core.performance.CinematicPerformanceGovernor;
 import com.tridev.liveweather.data.local.PerformancePreferences;
 import com.tridev.liveweather.data.local.WallpaperPreferences;
@@ -32,8 +33,9 @@ import com.tridev.liveweather.ui.gl.HeroGlPipeline;
 
 /**
  * In-app live weather surface backed by the same OpenGL pipeline as the system
- * Live Wallpaper. Hidden views draw zero frames. Renderer faults are isolated
- * in HeroGlPipeline and transient EGL failures get a small bounded recovery path.
+ * Live Wallpaper. Hidden views draw zero frames. Renderer faults are isolated,
+ * transient EGL failures recover in a bounded path, and sustained frame pressure
+ * trims only secondary detail while the actual weather state remains untouched.
  */
 public final class LiveSkyView extends FrameLayout implements TextureView.SurfaceTextureListener {
 
@@ -54,6 +56,7 @@ public final class LiveSkyView extends FrameLayout implements TextureView.Surfac
     private final Context appContext;
     private final TextureView textureView;
     private final HeroGlPipeline pipeline = new HeroGlPipeline();
+    private final AdaptiveFrameTimeGuard frameTimeGuard = new AdaptiveFrameTimeGuard();
     private final HandlerThread renderThread;
     private final Handler renderHandler;
     private final PerformancePreferences performancePreferences;
@@ -81,14 +84,25 @@ public final class LiveSkyView extends FrameLayout implements TextureView.Surfac
         @Override
         public void run() {
             if (released || !visible || eglSurface == EGL14.EGL_NO_SURFACE) return;
+
+            long loopStartNanos = System.nanoTime();
             try {
                 refreshPerformanceIfNeeded();
                 refreshRealityIfNeeded();
+
+                long renderStartNanos = System.nanoTime();
                 pipeline.drawFrame();
                 if (!EGL14.eglSwapBuffers(display, eglSurface)) {
                     int eglError = EGL14.eglGetError();
                     scheduleEglRecovery("app-swap-0x" + Integer.toHexString(eglError), null);
                     return;
+                }
+
+                float adaptedDetail = frameTimeGuard.observeFrameNanos(
+                        System.nanoTime() - renderStartNanos
+                );
+                if (!Float.isNaN(adaptedDetail)) {
+                    pipeline.setPerformanceDetailScale(adaptedDetail);
                 }
                 eglRecoveryAttempts = 0;
             } catch (RuntimeException error) {
@@ -97,7 +111,9 @@ public final class LiveSkyView extends FrameLayout implements TextureView.Surfac
             }
 
             if (!released && visible && eglSurface != EGL14.EGL_NO_SURFACE) {
-                renderHandler.postDelayed(this, frameIntervalMillis);
+                long loopElapsedMillis = nanosToCeilMillis(System.nanoTime() - loopStartNanos);
+                long delayMillis = Math.max(0L, frameIntervalMillis - loopElapsedMillis);
+                renderHandler.postDelayed(this, delayMillis);
             }
         }
     };
@@ -130,7 +146,11 @@ public final class LiveSkyView extends FrameLayout implements TextureView.Surfac
                 CinematicPerformanceGovernor.Surface.APP_HERO
         );
         frameIntervalMillis = initialProfile.frameIntervalMillis;
-        pipeline.setPerformanceDetailScale(initialProfile.detailScale);
+        float initialDetail = frameTimeGuard.setBaseProfile(
+                initialProfile.frameIntervalMillis,
+                initialProfile.detailScale
+        );
+        pipeline.setPerformanceDetailScale(initialDetail);
 
         setClipToOutline(true);
         setClipChildren(true);
@@ -232,6 +252,7 @@ public final class LiveSkyView extends FrameLayout implements TextureView.Surfac
         renderHandler.post(() -> {
             if (released) return;
             try {
+                frameTimeGuard.resetMeasurements();
                 createEglSurface(surface, surfaceWidth, surfaceHeight);
                 seenSharedVersion = -1L;
                 lastPerformanceRefresh = 0L;
@@ -250,6 +271,7 @@ public final class LiveSkyView extends FrameLayout implements TextureView.Surfac
             if (released || eglSurface == EGL14.EGL_NO_SURFACE) return;
             if (EGL14.eglMakeCurrent(display, eglSurface, eglSurface, eglContext)) {
                 pipeline.onSurfaceChanged(surfaceWidth, surfaceHeight);
+                frameTimeGuard.resetMeasurements();
             }
         });
     }
@@ -259,6 +281,7 @@ public final class LiveSkyView extends FrameLayout implements TextureView.Surfac
         if (!released) {
             renderHandler.post(() -> {
                 renderHandler.removeCallbacks(renderRunnable);
+                frameTimeGuard.resetMeasurements();
                 detachEglSurface();
             });
         }
@@ -293,6 +316,8 @@ public final class LiveSkyView extends FrameLayout implements TextureView.Surfac
         renderHandler.removeCallbacks(renderRunnable);
         if (!released && visible && eglSurface != EGL14.EGL_NO_SURFACE) {
             renderHandler.post(renderRunnable);
+        } else {
+            frameTimeGuard.resetMeasurements();
         }
     }
 
@@ -309,6 +334,7 @@ public final class LiveSkyView extends FrameLayout implements TextureView.Surfac
 
         eglRecoveryAttempts++;
         Log.e(TAG, "app-egl-recovery attempt=" + eglRecoveryAttempts + " reason=" + reason, error);
+        frameTimeGuard.resetMeasurements();
         resetEglContextForRecovery();
 
         long delay = EGL_RECOVERY_DELAY_MILLIS * eglRecoveryAttempts;
@@ -392,6 +418,7 @@ public final class LiveSkyView extends FrameLayout implements TextureView.Surfac
             pipeline.onSurfaceCreated();
             pipelineCreated = true;
         }
+        pipeline.setPerformanceDetailScale(frameTimeGuard.getEffectiveDetailScale());
         pipeline.onSurfaceChanged(width, height);
         seenSharedVersion = -1L;
         lastRealityRefresh = 0L;
@@ -453,7 +480,11 @@ public final class LiveSkyView extends FrameLayout implements TextureView.Surfac
                 CinematicPerformanceGovernor.Surface.APP_HERO
         );
         frameIntervalMillis = profile.frameIntervalMillis;
-        pipeline.setPerformanceDetailScale(profile.detailScale);
+        float effectiveDetail = frameTimeGuard.setBaseProfile(
+                profile.frameIntervalMillis,
+                profile.detailScale
+        );
+        pipeline.setPerformanceDetailScale(effectiveDetail);
     }
 
     private void refreshRealityIfNeeded() {
@@ -516,5 +547,10 @@ public final class LiveSkyView extends FrameLayout implements TextureView.Surfac
             display = EGL14.EGL_NO_DISPLAY;
             renderThread.quitSafely();
         });
+    }
+
+    private static long nanosToCeilMillis(long nanos) {
+        if (nanos <= 0L) return 0L;
+        return (nanos + 999_999L) / 1_000_000L;
     }
 }
