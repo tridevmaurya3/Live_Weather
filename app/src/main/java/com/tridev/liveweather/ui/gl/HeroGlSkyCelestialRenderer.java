@@ -12,9 +12,10 @@ import java.nio.FloatBuffer;
 /**
  * Hash-free base renderer for gradient sky, Sun and Moon.
  *
- * Astronomy/visibility remain supplied by GlSceneSnapshot. Moon phase geometry
- * is analytic; small maria patches use fixed gaussian shapes rather than GPU
- * random hashes, keeping the same result across emulator/Adreno/Mali.
+ * Astronomy and global celestial visibility are supplied by GlSceneSnapshot.
+ * This pass keeps twilight transitions perceptually smooth while the cloud
+ * texture pass, drawn afterwards, provides the actual local Sun/Moon occlusion.
+ * Moon phase geometry is analytic and deterministic across GPU families.
  */
 public final class HeroGlSkyCelestialRenderer {
 
@@ -82,34 +83,42 @@ public final class HeroGlSkyCelestialRenderer {
             "  sky+=vec3(0.026,0.052,0.083)*horizon*deepNight*(1.0-uHaze*0.55)*0.34;",
             "  vec3 color=sky;",
             "",
+            "  float sunVis=clamp(uSunVis,0.0,1.0);",
             "  vec2 sp=(p-uSunPos)*vec2(aspect,1.0);",
             "  float sd=length(sp);",
-            "  float sunGlow=exp(-sd*20.0)*uSunVis;",
+            "  float lowSun=1.0-smoothstep(3.0,18.0,uSunAltitude);",
+            "  vec3 sunDiscColor=mix(vec3(1.0,0.92,0.56),vec3(1.0,0.64,0.25),lowSun*0.82);",
+            "  vec3 sunGlowColor=mix(vec3(1.0,0.69,0.24),vec3(1.0,0.48,0.16),lowSun*0.72);",
+            "  float sunGlow=exp(-sd*20.0)*sunVis;",
+            "  float sunWideGlow=exp(-sd*8.0)*sunVis*lowSun*0.10;",
             "  float sunDisc=1.0-smoothstep(0.027,0.033,sd);",
-            "  color+=vec3(1.0,0.69,0.24)*sunGlow*0.76;",
-            "  color=mix(color,vec3(1.0,0.91,0.50),sunDisc*uSunVis);",
+            "  color+=sunGlowColor*sunGlow*0.76;",
+            "  color+=sunGlowColor*sunWideGlow;",
+            "  color=mix(color,sunDiscColor,sunDisc*sunVis);",
             "",
+            "  float moonVis=clamp(uMoonVis,0.0,1.0);",
             "  vec2 mp=(p-uMoonPos)*vec2(aspect,1.0);",
             "  float md=length(mp);",
             "  float moonRadius=0.031;",
             "  vec2 q=mp/moonRadius;",
             "  float q2=dot(q,q);",
-            "  float astronomicalDark=1.0-smoothstep(-12.0,-3.0,uSunAltitude);",
+            "  float astronomicalDark=1.0-smoothstep(-10.0,-2.0,uSunAltitude);",
+            "  float twilightDark=1.0-smoothstep(-4.0,3.0,uSunAltitude);",
             "  float warm=1.0-smoothstep(5.0,24.0,uMoonAltitude);",
             "  vec3 moonBase=mix(vec3(0.88,0.92,0.98),vec3(0.97,0.84,0.68),warm*0.34);",
-            "  if(q2<1.0 && uMoonVis>0.001){",
+            "  if(q2<1.0 && moonVis>0.0001){",
             "    float z=sqrt(max(0.0,1.0-q2));",
             "    float incident=q.x*sin(uMoonPhase)+z*(-cos(uMoonPhase));",
             "    float lit=smoothstep(-0.030,0.050,incident);",
-            "    float earthshine=(0.004+0.020*astronomicalDark)*(1.0-uMoonIllum*0.58);",
+            "    float earthshine=(0.003+0.021*astronomicalDark)*(1.0-uMoonIllum*0.58);",
             "    float phaseLight=earthshine+lit*(0.96-earthshine)*(0.62+0.38*max(0.0,incident));",
             "    float limb=1.0-smoothstep(0.90,1.0,sqrt(q2));",
             "    float limbShade=0.75+0.25*z;",
             "    float surface=clamp(0.96-maria(q),0.68,1.0);",
             "    vec3 moonColor=moonBase*phaseLight*limbShade*surface;",
-            "    color=mix(color,moonColor,clamp(uMoonVis*limb,0.0,1.0));",
+            "    color=mix(color,moonColor,clamp(moonVis*limb,0.0,1.0));",
             "  }",
-            "  float haloStrength=uMoonVis*(0.030+uMoonIllum*0.18)*astronomicalDark;",
+            "  float haloStrength=moonVis*(0.025+uMoonIllum*0.17)*mix(0.28,1.0,twilightDark);",
             "  float halo=exp(-md*16.0)*haloStrength+exp(-md*6.4)*haloStrength*0.20;",
             "  color+=vec3(0.30,0.40,0.57)*halo;",
             "  gl_FragColor=vec4(clamp(color,0.0,1.0),1.0);",
