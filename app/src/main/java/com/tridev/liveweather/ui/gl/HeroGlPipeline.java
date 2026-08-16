@@ -9,12 +9,15 @@ import com.tridev.liveweather.data.local.WallpaperPreferences;
  * Shared GPU composition pipeline used by both the in-app live scene and
  * Android system Live Wallpaper.
  *
- * Final stable visual rebuild:
- * - analytic hash-free sky/Sun/Moon
- * - fixed Java-generated GL-point stars
- * - photoreal weather-selected cloud texture atlas with layered parallax
- * - smooth analytic hills/forest with no texture/profile spikes
- * - portable storm overlay plus depth-aware rain retained after the stable base scene
+ * Stable Phase 20A visual stack:
+ * - analytic sky/Sun/Moon with twilight tuning
+ * - fixed deterministic star field
+ * - photoreal weather-selected cloud texture atlas with parallax
+ * - smooth analytic hills/forest
+ * - layered fog/haze atmosphere
+ * - storm/lightning overlay
+ * - depth-aware rain
+ * - depth-aware snow
  */
 public final class HeroGlPipeline {
 
@@ -25,6 +28,7 @@ public final class HeroGlPipeline {
     private final HeroGlAtmosphereOverlayRenderer atmosphereRenderer = new HeroGlAtmosphereOverlayRenderer();
     private final HeroGlPortableStormRenderer stormRenderer = new HeroGlPortableStormRenderer();
     private final HeroGlDepthRainRenderer rainRenderer = new HeroGlDepthRainRenderer();
+    private final HeroGlSnowRenderer snowRenderer = new HeroGlSnowRenderer();
 
     @Nullable
     private GlSceneSnapshot fullSnapshot;
@@ -42,6 +46,7 @@ public final class HeroGlPipeline {
         atmosphereRenderer.onSurfaceCreated();
         stormRenderer.onSurfaceCreated();
         rainRenderer.onSurfaceCreated();
+        snowRenderer.onSurfaceCreated();
         applySnapshot();
     }
 
@@ -53,6 +58,7 @@ public final class HeroGlPipeline {
         atmosphereRenderer.onSurfaceChanged(width, height);
         stormRenderer.onSurfaceChanged(width, height);
         rainRenderer.onSurfaceChanged(width, height);
+        snowRenderer.onSurfaceChanged(width, height);
     }
 
     public void setSnapshot(@Nullable GlSceneSnapshot snapshot) {
@@ -73,6 +79,7 @@ public final class HeroGlPipeline {
         atmosphereRenderer.drawFrame();
         stormRenderer.drawFrame();
         rainRenderer.drawFrame();
+        snowRenderer.drawFrame();
     }
 
     public void release() {
@@ -83,6 +90,7 @@ public final class HeroGlPipeline {
         atmosphereRenderer.release();
         stormRenderer.release();
         rainRenderer.release();
+        snowRenderer.release();
     }
 
     private void applySnapshot() {
@@ -95,6 +103,7 @@ public final class HeroGlPipeline {
             atmosphereRenderer.setSnapshot(null);
             stormRenderer.setSnapshot(null);
             rainRenderer.setSnapshot(null);
+            snowRenderer.setSnapshot(null);
             return;
         }
 
@@ -161,6 +170,15 @@ public final class HeroGlPipeline {
                 true
         );
 
+        GlSceneSnapshot snowSnapshot = state.withVisualOptions(
+                true,
+                false,
+                true,
+                options.isSnow(),
+                true,
+                true
+        );
+
         sceneRenderer.setSnapshot(sceneSnapshot);
         starRenderer.setSnapshot(starSnapshot);
         cloudRenderer.setSnapshot(cloudSnapshot);
@@ -169,5 +187,6 @@ public final class HeroGlPipeline {
         stormRenderer.setSnapshot(stormSnapshot);
         stormRenderer.setElectricalEnabled(options.isLightning());
         rainRenderer.setSnapshot(rainSnapshot);
+        snowRenderer.setSnapshot(snowSnapshot);
     }
 }
