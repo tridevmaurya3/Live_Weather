@@ -180,6 +180,28 @@ real-device GPU validation are still required before Phase 20A visual acceptance
 - Profile changes use uniforms/state updates and do not recreate GL programs,
   textures, activities, fragments or weather pages.
 
+## Checkpoint 20A.13 — GL fault isolation and graceful recovery
+
+- Each shared Hero renderer now has per-surface health state for sky, stars,
+  photoreal clouds, world, atmosphere, storm/lightning, depth rain and snow.
+- Shader compile/link or runtime exceptions quarantine only the failing renderer;
+  healthy layers continue drawing instead of repeatedly throwing every frame.
+- A failed core sky pass falls back to a lightweight scene-light-aware clear color
+  so the surface does not become an undefined/black frame while healthy overlays continue.
+- Renderer faults are recorded under the existing `LiveWeatherGL` diagnostics tag
+  with renderer name and lifecycle stage (`surface-create`, `surface-change`, `draw`, `release`).
+- Diagnostics expose a concise renderer-fault summary without adding per-frame logging.
+- App Hero and Live Wallpaper now use bounded EGL recovery after actual swap/runtime
+  failure: at most two delayed context/surface recreation attempts are made.
+- EGL recovery destroys/recreates GL resources only on failure; normal frames do not
+  poll `glGetError()` or rebuild contexts/programs/textures.
+- Wallpaper EGL initialization is lazy at surface attachment, preventing an early
+  background-thread initialization failure from killing the renderer before a valid surface exists.
+- A fresh EGL surface/context retries quarantined renderers once, allowing transient
+  driver/context faults to recover while persistent renderer faults are isolated again.
+- Weather truth, current-condition classification and cinematic performance profiles
+  are unchanged by the recovery system.
+
 ## Acceptance required
 
 Source implementation is complete, but Phase 20A is not accepted until it is
@@ -202,6 +224,8 @@ Confirm:
 - launcher swipes/parallax do not cause stutter or visible scene resets;
 - unchanged cached weather does not cause a visible refresh/flicker;
 - switching AUTO / SMOOTH / BATTERY changes smoothness/cost without changing the
-  actual weather state shown on screen.
+  actual weather state shown on screen;
+- an isolated secondary renderer failure does not terminate the entire Hero/Wallpaper loop;
+- transient EGL recovery is bounded and does not create an infinite restart loop.
 
 Source implementation alone is not visual acceptance.
