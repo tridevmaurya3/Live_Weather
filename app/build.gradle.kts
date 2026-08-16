@@ -62,6 +62,11 @@ dependencies {
     // Accurate local astronomical calculations for Sun/Moon/sky reality state.
     implementation(libs.astronomy)
 
+    // Radar Pro 20B.8: package the Leaflet engine inside the APK classpath.
+    // Phase9Renderer serves these WebJar resources to the WebView through a
+    // private local HTTPS origin, removing the runtime unpkg/CDN dependency.
+    implementation("org.webjars.npm:leaflet:1.9.4")
+
     testImplementation(libs.junit)
     androidTestImplementation(libs.espresso.core)
     androidTestImplementation(libs.ext.junit)
