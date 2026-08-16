@@ -2,71 +2,74 @@
 
 Current product version: 1.0.0
 
-Status: ACTIVE DEVELOPMENT — Phase 25 source implementation complete; Phase 26 Final Release Gate not started.
+Status: PHASE 26 ACTIVE — automated release gate PASSED; real-device acceptance + explicit user final approval pending.
 
 ## Important boundary
 
-The project is **not** yet labelled Final, Complete, Production Ready or Release Candidate.
+The project is **not yet** labelled Final, Complete, Production Ready or Release Candidate.
 
-Phases 16 through 25 have now been implemented at source level, and the current project debug-build checkpoint has passed with those source changes included. Full real-device regression and the release/R8 gate still remain.
+The full source/product roadmap through Phase 25 is implemented. Phase 26 has now passed its automated build/release gate, including Debug, unit-test, Release lint, R8/minification, resource shrinking, Release APK, Release AAB and output verification. What remains is the consolidated real-device acceptance matrix and explicit user approval.
 
-## Implemented product scope
+## Automated release gate — PASS
 
-The current product includes:
-- current weather and location-aware dashboard;
-- saved cities and current-location switching;
-- advanced hourly and 10-day Forecast Pro;
-- weather intelligence with current-vs-forecast precipitation truth separation;
-- AQI and Sun/Moon intelligence;
-- official-warning / Smart Risk Alerts Pro;
-- Radar Pro with observed RainViewer radar and model Clouds/Wind/Temperature layers;
-- configurable home-screen widgets;
-- Units and Performance settings;
-- offline/cache/data-reliability protections and diagnostics;
-- responsive/accessibility policy;
-- shared cinematic OpenGL Hero and Android Live Wallpaper pipeline;
-- Phase 24 rain/cloud/storm/wet-surface/world-quality upgrades;
-- Phase 25 product-completeness wiring and user-facing wording cleanup.
+Authoritative GitHub Actions run:
+- Workflow: `Phase 26 Release Gate`
+- Run: `#9`
+- Run ID: `31965101892`
+- Head commit: `b8a6a0f483ed253f49a89ab8cb14e3793916314a`
+- Result: SUCCESS
+- Artifact ID: `9268321760`
+- Artifact digest: `sha256:5e5dadb31ea6f9757274593aaf55669195511cb870572ee7de5e3e32563027be`
 
-## Current verification state
+Passed checks:
+- Debug APK;
+- Debug unit tests;
+- Release lint;
+- minified/shrunk Release APK via R8;
+- Release AAB;
+- R8 mapping output;
+- release lint report;
+- APK/AAB output verification;
+- configuration-cache-enabled build;
+- release verification artifact upload.
 
-Confirmed:
-- current project Gradle Sync/debug integration checkpoint has passed locally;
-- Phase 25 source is included in that current source line;
-- versionName is 1.0.0;
-- the five primary destinations are Home, Forecast, Radar, Wallpaper and More;
-- active product UI is no longer intentionally labelled as a development/roadmap screen.
+## Phase 26 fixes/hardening
 
-Still required before release approval:
-- full real-device product regression;
-- runtime OpenGL/Live Wallpaper visual verification;
-- Radar weak/offline network and provider-tile behavior;
-- alerts/notification permission and channel behavior;
-- widget launcher/configuration behavior;
-- offline/cache restart and city-switch race checks;
-- narrow/large-text/TalkBack smoke checks;
-- Release/R8 build and shrinker validation;
-- final versionCode/versionName/release packaging decision.
+- Strict Release lint found two genuine API-level errors for `android:windowLightNavigationBar` on minSdk 26.
+- The API-27-only theme item was moved out of base day/night resources into API-27+ qualified day/night theme resources.
+- Release signing material is protected by `.gitignore` patterns for JKS/keystore/signing property files.
+- No upload/release keystore is stored in GitHub.
+- CI release automation uses current major lines: checkout v7, setup-java v5, upload-artifact v7.
+- Backup/data-extraction/cleartext restrictions remain enabled.
+- Radar attribution/User-Agent/mixed-content behavior was audited.
 
-## Phase 26 — Final Release Gate
+## Current version checkpoint
 
-Phase 26 has **not** started.
+- `versionName = 1.0.0`
+- `versionCode = 1`
 
-It may begin only on explicit user instruction. It will be the final validation gate, not another feature-development phase.
+Before a Google Play upload, compare `versionCode` with any prior Play Console build for the same application ID. If a prior build exists, use a value greater than the highest versionCode already used.
 
-Required gate:
-1. latest Debug build;
-2. Release/R8 build;
-3. real-device smoke/regression;
-4. Widgets;
-5. Live Wallpaper/OpenGL;
-6. Radar;
-7. Alerts/notifications;
-8. offline/cache reliability;
-9. final version decision;
-10. Play Store/release preparation if requested;
-11. explicit user approval before final status.
+## Remaining real-device acceptance
+
+One consolidated phone pass is still required:
+1. Home/current location/saved city/refresh.
+2. Forecast hourly/charts/daily/Sun-Moon/units.
+3. Radar local Leaflet/base tiles/RainViewer/model layers/replay/recenter/weak-offline warning/lifecycle.
+4. Alerts permission/channels/filters/details/notification navigation/stale states.
+5. Compact + wide widgets, active/fixed city, resize/taps/offline refresh/removal.
+6. Live Wallpaper preview/apply and real OpenGL visual parity across available dry/rain/storm/cloud/fog/night scenes and Auto/Smooth/Battery modes.
+7. Offline restart/cache age/city-switch race/Data Reliability alignment.
+8. Narrow screen/large font/TalkBack/touch/navigation restore.
+9. Background/foreground/tab switching/renderer lifecycle smoke test.
+10. Final store signing/version/provider-terms decision if publishing.
+
+## Provider/distribution note
+
+OpenStreetMap, Open-Meteo, RainViewer and Leaflet attribution is present in the Radar experience. RainViewer public API use must still match the intended distribution/use scale; broad commercial/high-volume release may require suitable commercial terms or a provider change.
 
 ## Completion rule
 
-Do not call this project Final, Complete, Production Ready or Release Candidate until Phase 26 is completed and the user explicitly approves finalization.
+Only after the consolidated real-device acceptance passes **and the user explicitly approves finalization** may this status change to Final / Complete / Production Ready / Release Candidate.
+
+See `PHASE_26_FINAL_RELEASE_GATE.md` for the full authoritative gate record.
