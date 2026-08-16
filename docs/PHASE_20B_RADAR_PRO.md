@@ -1,6 +1,6 @@
 # Phase 20B — Radar Pro
 
-Status: IMPLEMENTATION STARTED — Steps 20B.1–20B.5 complete; visual/device verification pending.
+Status: IMPLEMENTATION STARTED — Steps 20B.1–20B.6 source implementation complete; visual/device verification pending.
 
 ## Product contract
 
@@ -102,9 +102,27 @@ Implemented:
 - Active legends and timeline wording also disclose delayed observations/model data as the age threshold is crossed.
 - Existing cached layers remain usable during refresh/fallback instead of being blanked solely because the latest request failed.
 
+## Step 20B.6 — WebView lifecycle, memory and offline shell reliability
+
+Implemented:
+- The existing lazy-init rule remains intact: the Chromium/WebView Radar renderer is created only after the Radar destination becomes visible, so app startup does not pay the WebView initialization cost.
+- Hiding the Radar destination no longer destroys or reloads the map. Android sends `RadarApp.suspend()` and pauses the WebView; showing it sends `RadarApp.resume()` and Leaflet performs a zero-animation `invalidateSize()` before reusing the existing layers.
+- Playback and freshness callbacks still stop while hidden, avoiding background Radar animation work.
+- Android now keeps the last delivered map JSON, active layer and frame index. Unchanged state is not resent on every show/hide or repeated render callback, preventing unnecessary `setData()`, model-layer rebuilding, location-marker rebuilding and `map.setView()` resets.
+- WebView renderer-process loss and JavaScript-bridge runtime failures are isolated. The failed WebView is removed and destroyed instead of leaving a permanently black surface.
+- Automatic WebView recovery is bounded to at most two attempts inside a 30-second fault window, with a short recovery delay. This prevents rapid Chromium crash loops. Manual Refresh may explicitly reset the recovery budget and retry.
+- WebView teardown clears callbacks/client/history/views, detaches the view from its parent and destroys it. Global `WebView.pauseTimers()` is intentionally not used because it would affect unrelated WebViews in the process.
+- Web settings disallow popup windows, geolocation and mixed content while retaining only the JavaScript/network capabilities required by the Radar map.
+- The local `radar_map.html` now contains an offline-safe dark map shell and status card. If the external map engine cannot load, the page remains visible and explains that Radar/model data is retained rather than presenting a black/empty WebView.
+- Leaflet loading is timeout/error guarded and can be retried through Refresh/Recenter. The timeout handle is initialized before asynchronous completion callbacks to avoid a loader race.
+- Leaflet 1.9.4 JavaScript/CSS are still runtime `unpkg.com` dependencies in this step. Therefore first-use fully-offline interactive map initialization is **not** claimed. The local shell is offline-safe; a previously cached Leaflet response may help, but is not guaranteed.
+- OpenStreetMap and RainViewer raster tiles still depend on network/provider/browser cache. No persistent offline radar/base-map tile cache is added here; that belongs to later offline/data-reliability work.
+- No weather evidence, radar observation, model field, timeline truth or forecast/current-weather rule was changed.
+- No new network polling was introduced by lifecycle recovery.
+
 ## Verification boundary
 
 - Source changes are on `main`.
 - No local Android Studio / Gradle build was run in these Radar Pro steps.
-- No real-device WebView/radar playback/cloud-surface/legend/freshness validation was run yet.
+- No real-device WebView/radar playback/cloud-surface/legend/freshness/lifecycle validation was run yet.
 - Phase 20B is not complete.
