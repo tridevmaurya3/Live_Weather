@@ -10,12 +10,11 @@ import java.nio.ByteOrder;
 import java.nio.FloatBuffer;
 
 /**
- * ODM-5 cinematic atmosphere pass.
+ * Phase 20A cinematic atmosphere pass.
  *
- * This is deliberately restrained. It does not invent scenery or weather. It
- * uses the already-resolved scene state to add distance haze, low-horizon
- * scattering, rain/storm atmosphere, lunar fill and a subtle optical vignette.
- * The pass is transparent and contains no bitmap/texture bounds.
+ * Fog is treated as low, layered moisture while haze is a broader horizon veil.
+ * Both remain driven only by the resolved scene state. Subtle wind-driven band
+ * movement prevents fog from looking like a static grey overlay.
  */
 public final class HeroGlAtmosphereOverlayRenderer {
 
@@ -36,7 +35,11 @@ public final class HeroGlAtmosphereOverlayRenderer {
     );
 
     private static final String FRAGMENT_SHADER = String.join("\n",
+            "#ifdef GL_FRAGMENT_PRECISION_HIGH",
+            "precision highp float;",
+            "#else",
             "precision mediump float;",
+            "#endif",
             "varying vec2 vUv;",
             "uniform vec2 uResolution;",
             "uniform vec2 uSunPos;",
@@ -52,45 +55,60 @@ public final class HeroGlAtmosphereOverlayRenderer {
             "uniform float uHaze;",
             "uniform float uSceneLight;",
             "uniform float uVisibility;",
+            "uniform float uTime;",
+            "uniform float uWind;",
+            "uniform float uWindDir;",
             "void main(){",
             "  vec2 p=vec2(vUv.x,1.0-vUv.y);",
             "  float aspect=uResolution.x/max(1.0,uResolution.y);",
-            "  float horizon=smoothstep(0.48,0.98,p.y);",
-            "  float lower=smoothstep(0.64,1.0,p.y);",
-            "  float fogVeil=uFog*(0.10+0.34*horizon);",
-            "  float hazeVeil=uHaze*(0.025+0.12*horizon);",
-            "  float rainVeil=max(uRain,uDrizzle*0.55)*(0.018+0.060*horizon);",
-            "  float distanceLoss=(1.0-uVisibility)*(0.020+0.14*horizon);",
-            "  float atmospheric=clamp(fogVeil+hazeVeil+rainVeil+distanceLoss,0.0,0.42);",
+            "  float horizon=smoothstep(0.44,0.98,p.y);",
+            "  float lower=smoothstep(0.60,1.0,p.y);",
+            "  float side=sin(uWindDir);",
+            "  float drift=uTime*side*(0.006+uWind*0.015);",
+            "  float band1=0.5+0.5*sin((p.x+drift)*8.0+p.y*4.2);",
+            "  float band2=0.5+0.5*sin((p.x-drift*0.62)*13.0-p.y*6.4+1.7);",
+            "  float rolling=clamp(band1*0.62+band2*0.38,0.0,1.0);",
+            "",
+            "  float fogBase=uFog*(0.075+0.29*horizon);",
+            "  float fogBands=uFog*lower*(0.020+0.075*rolling);",
+            "  float fogVeil=fogBase+fogBands;",
+            "  float hazeVeil=uHaze*(0.020+0.125*horizon)*(0.90+0.10*uSceneLight);",
+            "  float precip=max(uRain,uDrizzle*0.55);",
+            "  float rainVeil=precip*(0.014+0.052*horizon);",
+            "  float distanceLoss=(1.0-uVisibility)*(0.018+0.135*horizon);",
+            "  float atmospheric=clamp(fogVeil+hazeVeil+rainVeil+distanceLoss,0.0,0.48);",
             "",
             "  float sunLow=smoothstep(0.40,0.83,uSunPos.y)*uSunVis;",
             "  vec2 sp=(p-uSunPos)*vec2(aspect,1.0);",
-            "  float sunScatter=exp(-length(sp)*2.1)*sunLow*horizon*(1.0-uStorm*0.72);",
+            "  float sunScatter=exp(-length(sp)*2.15)*sunLow*horizon*(1.0-uStorm*0.72);",
             "  float moonNight=(1.0-uSceneLight)*uMoonVis*uMoonIllum;",
             "  vec2 mp=(p-uMoonPos)*vec2(aspect,1.0);",
-            "  float moonScatter=exp(-length(mp)*2.4)*moonNight*(0.020+0.050*horizon);",
+            "  float moonScatter=exp(-length(mp)*2.45)*moonNight*(0.018+0.048*horizon);",
             "",
-            "  vec3 coolVeil=mix(vec3(0.38,0.47,0.55),vec3(0.22,0.29,0.37),uStorm);",
-            "  vec3 warmVeil=vec3(0.78,0.52,0.31);",
-            "  vec3 moonVeil=vec3(0.28,0.37,0.52);",
-            "  vec3 color=coolVeil*atmospheric;",
+            "  vec3 fogColor=mix(vec3(0.50,0.56,0.60),vec3(0.38,0.44,0.49),1.0-uSceneLight);",
+            "  vec3 hazeColor=mix(vec3(0.48,0.50,0.50),vec3(0.61,0.54,0.44),uSceneLight*0.42);",
+            "  vec3 rainColor=mix(vec3(0.38,0.47,0.55),vec3(0.22,0.29,0.37),uStorm);",
+            "  float fogPart=clamp(fogVeil,0.0,0.38);",
+            "  float hazePart=clamp(hazeVeil+distanceLoss,0.0,0.24);",
+            "  float rainPart=clamp(rainVeil,0.0,0.16);",
+            "  vec3 color=fogColor*fogPart+hazeColor*hazePart+rainColor*rainPart;",
             "  float alpha=atmospheric;",
-            "  color+=warmVeil*sunScatter*0.14;",
-            "  alpha+=sunScatter*0.08;",
-            "  color+=moonVeil*moonScatter;",
-            "  alpha+=moonScatter*0.60;",
+            "  color+=vec3(0.78,0.52,0.31)*sunScatter*0.13;",
+            "  alpha+=sunScatter*0.07;",
+            "  color+=vec3(0.28,0.37,0.52)*moonScatter;",
+            "  alpha+=moonScatter*0.55;",
             "",
-            "  float stormFloor=uStorm*lower*(0.015+uCloud*0.020);",
+            "  float stormFloor=uStorm*lower*(0.013+uCloud*0.020);",
             "  color+=vec3(0.035,0.050,0.072)*stormFloor;",
             "  alpha+=stormFloor;",
             "",
             "  vec2 centered=(p-0.5)*vec2(1.0,0.78);",
             "  float vignette=smoothstep(0.42,0.69,length(centered));",
-            "  vignette*=0.012+uStorm*0.026+max(uRain,uDrizzle*0.5)*0.010;",
-            "  color=mix(color,vec3(0.008,0.012,0.020),clamp(vignette*7.0,0.0,0.28));",
+            "  vignette*=0.010+uStorm*0.024+precip*0.009;",
+            "  color=mix(color,vec3(0.008,0.012,0.020),clamp(vignette*7.0,0.0,0.26));",
             "  alpha=1.0-(1.0-alpha)*(1.0-vignette);",
             "",
-            "  gl_FragColor=vec4(clamp(color,0.0,1.0),clamp(alpha,0.0,0.46));",
+            "  gl_FragColor=vec4(clamp(color,0.0,1.0),clamp(alpha,0.0,0.50));",
             "}"
     );
 
@@ -114,6 +132,10 @@ public final class HeroGlAtmosphereOverlayRenderer {
     private int uHaze;
     private int uSceneLight;
     private int uVisibility;
+    private int uTime;
+    private int uWind;
+    private int uWindDir;
+    private long startNanos;
 
     @Nullable
     private volatile GlSceneSnapshot snapshot;
@@ -145,6 +167,10 @@ public final class HeroGlAtmosphereOverlayRenderer {
         uHaze = uniform("uHaze");
         uSceneLight = uniform("uSceneLight");
         uVisibility = uniform("uVisibility");
+        uTime = uniform("uTime");
+        uWind = uniform("uWind");
+        uWindDir = uniform("uWindDir");
+        startNanos = System.nanoTime();
         GLES20.glDisable(GLES20.GL_DEPTH_TEST);
         GLES20.glDisable(GLES20.GL_CULL_FACE);
     }
@@ -176,6 +202,9 @@ public final class HeroGlAtmosphereOverlayRenderer {
         GLES20.glUniform1f(uHaze, state.airHazeIntensity);
         GLES20.glUniform1f(uSceneLight, state.sceneLight);
         GLES20.glUniform1f(uVisibility, state.visibilityFactor);
+        GLES20.glUniform1f(uTime, (System.nanoTime() - startNanos) / 1_000_000_000f);
+        GLES20.glUniform1f(uWind, state.windStrength);
+        GLES20.glUniform1f(uWindDir, state.windDirectionRadians);
 
         quadBuffer.position(0);
         GLES20.glEnableVertexAttribArray(aPosition);
