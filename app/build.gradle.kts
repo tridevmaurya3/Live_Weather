@@ -23,17 +23,17 @@ val generatedRadarLeafletAssets = layout.buildDirectory
  * Configuration-cache-safe Copy task:
  * - no doLast/doFirst task action capturing Kotlin script state
  * - no lazy from { ... } closure that captures the Configuration / Project
- * - CopySpec receives concrete archive trees while the task is configured
- * - per-file path action is stateless and captures no build-script variables
+ * - CopySpec receives archive trees while the task is configured
+ * - eachFile uses Kotlin DSL receiver syntax and only string literals
  */
 val prepareRadarLeafletRuntime by tasks.registering(Copy::class) {
     from(radarLeafletRuntime.map { archive -> zipTree(archive) }) {
         include("META-INF/resources/webjars/leaflet/1.9.4/dist/**")
-        eachFile(org.gradle.api.Action<org.gradle.api.file.FileCopyDetails> { details ->
-            details.path = "radar/vendor/leaflet/" + details.path.removePrefix(
+        eachFile {
+            path = "radar/vendor/leaflet/" + path.removePrefix(
                 "META-INF/resources/webjars/leaflet/1.9.4/dist/"
             )
-        })
+        }
         includeEmptyDirs = false
     }
 
