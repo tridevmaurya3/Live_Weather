@@ -42,8 +42,9 @@ import java.util.Map;
  * model-field context. Only the sanitized observed timeline and safe tile host
  * from RadarUiState are allowed into the WebView payload.
  *
- * Phase 20B.3 adds a compact active-layer legend and explicit selected-chip
- * styling without reloading the WebView or rebuilding the map on layer changes.
+ * Phase 20B.4 makes the observed timeline timestamp-aware, gives latest/history/
+ * playback states explicit UI, and keeps replay behavior deterministic without
+ * inventing any future radar frame.
  */
 public final class Phase9Renderer {
 
@@ -60,6 +61,7 @@ public final class Phase9Renderer {
     private final TextView locationValue;
     private final TextView statusValue;
     private final TextView frameTimeValue;
+    private final TextView timelineSummary;
     private final TextView sourceValue;
     private final TextView legendTitle;
     private final TextView legendBody;
@@ -76,7 +78,9 @@ public final class Phase9Renderer {
     private boolean webReady;
     private boolean playing;
     private boolean destroyed;
+    private boolean followLatest = true;
     private int frameIndex = -1;
+    @Nullable private Long selectedFrameTime;
     private String activeLayer = "rain";
     private Runnable refreshAction;
 
@@ -84,15 +88,21 @@ public final class Phase9Renderer {
         @Override
         public void run() {
             if (destroyed || !playing || latestState == null || !latestState.hasRadarFrames()) return;
+
             int count = latestState.getObservedFrames().size();
             if (count <= 1 || frameIndex >= count - 1) {
+                followLatest = true;
                 stopPlayback();
                 return;
             }
+
             frameIndex++;
+            followLatest = frameIndex >= count - 1;
             timelineSeek.setProgress(frameIndex);
             applyFrame();
+
             if (frameIndex >= count - 1) {
+                followLatest = true;
                 stopPlayback();
             } else {
                 handler.postDelayed(this, PLAY_INTERVAL_MILLIS);
@@ -106,6 +116,7 @@ public final class Phase9Renderer {
         locationValue = activity.findViewById(R.id.radarLocationValue);
         statusValue = activity.findViewById(R.id.radarStatusValue);
         frameTimeValue = activity.findViewById(R.id.radarFrameTimeValue);
+        timelineSummary = activity.findViewById(R.id.radarTimelineSummary);
         sourceValue = activity.findViewById(R.id.radarSourceValue);
         legendTitle = activity.findViewById(R.id.radarLegendTitle);
         legendBody = activity.findViewById(R.id.radarLegendBody);
@@ -136,6 +147,7 @@ public final class Phase9Renderer {
 
     public void render(@NonNull RadarUiState state) {
         if (destroyed) return;
+
         boolean locationChanged = latestState == null
                 || Math.abs(latestState.getLatitude() - state.getLatitude()) > 0.02d
                 || Math.abs(latestState.getLongitude() - state.getLongitude()) > 0.02d;
@@ -279,9 +291,12 @@ public final class Phase9Renderer {
         timelineSeek.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
             @Override
             public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
-                if (!fromUser) return;
+                if (!fromUser || latestState == null || !latestState.hasRadarFrames()) return;
+
                 stopPlayback();
-                frameIndex = progress;
+                int last = latestState.getObservedFrames().size() - 1;
+                frameIndex = Math.max(0, Math.min(progress, last));
+                followLatest = frameIndex == last;
                 selectLayer("rain");
                 applyFrame();
             }
@@ -308,6 +323,7 @@ public final class Phase9Renderer {
             statusValue.setText("Model field ready • observed radar unavailable here");
             return;
         }
+
         String radarError = state.getRadarError();
         String fieldError = state.getFieldError();
         if (radarError != null && fieldError != null) {
@@ -335,27 +351,65 @@ public final class Phase9Renderer {
         sourceValue.setText(text.toString());
     }
 
-    private void renderTimeline(RadarUiState state, boolean locationChanged) {
+    private void renderTimeline(@NonNull RadarUiState state, boolean locationChanged) {
         if (!state.hasRadarFrames()) {
+            playing = false;
+            handler.removeCallbacks(playTicker);
             timelineSeek.setEnabled(false);
             timelineSeek.setMax(0);
             timelineSeek.setProgress(0);
             frameIndex = -1;
-            frameTimeValue.setText("No observed radar frames");
+            selectedFrameTime = null;
+            followLatest = true;
+            frameTimeValue.setText("--:-- UTC");
+            timelineSummary.setText(state.isLoadingRadar()
+                    ? "Loading observed radar history…"
+                    : "Observed radar history unavailable");
+            playButton.setText("Play");
             playButton.setEnabled(false);
-            stopPlayback();
+            updateTimelineAccessibility();
             return;
         }
 
-        int count = state.getObservedFrames().size();
+        List<RainViewerResponse.Frame> frames = state.getObservedFrames();
+        int count = frames.size();
+        int last = count - 1;
+
         timelineSeek.setEnabled(true);
-        playButton.setEnabled(true);
-        timelineSeek.setMax(Math.max(0, count - 1));
-        if (locationChanged || frameIndex < 0 || frameIndex >= count) {
-            frameIndex = count - 1;
+        timelineSeek.setMax(last);
+        playButton.setEnabled(count > 1);
+
+        if (locationChanged || frameIndex < 0) {
+            frameIndex = last;
+            followLatest = true;
+        } else if (followLatest) {
+            frameIndex = last;
+        } else if (selectedFrameTime != null) {
+            frameIndex = findNearestFrameIndex(frames, selectedFrameTime);
+        } else {
+            frameIndex = Math.max(0, Math.min(frameIndex, last));
         }
+
         timelineSeek.setProgress(frameIndex);
-        updateFrameTime();
+        updateFramePresentation();
+    }
+
+    private int findNearestFrameIndex(
+            @NonNull List<RainViewerResponse.Frame> frames,
+            long targetTime
+    ) {
+        int bestIndex = 0;
+        long bestDistance = Long.MAX_VALUE;
+        for (int i = 0; i < frames.size(); i++) {
+            Long time = frames.get(i).getTime();
+            if (time == null) continue;
+            long distance = Math.abs(time - targetTime);
+            if (distance < bestDistance) {
+                bestDistance = distance;
+                bestIndex = i;
+            }
+        }
+        return bestIndex;
     }
 
     private void startPlayback() {
@@ -366,38 +420,91 @@ public final class Phase9Renderer {
         selectLayer("rain");
         if (frameIndex < 0 || frameIndex >= count - 1) {
             frameIndex = 0;
+            followLatest = false;
             timelineSeek.setProgress(frameIndex);
             applyFrame();
+        } else {
+            followLatest = false;
         }
+
         playing = true;
-        playButton.setText("Pause");
+        updatePlaybackPresentation();
         handler.removeCallbacks(playTicker);
         handler.postDelayed(playTicker, PLAY_INTERVAL_MILLIS);
     }
 
     private void stopPlayback() {
         playing = false;
-        playButton.setText("Play");
         handler.removeCallbacks(playTicker);
+        updatePlaybackPresentation();
     }
 
     private void applyFrame() {
-        updateFrameTime();
+        updateFramePresentation();
         if (frameIndex >= 0) {
             evaluate("RadarApp.setFrame(" + frameIndex + ");");
         }
     }
 
-    private void updateFrameTime() {
-        if (latestState == null || !latestState.hasRadarFrames() || frameIndex < 0) return;
-        List<RainViewerResponse.Frame> frames = latestState.getObservedFrames();
-        if (frameIndex >= frames.size()) return;
-        Long time = frames.get(frameIndex).getTime();
-        if (time == null) {
-            frameTimeValue.setText("Observed radar frame");
-        } else {
-            frameTimeValue.setText(FRAME_TIME_FORMATTER.format(Instant.ofEpochSecond(time)));
+    private void updateFramePresentation() {
+        RadarUiState state = latestState;
+        if (state == null || !state.hasRadarFrames() || frameIndex < 0) {
+            updatePlaybackPresentation();
+            return;
         }
+
+        List<RainViewerResponse.Frame> frames = state.getObservedFrames();
+        if (frameIndex >= frames.size()) return;
+
+        Long time = frames.get(frameIndex).getTime();
+        selectedFrameTime = time;
+        frameTimeValue.setText(time == null
+                ? "Observed frame"
+                : FRAME_TIME_FORMATTER.format(Instant.ofEpochSecond(time)));
+        updatePlaybackPresentation();
+    }
+
+    private void updatePlaybackPresentation() {
+        RadarUiState state = latestState;
+        if (state == null || !state.hasRadarFrames() || frameIndex < 0) {
+            playButton.setText("Play");
+            updateTimelineAccessibility();
+            return;
+        }
+
+        int count = state.getObservedFrames().size();
+        int boundedIndex = Math.max(0, Math.min(frameIndex, count - 1));
+        boolean atLatest = boundedIndex == count - 1;
+        String position = "frame " + (boundedIndex + 1) + "/" + count;
+
+        if (playing) {
+            playButton.setText("Pause");
+            timelineSummary.setText("Playing observed history · " + position);
+        } else if (atLatest) {
+            playButton.setText(count > 1 ? "Replay" : "Play");
+            if (state.isRadarMetadataStale()) {
+                timelineSummary.setText("Latest available · delayed metadata · " + position);
+            } else if (state.isRadarFromCache()) {
+                timelineSummary.setText("Latest cached observation · " + position);
+            } else {
+                timelineSummary.setText("Latest observed frame · " + position);
+            }
+        } else {
+            playButton.setText("Play");
+            timelineSummary.setText(
+                    (state.isRadarFromCache() ? "Cached historical frame · " : "Historical observed frame · ")
+                            + position
+            );
+        }
+
+        updateTimelineAccessibility();
+    }
+
+    private void updateTimelineAccessibility() {
+        String summary = String.valueOf(timelineSummary.getText());
+        String time = String.valueOf(frameTimeValue.getText());
+        timelineSeek.setContentDescription(summary + " · " + time + ". Swipe to choose an observed past frame.");
+        playButton.setContentDescription(String.valueOf(playButton.getText()) + " observed radar history");
     }
 
     private void selectLayer(@NonNull String layer) {
