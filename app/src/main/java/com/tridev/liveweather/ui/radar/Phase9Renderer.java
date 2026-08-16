@@ -4,11 +4,12 @@ import android.app.Activity;
 import android.content.Intent;
 import android.graphics.Typeface;
 import android.net.Uri;
-import android.os.Handler;
-import android.os.Looper;
+import android.util.Log;
 import android.view.HapticFeedbackConstants;
 import android.view.View;
 import android.view.ViewGroup;
+import android.webkit.RenderProcessGoneDetail;
+import android.webkit.WebResourceError;
 import android.webkit.WebResourceRequest;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
@@ -16,6 +17,9 @@ import android.webkit.WebViewClient;
 import android.widget.FrameLayout;
 import android.widget.SeekBar;
 import android.widget.TextView;
+
+import android.os.Handler;
+import android.os.Looper;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
@@ -48,13 +52,22 @@ import java.util.Map;
  * inventing any future radar frame.
  *
  * Phase 20B.5 exposes freshness and delivery provenance while preserving usable
- * cached layers during refresh. Freshness text updates once per minute only while
- * the Radar page is visible; it performs no network request or map rebuild.
+ * cached layers during refresh.
+ *
+ * Phase 20B.6 hardens the WebView/Chromium lifecycle. Unchanged map payloads are
+ * not resent on every show/hide cycle, the page gets explicit suspend/resume
+ * signals, and a crashed WebView renderer receives bounded recreation instead of
+ * leaving the Radar destination permanently black.
  */
 public final class Phase9Renderer {
 
+    private static final String TAG = "LiveWeatherRadar";
+    private static final String RADAR_ASSET_URL = "file:///android_asset/radar/radar_map.html";
     private static final long PLAY_INTERVAL_MILLIS = 1_100L;
     private static final long FRESHNESS_TICK_MILLIS = 60_000L;
+    private static final long WEB_RECOVERY_DELAY_MILLIS = 650L;
+    private static final int MAX_WEB_RECOVERY_ATTEMPTS = 2;
+
     private static final DateTimeFormatter FRAME_TIME_FORMATTER =
             DateTimeFormatter.ofPattern("HH:mm 'UTC'", Locale.US).withZone(ZoneOffset.UTC);
 
@@ -63,7 +76,6 @@ public final class Phase9Renderer {
     private final Handler handler = new Handler(Looper.getMainLooper());
 
     private final FrameLayout mapHost;
-    private final WebView mapWebView;
     private final TextView locationValue;
     private final TextView statusValue;
     private final TextView freshnessValue;
@@ -81,14 +93,23 @@ public final class Phase9Renderer {
     private final TextView recenterButton;
     private final SeekBar timelineSeek;
 
-    private RadarUiState latestState;
+    @Nullable private WebView mapWebView;
+    @Nullable private RadarUiState latestState;
+    @Nullable private String preparedPayloadJson;
+    @Nullable private String lastDeliveredPayloadJson;
+    @Nullable private String lastDeliveredLayer;
+    @Nullable private Long selectedFrameTime;
+
     private boolean webReady;
     private boolean playing;
     private boolean destroyed;
     private boolean pageVisible;
     private boolean followLatest = true;
+    private boolean webRecoveryScheduled;
+    private boolean webRecoveryExhausted;
+    private int webRecoveryAttempts;
     private int frameIndex = -1;
-    @Nullable private Long selectedFrameTime;
+    private int lastDeliveredFrame = Integer.MIN_VALUE;
     private String activeLayer = "rain";
     private Runnable refreshAction;
 
@@ -151,14 +172,7 @@ public final class Phase9Renderer {
         recenterButton = activity.findViewById(R.id.radarRecenterButton);
         timelineSeek = activity.findViewById(R.id.radarTimelineSeek);
 
-        mapWebView = new WebView(activity);
-        FrameLayout.LayoutParams mapParams = new FrameLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,
-                ViewGroup.LayoutParams.MATCH_PARENT
-        );
-        mapHost.addView(mapWebView, 0, mapParams);
-
-        setupWebView();
+        createWebView();
         setupControls();
         selectLayer("rain");
     }
@@ -174,6 +188,7 @@ public final class Phase9Renderer {
                 || Math.abs(latestState.getLatitude() - state.getLatitude()) > 0.02d
                 || Math.abs(latestState.getLongitude() - state.getLongitude()) > 0.02d;
         latestState = state;
+        preparedPayloadJson = buildMapPayloadJson(state);
 
         locationValue.setText(String.format(
                 Locale.US,
@@ -193,7 +208,22 @@ public final class Phase9Renderer {
     public void onVisible() {
         if (destroyed) return;
         pageVisible = true;
-        mapWebView.onResume();
+
+        if (mapWebView == null && !webRecoveryExhausted) {
+            createWebView();
+        }
+
+        WebView view = mapWebView;
+        if (view != null) {
+            try {
+                view.setRendererPriorityPolicy(WebView.RENDERER_PRIORITY_BOUND, true);
+                view.onResume();
+            } catch (RuntimeException exception) {
+                requestWebRecovery(view, "resume", exception);
+            }
+        }
+
+        evaluate("RadarApp.resume();");
         pushStateToMap();
         if (latestState != null) renderFreshness(latestState);
         handler.removeCallbacks(freshnessTicker);
@@ -205,31 +235,68 @@ public final class Phase9Renderer {
         pageVisible = false;
         handler.removeCallbacks(freshnessTicker);
         stopPlayback();
-        mapWebView.onPause();
+        evaluate("RadarApp.suspend();");
+
+        WebView view = mapWebView;
+        if (view != null) {
+            try {
+                view.onPause();
+            } catch (RuntimeException exception) {
+                requestWebRecovery(view, "pause", exception);
+            }
+        }
     }
 
     public void onDestroy() {
         if (destroyed) return;
         destroyed = true;
         pageVisible = false;
-        handler.removeCallbacks(freshnessTicker);
-        stopPlayback();
+        playing = false;
         refreshAction = null;
+        preparedPayloadJson = null;
+        latestState = null;
+        handler.removeCallbacksAndMessages(null);
+
+        WebView view = mapWebView;
+        mapWebView = null;
         webReady = false;
-        try {
-            mapWebView.stopLoading();
-            mapWebView.setWebViewClient(null);
-            mapWebView.loadUrl("about:blank");
-            mapHost.removeView(mapWebView);
-            mapWebView.destroy();
-        } catch (RuntimeException ignored) {
-        }
+        destroyWebView(view);
+        resetDeliveredBridgeState();
     }
 
-    private void setupWebView() {
-        WebSettings settings = mapWebView.getSettings();
+    private void createWebView() {
+        if (destroyed || mapWebView != null) return;
+
+        WebView view;
+        try {
+            view = new WebView(activity);
+        } catch (RuntimeException exception) {
+            webRecoveryExhausted = true;
+            Log.e(TAG, "Unable to create Radar WebView", exception);
+            renderMapEngineFailureStatus();
+            return;
+        }
+
+        mapWebView = view;
+        webReady = false;
+        resetDeliveredBridgeState();
+
+        FrameLayout.LayoutParams mapParams = new FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.MATCH_PARENT
+        );
+        mapHost.addView(view, 0, mapParams);
+        setupWebView(view);
+        view.loadUrl(RADAR_ASSET_URL);
+    }
+
+    private void setupWebView(@NonNull WebView view) {
+        WebSettings settings = view.getSettings();
         settings.setJavaScriptEnabled(true);
+        settings.setJavaScriptCanOpenWindowsAutomatically(false);
+        settings.setSupportMultipleWindows(false);
         settings.setDomStorageEnabled(false);
+        settings.setGeolocationEnabled(false);
         settings.setAllowContentAccess(false);
         settings.setAllowFileAccess(true);
         settings.setAllowFileAccessFromFileURLs(false);
@@ -238,28 +305,72 @@ public final class Phase9Renderer {
         settings.setDisplayZoomControls(false);
         settings.setSupportZoom(false);
         settings.setLoadsImagesAutomatically(true);
+        settings.setCacheMode(WebSettings.LOAD_DEFAULT);
+        settings.setMixedContentMode(WebSettings.MIXED_CONTENT_NEVER_ALLOW);
+        settings.setMediaPlaybackRequiresUserGesture(true);
+
         String userAgent = settings.getUserAgentString();
         if (userAgent != null && !userAgent.contains("LiveWeather/1.0")) {
             settings.setUserAgentString(userAgent + " LiveWeather/1.0");
         }
 
-        mapWebView.setBackgroundColor(0xFF0B1F36);
-        mapWebView.setOverScrollMode(View.OVER_SCROLL_NEVER);
-        mapWebView.setWebViewClient(new WebViewClient() {
+        view.setSaveEnabled(false);
+        view.setBackgroundColor(0xFF0B1F36);
+        view.setOverScrollMode(View.OVER_SCROLL_NEVER);
+        view.setRendererPriorityPolicy(WebView.RENDERER_PRIORITY_BOUND, true);
+        view.setWebViewClient(new WebViewClient() {
             @Override
-            public void onPageFinished(WebView view, String url) {
-                if (destroyed) return;
+            public void onPageFinished(WebView finishedView, String url) {
+                if (destroyed || finishedView != mapWebView || !isRadarAssetUrl(url)) return;
+
                 webReady = true;
+                webRecoveryScheduled = false;
+                webRecoveryAttempts = 0;
+                webRecoveryExhausted = false;
+                resetDeliveredBridgeState();
+                evaluate("RadarApp.resume();");
                 pushStateToMap();
             }
 
             @Override
-            public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) {
+            public void onReceivedError(
+                    WebView failedView,
+                    WebResourceRequest request,
+                    WebResourceError error
+            ) {
+                if (destroyed || failedView != mapWebView || request == null) return;
                 Uri uri = request.getUrl();
-                String url = uri == null ? "" : uri.toString();
-                if (url.startsWith("file:///android_asset/radar/")) {
-                    return false;
+                if (request.isForMainFrame() && uri != null && isRadarAssetUrl(uri.toString())) {
+                    requestWebRecovery(
+                            failedView,
+                            "main-frame-load",
+                            new IllegalStateException("Radar local page load failed: " + error)
+                    );
                 }
+            }
+
+            @Override
+            public boolean onRenderProcessGone(
+                    WebView failedView,
+                    RenderProcessGoneDetail detail
+            ) {
+                if (destroyed || failedView != mapWebView) return true;
+                String stage = detail != null && detail.didCrash()
+                        ? "renderer-crash"
+                        : "renderer-terminated";
+                requestWebRecovery(
+                        failedView,
+                        stage,
+                        new IllegalStateException("Radar WebView render process unavailable")
+                );
+                return true;
+            }
+
+            @Override
+            public boolean shouldOverrideUrlLoading(WebView sourceView, WebResourceRequest request) {
+                Uri uri = request == null ? null : request.getUrl();
+                String url = uri == null ? "" : uri.toString();
+                if (isRadarAssetUrl(url)) return false;
 
                 String host = uri == null ? null : uri.getHost();
                 if (isAttributionHost(host)) {
@@ -271,7 +382,10 @@ public final class Phase9Renderer {
                 return true;
             }
         });
-        mapWebView.loadUrl("file:///android_asset/radar/radar_map.html");
+    }
+
+    private boolean isRadarAssetUrl(@Nullable String url) {
+        return url != null && url.startsWith("file:///android_asset/radar/");
     }
 
     private boolean isAttributionHost(@Nullable String host) {
@@ -282,7 +396,94 @@ public final class Phase9Renderer {
                 || normalized.equals("open-meteo.com")
                 || normalized.equals("www.open-meteo.com")
                 || normalized.equals("openstreetmap.org")
-                || normalized.equals("www.openstreetmap.org");
+                || normalized.equals("www.openstreetmap.org")
+                || normalized.equals("leafletjs.com")
+                || normalized.equals("www.leafletjs.com");
+    }
+
+    private void requestWebRecovery(
+            @NonNull WebView failedView,
+            @NonNull String stage,
+            @NonNull Throwable throwable
+    ) {
+        if (destroyed || failedView != mapWebView) return;
+
+        Log.e(TAG, "Radar WebView fault at " + stage, throwable);
+        webReady = false;
+        resetDeliveredBridgeState();
+
+        mapWebView = null;
+        destroyWebView(failedView);
+
+        if (webRecoveryAttempts >= MAX_WEB_RECOVERY_ATTEMPTS) {
+            webRecoveryExhausted = true;
+            webRecoveryScheduled = false;
+            renderMapEngineFailureStatus();
+            return;
+        }
+
+        webRecoveryAttempts++;
+        if (webRecoveryScheduled) return;
+        webRecoveryScheduled = true;
+
+        handler.postDelayed(() -> {
+            webRecoveryScheduled = false;
+            if (destroyed || mapWebView != null) return;
+            if (pageVisible) {
+                createWebView();
+            }
+        }, WEB_RECOVERY_DELAY_MILLIS);
+    }
+
+    private void destroyWebView(@Nullable WebView view) {
+        if (view == null) return;
+        try {
+            view.stopLoading();
+        } catch (RuntimeException ignored) {
+        }
+        try {
+            view.setWebViewClient(null);
+        } catch (RuntimeException ignored) {
+        }
+        try {
+            view.clearHistory();
+            view.removeAllViews();
+        } catch (RuntimeException ignored) {
+        }
+        try {
+            ViewGroup parent = (ViewGroup) view.getParent();
+            if (parent != null) parent.removeView(view);
+        } catch (RuntimeException ignored) {
+        }
+        try {
+            view.destroy();
+        } catch (RuntimeException ignored) {
+        }
+    }
+
+    private void retryMapEngine() {
+        if (destroyed) return;
+
+        if (mapWebView == null) {
+            webRecoveryAttempts = 0;
+            webRecoveryExhausted = false;
+            createWebView();
+            return;
+        }
+
+        evaluate("RadarApp.retryEngine();");
+    }
+
+    private void renderMapEngineFailureStatus() {
+        if (destroyed) return;
+        statusValue.setText("Interactive map engine unavailable • weather data retained");
+        freshnessValue.setTextColor(activity.getColor(R.color.weather_warning));
+    }
+
+    private void resetDeliveredBridgeState() {
+        lastDeliveredPayloadJson = null;
+        lastDeliveredLayer = null;
+        lastDeliveredFrame = Integer.MIN_VALUE;
     }
 
     private void setupControls() {
@@ -311,12 +512,13 @@ public final class Phase9Renderer {
 
         refreshButton.setOnClickListener(view -> {
             haptic(view);
+            retryMapEngine();
             if (refreshAction != null) refreshAction.run();
         });
 
         recenterButton.setOnClickListener(view -> {
             haptic(view);
-            evaluate("RadarApp.recenter();");
+            if (!evaluate("RadarApp.recenter();")) retryMapEngine();
         });
 
         timelineSeek.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
@@ -347,6 +549,13 @@ public final class Phase9Renderer {
         refreshButton.setContentDescription(refreshing
                 ? "Refreshing radar and model field"
                 : "Refresh radar and model field");
+
+        if (webRecoveryExhausted) {
+            statusValue.setText(hasUsableData
+                    ? "Interactive map engine unavailable • weather data retained"
+                    : "Interactive map engine unavailable • retry Refresh when ready");
+            return;
+        }
 
         if (refreshing) {
             statusValue.setText(hasUsableData
@@ -427,7 +636,8 @@ public final class Phase9Renderer {
         }
 
         freshnessValue.setText(text.toString());
-        boolean warning = state.isRadarNetworkFallback()
+        boolean warning = webRecoveryExhausted
+                || state.isRadarNetworkFallback()
                 || state.isFieldNetworkFallback()
                 || state.isRadarServerFallback()
                 || state.isFieldServerFallback()
@@ -581,8 +791,8 @@ public final class Phase9Renderer {
 
     private void applyFrame() {
         updateFramePresentation();
-        if (frameIndex >= 0) {
-            evaluate("RadarApp.setFrame(" + frameIndex + ");");
+        if (frameIndex >= 0 && evaluate("RadarApp.setFrame(" + frameIndex + ");")) {
+            lastDeliveredFrame = frameIndex;
         }
     }
 
@@ -658,7 +868,9 @@ public final class Phase9Renderer {
         setChipSelected(windLayer, "wind".equals(layer));
         setChipSelected(tempLayer, "temp".equals(layer));
         renderLegend();
-        evaluate("RadarApp.setLayer('" + layer + "');");
+        if (!layer.equals(lastDeliveredLayer) && evaluate("RadarApp.setLayer('" + layer + "');")) {
+            lastDeliveredLayer = layer;
+        }
     }
 
     private void setChipSelected(@NonNull TextView view, boolean selected) {
@@ -727,19 +939,18 @@ public final class Phase9Renderer {
         }
     }
 
-    private void pushStateToMap() {
-        if (destroyed || !webReady || latestState == null) return;
-
+    @NonNull
+    private String buildMapPayloadJson(@NonNull RadarUiState state) {
         Map<String, Object> payload = new LinkedHashMap<>();
-        payload.put("latitude", latestState.getLatitude());
-        payload.put("longitude", latestState.getLongitude());
+        payload.put("latitude", state.getLatitude());
+        payload.put("longitude", state.getLongitude());
         payload.put("zoom", 6);
-        payload.put("radarHost", latestState.getSafeRadarHost());
+        payload.put("radarHost", state.getSafeRadarHost());
         payload.put("radarKind", "observed_past");
         payload.put("fieldKind", "model_current");
 
         List<Map<String, Object>> frames = new ArrayList<>();
-        for (RainViewerResponse.Frame frame : latestState.getObservedFrames()) {
+        for (RainViewerResponse.Frame frame : state.getObservedFrames()) {
             Map<String, Object> item = new LinkedHashMap<>();
             item.put("time", frame.getTime());
             item.put("path", frame.getPath());
@@ -748,7 +959,7 @@ public final class Phase9Renderer {
         payload.put("frames", frames);
 
         List<Map<String, Object>> field = new ArrayList<>();
-        for (RadarFieldPointResponse point : latestState.getField()) {
+        for (RadarFieldPointResponse point : state.getField()) {
             if (point.getLatitude() == null || point.getLongitude() == null) continue;
             Map<String, Object> item = new LinkedHashMap<>();
             item.put("lat", point.getLatitude());
@@ -766,21 +977,62 @@ public final class Phase9Renderer {
         }
         payload.put("field", field);
 
-        String json = gson.toJson(payload);
-        mapWebView.post(() -> {
-            if (destroyed) return;
-            evaluate("RadarApp.setData(" + json + ");");
-            evaluate("RadarApp.setLayer('" + activeLayer + "');");
-            if (frameIndex >= 0) evaluate("RadarApp.setFrame(" + frameIndex + ");");
+        return gson.toJson(payload);
+    }
+
+    private void pushStateToMap() {
+        WebView view = mapWebView;
+        String json = preparedPayloadJson;
+        if (destroyed || !webReady || view == null || json == null) return;
+
+        boolean payloadChanged = !json.equals(lastDeliveredPayloadJson);
+        boolean layerChanged = !activeLayer.equals(lastDeliveredLayer);
+        boolean frameChanged = frameIndex >= 0 && frameIndex != lastDeliveredFrame;
+        if (!payloadChanged && !layerChanged && !frameChanged) return;
+
+        final int targetFrame = frameIndex;
+        final String targetLayer = activeLayer;
+        view.post(() -> {
+            if (destroyed || !webReady || view != mapWebView) return;
+
+            if (payloadChanged) {
+                if (!evaluateOnView(view, "RadarApp.setData(" + json + ");")) return;
+                lastDeliveredPayloadJson = json;
+                lastDeliveredLayer = null;
+                lastDeliveredFrame = Integer.MIN_VALUE;
+            }
+
+            if (payloadChanged || !targetLayer.equals(lastDeliveredLayer)) {
+                if (evaluateOnView(view, "RadarApp.setLayer('" + targetLayer + "');")) {
+                    lastDeliveredLayer = targetLayer;
+                }
+            }
+
+            if (targetFrame >= 0 && (payloadChanged || targetFrame != lastDeliveredFrame)) {
+                if (evaluateOnView(view, "RadarApp.setFrame(" + targetFrame + ");")) {
+                    lastDeliveredFrame = targetFrame;
+                }
+            }
         });
     }
 
-    private void evaluate(@NonNull String script) {
-        if (destroyed || !webReady) return;
-        mapWebView.evaluateJavascript(
-                "if (window.RadarApp) { " + script + " }",
-                null
-        );
+    private boolean evaluate(@NonNull String script) {
+        WebView view = mapWebView;
+        return view != null && evaluateOnView(view, script);
+    }
+
+    private boolean evaluateOnView(@NonNull WebView view, @NonNull String script) {
+        if (destroyed || !webReady || view != mapWebView) return false;
+        try {
+            view.evaluateJavascript(
+                    "if (window.RadarApp) { " + script + " }",
+                    null
+            );
+            return true;
+        } catch (RuntimeException exception) {
+            requestWebRecovery(view, "javascript-bridge", exception);
+            return false;
+        }
     }
 
     private void haptic(View view) {
