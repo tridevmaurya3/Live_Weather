@@ -14,6 +14,7 @@ import androidx.core.content.ContextCompat;
 import androidx.core.widget.NestedScrollView;
 
 import com.tridev.liveweather.R;
+import com.tridev.liveweather.domain.alert.AlertTruthPolicy;
 import com.tridev.liveweather.domain.alert.AlertUiState;
 import com.tridev.liveweather.domain.alert.WeatherAlert;
 import com.tridev.liveweather.ui.weather.WeatherFormatter;
@@ -76,7 +77,7 @@ public final class Phase8Renderer {
 
         alertsSection.addView(section("Weather Alerts Center"));
         alertsSection.addView(caption(
-                "Official IMD CAP warnings + separately labelled Smart Risk signals. Official and model-derived alerts are never mixed as the same source."
+                "Official warning data and app-derived Smart Risk signals stay separate. Saved or stale official data is labelled and is never presented as a live all-clear."
         ), top(-1, -2, 4));
 
         alertsLocation = bodyLarge("Waiting for active location");
@@ -130,36 +131,74 @@ public final class Phase8Renderer {
             alertsLocation.setText("Resolving alert district…");
         }
 
+        long now = System.currentTimeMillis();
         String status = state.isLoading() ? "Checking alerts…" : "Alerts checked";
-        if (state.getUpdatedAt() > 0L) {
-            status += " · " + WeatherFormatter.updatedTime(state.getUpdatedAt());
+        if (state.getCheckedAt() > 0L) {
+            status += " · " + WeatherFormatter.updatedTime(state.getCheckedAt());
         }
+        status += "\n" + state.officialDeliveryLabel(now);
         if (state.getMessage() != null) status += "\n" + state.getMessage();
         alertsStatus.setText(status);
+        boolean warningStatus = state.isOfficialStale(now)
+                || state.getOfficialDelivery() == AlertTruthPolicy.OfficialDelivery.UNAVAILABLE;
+        alertsStatus.setTextColor(ContextCompat.getColor(
+                activity,
+                warningStatus ? R.color.weather_warning : R.color.weather_text_tertiary
+        ));
 
         List<WeatherAlert> alerts = state.getAlerts();
         alertsList.removeAllViews();
         if (alerts.isEmpty()) {
-            TextView empty = body("No active weather alert is detected for this location right now.");
-            empty.setTextColor(ContextCompat.getColor(activity, R.color.weather_success));
+            TextView empty = body(emptyStateMessage(state, now));
+            boolean confirmedEmpty = !state.isLoading() && state.canConfirmNoOfficialMatch(now);
+            empty.setTextColor(ContextCompat.getColor(
+                    activity,
+                    confirmedEmpty ? R.color.weather_success : R.color.weather_warning
+            ));
             alertsList.addView(empty);
             homeAlertCard.setVisibility(View.GONE);
             return;
         }
 
         for (WeatherAlert alert : alerts) {
-            alertsList.addView(alertRow(alert), top(-1, -2, alertsList.getChildCount() == 0 ? 0 : 8));
+            alertsList.addView(
+                    alertRow(alert, state, now),
+                    top(-1, -2, alertsList.getChildCount() == 0 ? 0 : 8)
+            );
         }
 
         WeatherAlert highest = state.highestAlert();
         if (highest != null) {
             homeAlertCard.setVisibility(View.VISIBLE);
-            homeAlertBadge.setText(highest.sourceLabel() + " · " + severityName(highest.getSeverity()));
+            boolean staleOfficial = highest.isOfficial() && state.isOfficialStale(now);
+            homeAlertBadge.setText((staleOfficial ? "SAVED OFFICIAL" : highest.sourceLabel())
+                    + " · " + severityName(highest.getSeverity()));
             homeAlertBadge.setTextColor(severityColor(highest.getSeverity()));
             homeAlertTitle.setText(highest.getTitle());
-            homeAlertMessage.setText(highest.getMessage()
-                    + (highest.getValidLabel() == null ? "" : "\n" + highest.getValidLabel()));
+            String message = highest.getMessage()
+                    + (highest.getValidLabel() == null ? "" : "\n" + highest.getValidLabel());
+            if (staleOfficial) {
+                message += "\nSaved official warning shown as fallback; source refresh is stale.";
+            }
+            homeAlertMessage.setText(message);
         }
+    }
+
+    @NonNull
+    private String emptyStateMessage(@NonNull AlertUiState state, long now) {
+        if (state.isLoading()) {
+            return "Checking official warning data and Smart Risk signals…";
+        }
+        if (state.canConfirmNoOfficialMatch(now)) {
+            return "No active official warning matched this location in the latest available check, and Smart Risk has no active threshold signal. Conditions can still change.";
+        }
+        if (state.getOfficialDelivery() == AlertTruthPolicy.OfficialDelivery.NOT_APPLICABLE) {
+            return "No Smart Risk threshold signal is active for this location. Official IMD warning coverage is not applicable here.";
+        }
+        if (state.isOfficialStale(now)) {
+            return "No current all-clear can be confirmed. Saved official warning data is stale and the latest source refresh was unavailable.";
+        }
+        return "No alert is currently displayed, but the official warning source could not be verified. This is not an official all-clear.";
     }
 
     public void scrollToAlerts() {
@@ -174,9 +213,15 @@ public final class Phase8Renderer {
         }
     }
 
-    private View alertRow(WeatherAlert alert) {
+    private View alertRow(
+            WeatherAlert alert,
+            @NonNull AlertUiState state,
+            long now
+    ) {
         LinearLayout row = card(false);
-        TextView badge = captionAccent(alert.sourceLabel() + " · " + severityName(alert.getSeverity()));
+        boolean staleOfficial = alert.isOfficial() && state.isOfficialStale(now);
+        TextView badge = captionAccent((staleOfficial ? "SAVED OFFICIAL" : alert.sourceLabel())
+                + " · " + severityName(alert.getSeverity()));
         badge.setTextColor(severityColor(alert.getSeverity()));
         row.addView(badge);
         row.addView(title(alert.getTitle()), top(-1, -2, 5));
@@ -185,6 +230,11 @@ public final class Phase8Renderer {
         if (alert.getLocationLabel() != null) meta += alert.getLocationLabel();
         if (alert.getValidLabel() != null) meta += (meta.isEmpty() ? "" : " · ") + alert.getValidLabel();
         if (!meta.isEmpty()) row.addView(caption(meta), top(-1, -2, 7));
+        if (staleOfficial) {
+            TextView stale = caption("Saved official warning · latest source refresh unavailable/stale");
+            stale.setTextColor(ContextCompat.getColor(activity, R.color.weather_warning));
+            row.addView(stale, top(-1, -2, 6));
+        }
         return row;
     }
 
