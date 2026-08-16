@@ -100,8 +100,11 @@
         shell.classList.add('hidden');
     }
 
-    function ensureLeafletCss() {
-        if (document.getElementById('leaflet-css')) return;
+    function ensureLeafletCss(forceRetry) {
+        const current = document.getElementById('leaflet-css');
+        if (current && !forceRetry) return;
+        if (current && current.parentNode) current.parentNode.removeChild(current);
+
         const link = document.createElement('link');
         link.id = 'leaflet-css';
         link.rel = 'stylesheet';
@@ -121,14 +124,13 @@
             initializeMap();
             return Promise.resolve(true);
         }
-        if (leafletLoadPromise && !forceRetry) return leafletLoadPromise;
 
-        if (forceRetry) {
-            removeLeafletScript();
-            leafletLoadPromise = null;
-        }
+        // Never overlap engine-load attempts. A Refresh/Recenter during an active
+        // attempt simply joins it; explicit retry starts after that attempt ends.
+        if (leafletLoadPromise) return leafletLoadPromise;
 
-        ensureLeafletCss();
+        if (forceRetry) removeLeafletScript();
+        ensureLeafletCss(forceRetry);
         showShell(
             'PREPARING RADAR MAP',
             payload ? 'Weather data is ready. Loading the interactive map engine…' : 'Loading the interactive map engine…',
