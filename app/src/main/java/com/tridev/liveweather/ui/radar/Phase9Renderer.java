@@ -2,6 +2,7 @@ package com.tridev.liveweather.ui.radar;
 
 import android.app.Activity;
 import android.content.Intent;
+import android.graphics.Typeface;
 import android.net.Uri;
 import android.os.Handler;
 import android.os.Looper;
@@ -40,6 +41,9 @@ import java.util.Map;
  * Phase 20B keeps observed RainViewer radar frames separate from Open-Meteo
  * model-field context. Only the sanitized observed timeline and safe tile host
  * from RadarUiState are allowed into the WebView payload.
+ *
+ * Phase 20B.3 adds a compact active-layer legend and explicit selected-chip
+ * styling without reloading the WebView or rebuilding the map on layer changes.
  */
 public final class Phase9Renderer {
 
@@ -57,6 +61,8 @@ public final class Phase9Renderer {
     private final TextView statusValue;
     private final TextView frameTimeValue;
     private final TextView sourceValue;
+    private final TextView legendTitle;
+    private final TextView legendBody;
     private final TextView rainLayer;
     private final TextView cloudsLayer;
     private final TextView windLayer;
@@ -101,6 +107,8 @@ public final class Phase9Renderer {
         statusValue = activity.findViewById(R.id.radarStatusValue);
         frameTimeValue = activity.findViewById(R.id.radarFrameTimeValue);
         sourceValue = activity.findViewById(R.id.radarSourceValue);
+        legendTitle = activity.findViewById(R.id.radarLegendTitle);
+        legendBody = activity.findViewById(R.id.radarLegendBody);
         rainLayer = activity.findViewById(R.id.radarLayerRain);
         cloudsLayer = activity.findViewById(R.id.radarLayerClouds);
         windLayer = activity.findViewById(R.id.radarLayerWind);
@@ -143,6 +151,7 @@ public final class Phase9Renderer {
         renderStatus(state);
         renderSource(state);
         renderTimeline(state, locationChanged);
+        renderLegend();
         pushStateToMap();
     }
 
@@ -397,13 +406,68 @@ public final class Phase9Renderer {
         setChipSelected(cloudsLayer, "clouds".equals(layer));
         setChipSelected(windLayer, "wind".equals(layer));
         setChipSelected(tempLayer, "temp".equals(layer));
+        renderLegend();
         evaluate("RadarApp.setLayer('" + layer + "');");
     }
 
-    private void setChipSelected(TextView view, boolean selected) {
-        view.setAlpha(selected ? 1.0f : 0.56f);
-        view.setScaleX(selected ? 1.03f : 1.0f);
-        view.setScaleY(selected ? 1.03f : 1.0f);
+    private void setChipSelected(@NonNull TextView view, boolean selected) {
+        view.setSelected(selected);
+        view.setAlpha(selected ? 1.0f : 0.78f);
+        view.setScaleX(1.0f);
+        view.setScaleY(1.0f);
+        view.setBackgroundResource(
+                selected ? R.drawable.bg_weather_chip_selected : R.drawable.bg_weather_chip
+        );
+        view.setTextColor(activity.getColor(
+                selected ? R.color.weather_aqua : R.color.weather_text_primary
+        ));
+        view.setTypeface(Typeface.DEFAULT, selected ? Typeface.BOLD : Typeface.NORMAL);
+        String label = String.valueOf(view.getText());
+        view.setContentDescription(label + (selected ? ", selected" : ", not selected"));
+    }
+
+    private void renderLegend() {
+        RadarUiState state = latestState;
+        switch (activeLayer) {
+            case "clouds":
+                legendTitle.setText("MODEL CLOUDS · OPEN-METEO");
+                if (state != null && !state.hasField()) {
+                    legendBody.setText("Current model cloud field unavailable.");
+                } else {
+                    legendBody.setText("Cloud cover 0–100% · continuous interpolated model field");
+                }
+                break;
+
+            case "wind":
+                legendTitle.setText("MODEL WIND · OPEN-METEO");
+                if (state != null && !state.hasField()) {
+                    legendBody.setText("Current model wind field unavailable.");
+                } else {
+                    legendBody.setText("Arrow = flow direction · label = speed in selected wind unit");
+                }
+                break;
+
+            case "temp":
+                legendTitle.setText("MODEL TEMPERATURE · OPEN-METEO");
+                if (state != null && !state.hasField()) {
+                    legendBody.setText("Current model temperature field unavailable.");
+                } else {
+                    legendBody.setText("Color scale: cold → cool → mild → warm → hot · labels use selected unit");
+                }
+                break;
+
+            case "rain":
+            default:
+                legendTitle.setText("OBSERVED RAIN RADAR · RAINVIEWER");
+                if (state != null && !state.hasRadarFrames()) {
+                    legendBody.setText("Observed radar frames unavailable for this area/network.");
+                } else if (state != null && state.isRadarMetadataStale()) {
+                    legendBody.setText("Echo intensity: light → moderate → heavy → intense · delayed metadata");
+                } else {
+                    legendBody.setText("Echo intensity: light → moderate → heavy → intense · observed past frames");
+                }
+                break;
+        }
     }
 
     private void pushStateToMap() {
