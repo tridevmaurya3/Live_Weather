@@ -22,6 +22,11 @@ import retrofit2.Response;
  * RainViewer is treated as observed past radar imagery. Open-Meteo is a sampled
  * atmospheric model field for cloud/wind/temperature context; it is never
  * promoted to observed radar truth or used to fabricate future radar frames.
+ *
+ * Phase 20B.5 also reports where each successful delivery came from and when
+ * the cached/network payload was saved. This lets the UI distinguish a normal
+ * in-memory cache hit from a network/server fallback instead of calling every
+ * cached response "offline".
  */
 public final class RadarRepository {
 
@@ -38,8 +43,36 @@ public final class RadarRepository {
     private double cachedFieldLatitude = Double.NaN;
     private double cachedFieldLongitude = Double.NaN;
 
+    public enum DeliverySource {
+        NETWORK,
+        MEMORY_CACHE,
+        NETWORK_FALLBACK_CACHE,
+        SERVER_FALLBACK_CACHE;
+
+        public boolean isCache() {
+            return this != NETWORK;
+        }
+
+        public boolean isFallback() {
+            return this == NETWORK_FALLBACK_CACHE || this == SERVER_FALLBACK_CACHE;
+        }
+
+        public boolean isNetworkFallback() {
+            return this == NETWORK_FALLBACK_CACHE;
+        }
+
+        public boolean isServerFallback() {
+            return this == SERVER_FALLBACK_CACHE;
+        }
+    }
+
     public interface ResultCallback<T> {
-        void onSuccess(@NonNull T value, boolean fromCache);
+        void onSuccess(
+                @NonNull T value,
+                @NonNull DeliverySource source,
+                long savedAtMillis
+        );
+
         void onError(@NonNull String message, @Nullable Throwable throwable);
     }
 
@@ -49,7 +82,7 @@ public final class RadarRepository {
                 && cachedRadar != null
                 && now - cachedRadarAt < RADAR_CACHE_MILLIS
                 && RadarObservedDataPolicy.hasUsableObservedTimeline(cachedRadar, now)) {
-            callback.onSuccess(cachedRadar, true);
+            callback.onSuccess(cachedRadar, DeliverySource.MEMORY_CACHE, cachedRadarAt);
             return;
         }
 
@@ -66,14 +99,20 @@ public final class RadarRepository {
                         && RadarObservedDataPolicy.hasUsableObservedTimeline(body, receivedAt)) {
                     cachedRadar = body;
                     cachedRadarAt = receivedAt;
-                    callback.onSuccess(body, false);
+                    callback.onSuccess(body, DeliverySource.NETWORK, cachedRadarAt);
                     return;
                 }
+
                 if (cachedRadar != null
                         && RadarObservedDataPolicy.hasUsableObservedTimeline(cachedRadar, receivedAt)) {
-                    callback.onSuccess(cachedRadar, true);
+                    callback.onSuccess(
+                            cachedRadar,
+                            DeliverySource.SERVER_FALLBACK_CACHE,
+                            cachedRadarAt
+                    );
                     return;
                 }
+
                 if (response.isSuccessful() && body != null) {
                     callback.onError("Radar metadata contained no usable observed frames", null);
                 } else {
@@ -89,7 +128,11 @@ public final class RadarRepository {
                 long failedAt = System.currentTimeMillis();
                 if (cachedRadar != null
                         && RadarObservedDataPolicy.hasUsableObservedTimeline(cachedRadar, failedAt)) {
-                    callback.onSuccess(cachedRadar, true);
+                    callback.onSuccess(
+                            cachedRadar,
+                            DeliverySource.NETWORK_FALLBACK_CACHE,
+                            cachedRadarAt
+                    );
                     return;
                 }
                 callback.onError("Observed radar network unavailable", throwable);
@@ -109,7 +152,7 @@ public final class RadarRepository {
                 && Math.abs(cachedFieldLongitude - longitude) < 0.08d;
         if (!force && sameArea && !cachedField.isEmpty()
                 && now - cachedFieldAt < FIELD_CACHE_MILLIS) {
-            callback.onSuccess(cachedField, true);
+            callback.onSuccess(cachedField, DeliverySource.MEMORY_CACHE, cachedFieldAt);
             return;
         }
 
@@ -125,17 +168,23 @@ public final class RadarRepository {
                     @NonNull Call<List<RadarFieldPointResponse>> call,
                     @NonNull Response<List<RadarFieldPointResponse>> response
             ) {
+                long receivedAt = System.currentTimeMillis();
                 List<RadarFieldPointResponse> body = response.body();
                 if (response.isSuccessful() && body != null && !body.isEmpty()) {
                     cachedField = body;
-                    cachedFieldAt = System.currentTimeMillis();
+                    cachedFieldAt = receivedAt;
                     cachedFieldLatitude = latitude;
                     cachedFieldLongitude = longitude;
-                    callback.onSuccess(body, false);
+                    callback.onSuccess(body, DeliverySource.NETWORK, cachedFieldAt);
                     return;
                 }
+
                 if (sameArea && !cachedField.isEmpty()) {
-                    callback.onSuccess(cachedField, true);
+                    callback.onSuccess(
+                            cachedField,
+                            DeliverySource.SERVER_FALLBACK_CACHE,
+                            cachedFieldAt
+                    );
                     return;
                 }
                 callback.onError("Atmospheric model field unavailable (HTTP " + response.code() + ")", null);
@@ -147,7 +196,11 @@ public final class RadarRepository {
                     @NonNull Throwable throwable
             ) {
                 if (sameArea && !cachedField.isEmpty()) {
-                    callback.onSuccess(cachedField, true);
+                    callback.onSuccess(
+                            cachedField,
+                            DeliverySource.NETWORK_FALLBACK_CACHE,
+                            cachedFieldAt
+                    );
                     return;
                 }
                 callback.onError("Atmospheric model field network unavailable", throwable);
