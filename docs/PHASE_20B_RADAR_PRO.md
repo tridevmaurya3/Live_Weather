@@ -1,6 +1,6 @@
 # Phase 20B — Radar Pro
 
-Status: IMPLEMENTATION STARTED — Steps 20B.1–20B.4 complete; visual/device verification pending.
+Status: IMPLEMENTATION STARTED — Steps 20B.1–20B.5 complete; visual/device verification pending.
 
 ## Product contract
 
@@ -84,9 +84,27 @@ Implemented:
 - No frame prefetch loop, extra radar request, synthetic interpolation, or future nowcast was added.
 - The playback cadence remains bounded on the Android main handler and is stopped when the Radar page is hidden/destroyed.
 
+## Step 20B.5 — freshness, loading and fallback state
+
+Implemented:
+- `RadarRepository` now reports delivery provenance separately as network, normal in-memory cache, network-fallback cache, or provider/server-fallback cache.
+- Cache success is no longer automatically described as offline. A normal recent memory-cache hit is distinct from a failed-network fallback.
+- Repository callbacks also expose the payload saved-at time so the model-field age does not have to be guessed from UI timing.
+- `RadarUiState` exposes radar/model delivery source, saved-at times, latest observed radar timestamp, age helpers, and delayed-state helpers while keeping observed radar truth separate from cache metadata.
+- Radar freshness is based on the newest validated observed frame; model-field freshness is based on the repository save time for that location-specific field.
+- Manual refresh no longer clears usable same-location radar/model layers before the new requests finish.
+- When the active location changes, the location-specific Open-Meteo model field is cleared, while global RainViewer observed metadata may remain usable as the map recenters.
+- The top status distinguishes loading, refreshing while showing existing data, network fallback, provider fallback, ready, partial availability, and unavailable/error states.
+- A compact freshness line shows radar observation age and model-field age together with their source provenance.
+- Freshness color changes to warning for delayed/fallback data and danger only when both radar and model data are unavailable after loading.
+- The Refresh control becomes `Refreshing` and temporarily disables itself while requests are active, preventing duplicate forced refresh taps.
+- Freshness text is recomputed once per minute only while the Radar page is visible. This timer performs no network call, JSON rebuild, WebView reload, or map-layer regeneration and is removed when the page is hidden/destroyed.
+- Active legends and timeline wording also disclose delayed observations/model data as the age threshold is crossed.
+- Existing cached layers remain usable during refresh/fallback instead of being blanked solely because the latest request failed.
+
 ## Verification boundary
 
 - Source changes are on `main`.
 - No local Android Studio / Gradle build was run in these Radar Pro steps.
-- No real-device WebView/radar playback/cloud-surface/legend validation was run yet.
+- No real-device WebView/radar playback/cloud-surface/legend/freshness validation was run yet.
 - Phase 20B is not complete.
