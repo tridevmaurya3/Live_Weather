@@ -21,6 +21,9 @@ import java.util.List;
 
 public final class AlertNotificationManager {
 
+    public static final String EXTRA_OPEN_WEATHER_ALERTS = "open_weather_alerts";
+    public static final String EXTRA_ALERT_FINGERPRINT = "weather_alert_fingerprint";
+
     private static final String CHANNEL_OFFICIAL = "official_weather_alerts";
     private static final String CHANNEL_SMART = "smart_weather_risks";
 
@@ -51,7 +54,7 @@ public final class AlertNotificationManager {
                 "Smart weather risks",
                 NotificationManager.IMPORTANCE_DEFAULT
         );
-        smart.setDescription("High-confidence weather risks derived from the app forecast engine.");
+        smart.setDescription("High-confidence app-derived weather risk signals. Not official warnings.");
 
         manager.createNotificationChannel(official);
         manager.createNotificationChannel(smart);
@@ -64,9 +67,8 @@ public final class AlertNotificationManager {
 
         int sent = 0;
         for (WeatherAlert alert : alerts) {
-            if (alert == null || !preferences.shouldNotify(alert) || !preferences.markIfNew(alert)) {
-                continue;
-            }
+            if (alert == null || !preferences.shouldNotify(alert)) continue;
+            if (!isChannelEnabledFor(alert) || !preferences.markIfNew(alert)) continue;
             post(alert);
             sent++;
             if (sent >= 3) break;
@@ -76,10 +78,11 @@ public final class AlertNotificationManager {
     private void post(@NonNull WeatherAlert alert) {
         Intent intent = new Intent(context, MainActivity.class)
                 .addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP)
-                .putExtra("open_weather_alerts", true);
+                .putExtra(EXTRA_OPEN_WEATHER_ALERTS, true)
+                .putExtra(EXTRA_ALERT_FINGERPRINT, alert.fingerprint());
         PendingIntent contentIntent = PendingIntent.getActivity(
                 context,
-                Math.abs(alert.fingerprint().hashCode()),
+                alert.fingerprint().hashCode(),
                 intent,
                 PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE
         );
@@ -89,13 +92,20 @@ public final class AlertNotificationManager {
                 ? new Notification.Builder(context, channel)
                 : new Notification.Builder(context);
 
+        String sourcePrefix = alert.isOfficial() ? "IMD OFFICIAL" : "SMART RISK";
+        String title = sourcePrefix + " · " + severityLabel(alert.getSeverity());
+        String body = alert.getTitle() + " — " + alert.getMessage();
+
         builder.setSmallIcon(R.drawable.ic_nav_home)
-                .setContentTitle(alert.getTitle())
-                .setContentText(alert.getMessage())
-                .setStyle(new Notification.BigTextStyle().bigText(alert.getMessage()))
+                .setContentTitle(title)
+                .setContentText(body)
+                .setStyle(new Notification.BigTextStyle().bigText(body))
                 .setContentIntent(contentIntent)
                 .setAutoCancel(true)
-                .setCategory(Notification.CATEGORY_ALARM)
+                .setOnlyAlertOnce(true)
+                .setCategory(alert.getSeverity() == WeatherAlert.Severity.RED
+                        ? Notification.CATEGORY_ALARM
+                        : Notification.CATEGORY_STATUS)
                 .setWhen(alert.getIssuedAt() > 0L ? alert.getIssuedAt() : System.currentTimeMillis())
                 .setShowWhen(true);
 
@@ -103,12 +113,47 @@ public final class AlertNotificationManager {
             builder.setPriority(Notification.PRIORITY_HIGH);
         }
 
-        manager.notify(Math.abs(alert.fingerprint().hashCode()), builder.build());
+        manager.notify(alert.fingerprint().hashCode(), builder.build());
     }
 
     public boolean canPostNotifications() {
-        return Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU
+        if (manager == null) return false;
+        boolean permission = Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU
                 || context.checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS)
                 == PackageManager.PERMISSION_GRANTED;
+        return permission && manager.areNotificationsEnabled();
+    }
+
+    public boolean isOfficialChannelEnabled() {
+        return isChannelEnabled(CHANNEL_OFFICIAL);
+    }
+
+    public boolean isSmartChannelEnabled() {
+        return isChannelEnabled(CHANNEL_SMART);
+    }
+
+    public boolean isChannelEnabledFor(@NonNull WeatherAlert alert) {
+        return alert.isOfficial() ? isOfficialChannelEnabled() : isSmartChannelEnabled();
+    }
+
+    private boolean isChannelEnabled(@NonNull String channelId) {
+        if (manager == null || !manager.areNotificationsEnabled()) return false;
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return true;
+        NotificationChannel channel = manager.getNotificationChannel(channelId);
+        return channel != null && channel.getImportance() != NotificationManager.IMPORTANCE_NONE;
+    }
+
+    @NonNull
+    private String severityLabel(@NonNull WeatherAlert.Severity severity) {
+        switch (severity) {
+            case RED:
+                return "WARNING";
+            case ORANGE:
+                return "ALERT";
+            case YELLOW:
+                return "WATCH";
+            default:
+                return "INFO";
+        }
     }
 }
