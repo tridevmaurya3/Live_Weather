@@ -1,6 +1,6 @@
 # Phase 20B — Radar Pro
 
-Status: IMPLEMENTATION STARTED — Steps 20B.1–20B.2 complete; visual/device verification pending.
+Status: IMPLEMENTATION STARTED — Steps 20B.1–20B.3 complete; visual/device verification pending.
 
 ## Product contract
 
@@ -52,9 +52,26 @@ The cloud field is intentionally a low-frequency contextual layer. Its interpola
 
 This keeps the Radar page aligned with the Real Live Weather smoothness rule: realistic presentation without trading away responsiveness.
 
+## Step 20B.3 — professional layer controls + active legend
+
+Implemented:
+- Added a dedicated selected-state chip drawable with an aqua outline and stronger surface fill.
+- Replaced scale-based selected feedback with stable background/text/alpha state so selecting a layer does not visually resize the control row.
+- Layer labels now say `Rain Radar`, `Model Clouds`, `Wind`, and `Temperature`, making observed-vs-model semantics visible before the user opens a layer.
+- Added selected/not-selected accessibility descriptions to all four layer controls.
+- Added one compact glass legend inside the map itself at bottom-left, preserving the map's layout height.
+- The legend changes in place with the active layer; it does not create four permanent cards or reload the WebView.
+- Rain legend identifies `OBSERVED RAIN RADAR · RAINVIEWER` and uses qualitative echo strength wording instead of inventing an unsupported exact mm/h scale.
+- Delayed radar metadata is disclosed directly in the active Rain legend.
+- Cloud legend identifies `MODEL CLOUDS · OPEN-METEO` and explains the 0–100% continuous interpolated model field.
+- Wind legend identifies `MODEL WIND · OPEN-METEO`; arrow means flow direction and the label uses the selected wind unit.
+- Temperature legend identifies `MODEL TEMPERATURE · OPEN-METEO`; the color legend remains qualitative while numeric labels continue using the user's selected temperature unit.
+- If observed radar or model-field data is unavailable, the active legend says so instead of displaying a misleading normal-state explanation.
+- Layer switching still uses the existing `RadarApp.setLayer(...)` JavaScript bridge and does not reload the WebView, refetch network data, or rebuild the Android page.
+
 ## Verification boundary
 
 - Source changes are on `main`.
 - No local Android Studio / Gradle build was run in these Radar Pro steps.
-- No real-device WebView/radar playback/cloud-surface validation was run yet.
+- No real-device WebView/radar playback/cloud-surface/legend validation was run yet.
 - Phase 20B is not complete.
