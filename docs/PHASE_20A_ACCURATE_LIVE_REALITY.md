@@ -202,6 +202,33 @@ real-device GPU validation are still required before Phase 20A visual acceptance
 - Weather truth, current-condition classification and cinematic performance profiles
   are unchanged by the recovery system.
 
+## Checkpoint 20A.14 — temporal weather transition smoothing
+
+- Added `GlSceneTransitionController` between resolved weather truth and renderer-facing
+  presentation state.
+- Diagnostics receive the newest resolved current-weather snapshot immediately;
+  only visual parameters are eased, so classification/truth is never delayed.
+- First scene appearance snaps directly to current truth; later weather refreshes
+  transition naturally instead of looking like a page or texture reload.
+- Sky gradient, Sun/Moon visibility, stars and scene light use soft temporal easing.
+- Cloud cover/density/depth and cloud brightness build/clear more gradually than
+  confirmed precipitation, matching the visual inertia of real cloud masses.
+- Rain, drizzle, snow and storm onset respond quickly to confirmed current evidence,
+  while their visual decay is softer after the condition ends.
+- Fog and haze use slower atmospheric easing instead of suddenly appearing as a veil.
+- Wind strength is smoothed and wind direction follows the shortest angular path,
+  avoiding a long reverse rotation around the 0/360-degree boundary.
+- Sun/Moon horizontal positions also use wrap-safe interpolation across the azimuth boundary.
+- Launcher parallax keeps a much faster response than weather transitions so home-screen
+  swipes remain responsive.
+- The transition controller reuses one mutable display snapshot and renderer-specific
+  reusable views; it does not allocate snapshots, bitmaps, textures or shader programs
+  from the per-frame animation path.
+- Renderer view references are bound once per active GL surface and then updated by
+  primitive field mutation, avoiding repeated volatile snapshot assignments during easing.
+- No Activity/Fragment refresh, network request, cache reload or reality recomposition
+  was added to drive the transition animation.
+
 ## Acceptance required
 
 Source implementation is complete, but Phase 20A is not accepted until it is
@@ -226,6 +253,10 @@ Confirm:
 - switching AUTO / SMOOTH / BATTERY changes smoothness/cost without changing the
   actual weather state shown on screen;
 - an isolated secondary renderer failure does not terminate the entire Hero/Wallpaper loop;
-- transient EGL recovery is bounded and does not create an infinite restart loop.
+- transient EGL recovery is bounded and does not create an infinite restart loop;
+- a live weather update changes clouds/precipitation/light/wind continuously without
+  an obvious whole-scene jump or page-refresh appearance;
+- precipitation onset remains responsive enough to confirmed current rain/storm/snow
+  while cloud/fog/haze transitions stay atmospheric and smooth.
 
 Source implementation alone is not visual acceptance.
