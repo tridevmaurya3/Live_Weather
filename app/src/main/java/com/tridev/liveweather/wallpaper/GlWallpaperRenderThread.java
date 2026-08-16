@@ -23,12 +23,15 @@ import com.tridev.liveweather.ui.gl.HeroGlPipeline;
 /**
  * Dedicated EGL14 render thread for Android system Live Wallpaper.
  *
- * ODM-5 uses the same HeroGlPipeline as the in-app live scene so both surfaces
- * share exactly the same renderer ownership and composition order.
+ * The same HeroGlPipeline is used by the in-app live scene. Weather/network
+ * work never runs in the frame loop. Home-screen parallax can arrive in bursts,
+ * so expensive reality recomposition is bounded while the GL animation itself
+ * continues at the selected frame cadence.
  */
 public final class GlWallpaperRenderThread {
 
     private static final long REALITY_REFRESH_MILLIS = 30_000L;
+    private static final long PARALLAX_COMPOSE_MILLIS = 140L;
 
     private final HandlerThread thread;
     private final Handler handler;
@@ -55,6 +58,8 @@ public final class GlWallpaperRenderThread {
     private int height = 1;
     private long frameIntervalMillis = 33L;
     private long lastRealityRefresh;
+    private long lastParallaxCompose;
+    private boolean parallaxDirty;
     private boolean visible;
     private boolean released;
     private boolean pipelineCreated;
@@ -122,7 +127,6 @@ public final class GlWallpaperRenderThread {
         handler.post(() -> {
             this.options = options;
             if (pipelineCreated) pipeline.setOptions(options);
-            lastRealityRefresh = 0L;
         });
     }
 
@@ -148,14 +152,17 @@ public final class GlWallpaperRenderThread {
             latitude = Double.NaN;
             longitude = Double.NaN;
             lastRealityRefresh = 0L;
+            parallaxDirty = false;
             if (pipelineCreated) pipeline.setSnapshot(null);
         });
     }
 
     public void setParallax(float offset) {
         handler.post(() -> {
-            parallax = Math.max(0f, Math.min(1f, offset));
-            lastRealityRefresh = 0L;
+            float bounded = Math.max(0f, Math.min(1f, offset));
+            if (Math.abs(parallax - bounded) < 0.0005f) return;
+            parallax = bounded;
+            parallaxDirty = true;
         });
     }
 
@@ -275,6 +282,8 @@ public final class GlWallpaperRenderThread {
         pipeline.onSurfaceChanged(width, height);
         pipeline.setOptions(options);
         lastRealityRefresh = 0L;
+        lastParallaxCompose = 0L;
+        parallaxDirty = true;
     }
 
     private void detachEglSurface() {
@@ -295,12 +304,20 @@ public final class GlWallpaperRenderThread {
 
     private void refreshRealityIfNeeded() {
         long now = System.currentTimeMillis();
-        if (lastRealityRefresh > 0L && now - lastRealityRefresh < REALITY_REFRESH_MILLIS) return;
-        lastRealityRefresh = now;
+        boolean regularDue = lastRealityRefresh <= 0L
+                || now - lastRealityRefresh >= REALITY_REFRESH_MILLIS;
+        boolean parallaxDue = parallaxDirty
+                && (lastParallaxCompose <= 0L
+                || now - lastParallaxCompose >= PARALLAX_COMPOSE_MILLIS);
+
+        if (!regularDue && !parallaxDue) return;
 
         WeatherResponse currentWeather = weather;
         if (currentWeather == null || Double.isNaN(latitude) || Double.isNaN(longitude)) {
             if (pipelineCreated) pipeline.setSnapshot(null);
+            parallaxDirty = false;
+            if (regularDue) lastRealityRefresh = now;
+            if (parallaxDue) lastParallaxCompose = now;
             return;
         }
 
@@ -313,6 +330,12 @@ public final class GlWallpaperRenderThread {
                 parallax
         );
         if (pipelineCreated) pipeline.setSnapshot(snapshot);
+
+        if (regularDue) lastRealityRefresh = now;
+        if (parallaxDue) {
+            lastParallaxCompose = now;
+            parallaxDirty = false;
+        }
     }
 
     private void restartLoop() {
