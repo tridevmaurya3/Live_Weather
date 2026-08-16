@@ -16,6 +16,9 @@ public final class AlertPreferences {
 
     private static final String PREFS = "weather_alert_preferences";
     private static final String KEY_NOTIFICATIONS_ENABLED = "notifications_enabled";
+    private static final String KEY_OFFICIAL_ALERTS_ENABLED = "official_alerts_enabled";
+    private static final String KEY_SMART_RISK_ENABLED = "smart_risk_enabled";
+    private static final String KEY_MINIMUM_SEVERITY = "minimum_severity";
     private static final String KEY_NOTIFIED = "notified_fingerprints";
     private static final String KEY_DISTRICT = "last_district";
     private static final String KEY_STATE = "last_state";
@@ -36,6 +39,93 @@ public final class AlertPreferences {
 
     public void setNotificationsEnabled(boolean enabled) {
         preferences.edit().putBoolean(KEY_NOTIFICATIONS_ENABLED, enabled).apply();
+    }
+
+    /**
+     * Source filters default to enabled so Phase 21.2 does not silently hide
+     * alert categories that were visible before the settings surface existed.
+     */
+    public boolean isOfficialAlertsEnabled() {
+        return preferences.getBoolean(KEY_OFFICIAL_ALERTS_ENABLED, true);
+    }
+
+    public void setOfficialAlertsEnabled(boolean enabled) {
+        preferences.edit().putBoolean(KEY_OFFICIAL_ALERTS_ENABLED, enabled).apply();
+    }
+
+    public boolean isSmartRiskEnabled() {
+        return preferences.getBoolean(KEY_SMART_RISK_ENABLED, true);
+    }
+
+    public void setSmartRiskEnabled(boolean enabled) {
+        preferences.edit().putBoolean(KEY_SMART_RISK_ENABLED, enabled).apply();
+    }
+
+    @NonNull
+    public WeatherAlert.Severity getMinimumSeverity() {
+        String stored = preferences.getString(
+                KEY_MINIMUM_SEVERITY,
+                WeatherAlert.Severity.YELLOW.name()
+        );
+        if (stored == null) return WeatherAlert.Severity.YELLOW;
+        try {
+            return WeatherAlert.Severity.valueOf(stored);
+        } catch (IllegalArgumentException ignored) {
+            return WeatherAlert.Severity.YELLOW;
+        }
+    }
+
+    public void setMinimumSeverity(@NonNull WeatherAlert.Severity severity) {
+        preferences.edit().putString(KEY_MINIMUM_SEVERITY, severity.name()).apply();
+    }
+
+    @NonNull
+    public WeatherAlert.Severity cycleMinimumSeverity() {
+        WeatherAlert.Severity next;
+        switch (getMinimumSeverity()) {
+            case INFO:
+                next = WeatherAlert.Severity.YELLOW;
+                break;
+            case YELLOW:
+                next = WeatherAlert.Severity.ORANGE;
+                break;
+            case ORANGE:
+                next = WeatherAlert.Severity.RED;
+                break;
+            default:
+                next = WeatherAlert.Severity.INFO;
+                break;
+        }
+        setMinimumSeverity(next);
+        return next;
+    }
+
+    public boolean isSourceEnabled(@NonNull WeatherAlert alert) {
+        return alert.isOfficial() ? isOfficialAlertsEnabled() : isSmartRiskEnabled();
+    }
+
+    public boolean meetsMinimumSeverity(@NonNull WeatherAlert.Severity severity) {
+        return severityRank(severity) >= severityRank(getMinimumSeverity());
+    }
+
+    public boolean shouldShow(@NonNull WeatherAlert alert) {
+        return isSourceEnabled(alert) && meetsMinimumSeverity(alert.getSeverity());
+    }
+
+    /**
+     * Notification policy intentionally keeps the pre-Phase-21 confidence floors:
+     * official warnings require Yellow+, while Smart Risk requires Orange+.
+     * The user's minimum-severity setting can make notifications stricter but
+     * cannot make lower-confidence Smart Risk signals start generating pushes.
+     */
+    public boolean shouldNotify(@NonNull WeatherAlert alert) {
+        if (!isSourceEnabled(alert) || !meetsMinimumSeverity(alert.getSeverity())) {
+            return false;
+        }
+        if (alert.isOfficial()) {
+            return severityRank(alert.getSeverity()) >= severityRank(WeatherAlert.Severity.YELLOW);
+        }
+        return severityRank(alert.getSeverity()) >= severityRank(WeatherAlert.Severity.ORANGE);
     }
 
     public void saveLocation(@NonNull AlertLocation location) {
@@ -74,5 +164,18 @@ public final class AlertPreferences {
         }
         preferences.edit().putStringSet(KEY_NOTIFIED, fingerprints).apply();
         return true;
+    }
+
+    private static int severityRank(@NonNull WeatherAlert.Severity severity) {
+        switch (severity) {
+            case RED:
+                return 4;
+            case ORANGE:
+                return 3;
+            case YELLOW:
+                return 2;
+            default:
+                return 1;
+        }
     }
 }
