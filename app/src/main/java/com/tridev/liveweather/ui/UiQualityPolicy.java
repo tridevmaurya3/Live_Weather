@@ -4,15 +4,18 @@ import android.app.Activity;
 import android.content.res.Configuration;
 import android.os.SystemClock;
 import android.text.TextUtils;
+import android.util.TypedValue;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.ViewTreeObserver;
 import android.widget.EditText;
+import android.widget.LinearLayout;
 import android.widget.TextView;
 
 import androidx.annotation.NonNull;
 import androidx.core.view.ViewCompat;
 import androidx.core.widget.NestedScrollView;
+import androidx.core.widget.TextViewCompat;
 
 import com.tridev.liveweather.R;
 
@@ -77,6 +80,7 @@ public final class UiQualityPolicy {
         int widthDp = configuration.screenWidthDp;
         int heightDp = configuration.screenHeightDp;
         float fontScale = configuration.fontScale;
+        boolean compactLargeText = widthDp < 360 || fontScale >= 1.30f;
 
         int horizontalPaddingDp;
         if (widthDp >= 840) horizontalPaddingDp = 48;
@@ -93,9 +97,27 @@ public final class UiQualityPolicy {
         if (radarMap != null) {
             int mapMinDp;
             if (widthDp >= 600) mapMinDp = 320;
-            else if (heightDp < 640 || fontScale >= 1.30f) mapMinDp = 200;
+            else if (heightDp < 640 || compactLargeText) mapMinDp = 200;
             else mapMinDp = 260;
             radarMap.setMinimumHeight(dp(activity, mapMinDp));
+        }
+
+        TextView temperature = activity.findViewById(R.id.homeTemperature);
+        if (temperature != null) {
+            TextViewCompat.setAutoSizeTextTypeUniformWithConfiguration(
+                    temperature,
+                    compactLargeText ? 30 : 36,
+                    64,
+                    2,
+                    TypedValue.COMPLEX_UNIT_SP
+            );
+        }
+
+        if (compactLargeText) {
+            stackParent(activity.findViewById(R.id.homeFeelsLike));
+            stackParent(activity.findViewById(R.id.homeRadarAction));
+            stackParent(activity.findViewById(R.id.citySearchInput));
+            stackGrandparent(activity.findViewById(R.id.radarLocationValue));
         }
     }
 
@@ -113,6 +135,38 @@ public final class UiQualityPolicy {
                 horizontal,
                 target.getPaddingBottom()
         );
+    }
+
+    private static void stackParent(View child) {
+        if (child == null || !(child.getParent() instanceof LinearLayout)) return;
+        stackLinearLayout((LinearLayout) child.getParent());
+    }
+
+    private static void stackGrandparent(View child) {
+        if (child == null || !(child.getParent() instanceof View)) return;
+        View parent = (View) child.getParent();
+        if (parent.getParent() instanceof LinearLayout) {
+            stackLinearLayout((LinearLayout) parent.getParent());
+        }
+    }
+
+    private static void stackLinearLayout(@NonNull LinearLayout row) {
+        if (row.getOrientation() == LinearLayout.VERTICAL) return;
+        row.setOrientation(LinearLayout.VERTICAL);
+        for (int index = 0; index < row.getChildCount(); index++) {
+            View child = row.getChildAt(index);
+            ViewGroup.LayoutParams raw = child.getLayoutParams();
+            if (!(raw instanceof LinearLayout.LayoutParams)) continue;
+            LinearLayout.LayoutParams params = (LinearLayout.LayoutParams) raw;
+            params.width = ViewGroup.LayoutParams.MATCH_PARENT;
+            params.weight = 0f;
+            params.setMarginStart(0);
+            params.setMarginEnd(0);
+            if (index > 0 && params.topMargin < dp(child, 8)) {
+                params.topMargin = dp(child, 8);
+            }
+            child.setLayoutParams(params);
+        }
     }
 
     private static void applyKnownSemantics(@NonNull Activity activity) {
@@ -171,12 +225,14 @@ public final class UiQualityPolicy {
         describe(activity, R.id.moreWidgetsAction,
                 "Open weather widget choices.");
 
-        View forecastSky = activity.findViewById(R.id.forecastLiveSkyView);
-        if (forecastSky != null) forecastSky.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO);
-        View wallpaperSky = activity.findViewById(R.id.wallpaperLiveSkyView);
-        if (wallpaperSky != null) wallpaperSky.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO);
-        View appSky = activity.findViewById(R.id.appLiveNatureBackground);
-        if (appSky != null) appSky.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO);
+        // Canvas-rendered charts duplicate data already exposed by the accessible
+        // hourly controls and selected-hour text. Hiding the canvas from TalkBack
+        // avoids an unlabeled interactive surface while preserving touch use.
+        hideFromAccessibility(activity.findViewById(R.id.forecastTemperatureChart));
+        hideFromAccessibility(activity.findViewById(R.id.forecastRainChart));
+        hideFromAccessibility(activity.findViewById(R.id.forecastLiveSkyView));
+        hideFromAccessibility(activity.findViewById(R.id.wallpaperLiveSkyView));
+        hideFromAccessibility(activity.findViewById(R.id.appLiveNatureBackground));
     }
 
     private static void auditTree(@NonNull View view) {
@@ -242,6 +298,10 @@ public final class UiQualityPolicy {
     private static void describe(@NonNull Activity activity, int id, @NonNull String description) {
         View view = activity.findViewById(id);
         if (view != null) view.setContentDescription(description);
+    }
+
+    private static void hideFromAccessibility(View view) {
+        if (view != null) view.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO);
     }
 
     private static int dp(@NonNull Activity activity, int value) {
