@@ -14,9 +14,12 @@ import androidx.work.WorkManager;
 import java.util.concurrent.TimeUnit;
 
 /**
- * Battery-safe periodic refresh for fixed-city widgets.
- * Active-location widgets continue to benefit from the existing shared weather
- * refresh worker; this job mainly keeps independent fixed-city snapshots fresh.
+ * Battery-safe high-freshness periodic refresh for installed weather widgets.
+ *
+ * Android periodic work cannot be a continuous animation/data stream. Fifteen minutes
+ * is the platform periodic-work floor, so installed widgets use that cadence while
+ * retaining a small flex window for scheduler/battery cooperation. App foreground
+ * refresh and Live Wallpaper rendering remain independent from this job.
  */
 public final class WidgetRefreshScheduler {
 
@@ -34,9 +37,9 @@ public final class WidgetRefreshScheduler {
                 .build();
         PeriodicWorkRequest request = new PeriodicWorkRequest.Builder(
                 WidgetRefreshWorker.class,
-                30,
+                15,
                 TimeUnit.MINUTES,
-                10,
+                5,
                 TimeUnit.MINUTES
         ).setConstraints(constraints).build();
 
