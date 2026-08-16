@@ -64,22 +64,16 @@ public final class AlertNotificationManager {
 
         int sent = 0;
         for (WeatherAlert alert : alerts) {
-            if (!shouldNotify(alert) || !preferences.markIfNew(alert)) continue;
+            if (alert == null || !preferences.shouldNotify(alert) || !preferences.markIfNew(alert)) {
+                continue;
+            }
             post(alert);
             sent++;
             if (sent >= 3) break;
         }
     }
 
-    private boolean shouldNotify(WeatherAlert alert) {
-        if (alert.isOfficial()) {
-            return alert.getSeverity() != WeatherAlert.Severity.INFO;
-        }
-        return alert.getSeverity() == WeatherAlert.Severity.ORANGE
-                || alert.getSeverity() == WeatherAlert.Severity.RED;
-    }
-
-    private void post(WeatherAlert alert) {
+    private void post(@NonNull WeatherAlert alert) {
         Intent intent = new Intent(context, MainActivity.class)
                 .addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP)
                 .putExtra("open_weather_alerts", true);
