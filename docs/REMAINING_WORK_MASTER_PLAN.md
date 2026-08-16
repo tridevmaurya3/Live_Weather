@@ -161,14 +161,30 @@ Acceptance checkpoint: pull/build, permission flow, source/severity persistence,
 
 ## Phase 22 — App UX, Responsive & Accessibility Audit
 
-- Home / Forecast / Radar / Wallpaper / More full visual consistency
-- Tablet/small-phone/large-phone layout audit
-- Text scaling audit
-- Touch-target audit
-- TalkBack/content-description audit
-- Contrast/readability audit over live backgrounds
-- Loading/empty/error/retry consistency
-- Navigation-state consistency
+Status: SOURCE IMPLEMENTATION COMPLETE — build/device/accessibility verification pending.
+
+Implemented source checkpoints:
+- Central `UiQualityPolicy` applied from the MainActivity lifecycle to static and dynamically-created views
+- 48dp minimum interactive-target policy, including exact fixed-size controls below the baseline
+- Radar Refresh/Recenter/layers/Replay/timeline controls hardened directly to 48dp in XML
+- Responsive horizontal page padding for phone, 600dp+ and 840dp+ screen classes
+- Large-text/narrow-screen reflow for weighted Home/Forecast/More card rows
+- Large-text stacking for Home condition metadata, More city search and Radar location/Refresh rows
+- Stacked cards switch to wrap-content height to avoid clipped text
+- Home temperature bounded autosizing
+- Adaptive Radar map minimum height for compact phones, normal phones and tablets
+- Navigation label/icon readability increased without changing destination logic
+- Accessibility pane titles and heading semantics for Home / Forecast / Radar / Wallpaper / More
+- Explicit TalkBack descriptions for primary navigation/refresh/location/Radar/Wallpaper/City/Widget actions
+- Dynamic clickable card fallback descriptions generated from bounded child text
+- Decorative LiveSky surfaces and duplicate canvas chart surfaces excluded from noisy TalkBack focus
+- Existing accessible Forecast selected-hour/hourly controls remain the semantic path for chart data
+- Loading/checking/live/stale/error/retry states receive consistent semantic colors and polite accessibility live-region treatment
+- Contrast audit retained the established atmospheric palette while promoting action/status text to stronger semantic roles
+- Existing BottomNavigation selection/restoration, Radar lazy WebView lifecycle, Alerts truth, weather providers and Live Wallpaper truth were not rewritten
+- See `PHASE_22_APP_UX_ACCESSIBILITY.md` for the full source-freeze and acceptance checklist
+
+Acceptance checkpoint: Gradle Sync/debug build, normal/narrow phones, 600dp+ tablet, maximum available font scaling (including 200% where supported), TalkBack focus order, touch targets, Radar control reachability, dynamic Alerts/City/Settings cards, status/retry semantics and bottom-navigation restoration.
 
 ## Phase 23 — Offline, Cache & Data Reliability 2.0
 
