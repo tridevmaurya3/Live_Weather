@@ -13,8 +13,11 @@ import java.nio.FloatBuffer;
  * Cross-device stable star field.
  *
  * Star positions are generated once in Java with deterministic integer math and
- * rendered as GL points. No fragment hash/noise texture is involved, so the
- * same app build produces the same star layout on emulator, Adreno and Mali.
+ * rendered as GL points. GlSceneSnapshot.starVisibility is already resolved by
+ * the shared sky-reality engine for darkness, cloud transparency, visibility,
+ * precipitation and haze. This renderer therefore does not apply a second
+ * whole-screen weather/cloud gate; the cloud pass drawn afterwards performs
+ * the actual local occlusion of stars.
  */
 public final class HeroGlFixedStarRenderer {
 
@@ -107,16 +110,16 @@ public final class HeroGlFixedStarRenderer {
 
     public void drawFrame() {
         GlSceneSnapshot state = snapshot;
-        if (program == 0 || state == null || state.starVisibility <= 0.002f) return;
+        if (program == 0 || state == null || state.starVisibility <= 0.001f) return;
 
-        float weatherGate = (1f - state.fogIntensity * 0.82f)
-                * (1f - state.airHazeIntensity * 0.55f)
-                * (1f - state.rainIntensity * 0.78f)
-                * (1f - state.drizzleIntensity * 0.48f)
-                * (1f - state.stormIntensity * 0.96f);
-        float cloudGate = 1f - Math.max(0f, Math.min(0.88f, state.cloudCover * 0.88f));
-        float visibility = Math.max(0f, Math.min(1f, state.starVisibility * weatherGate * cloudGate));
-        if (visibility <= 0.002f) return;
+        // The shared reality engine is the single authority for global star
+        // visibility. A gentle perceptual curve avoids abrupt twilight popping
+        // while preserving a true resolved zero as zero.
+        float resolved = Math.max(0f, Math.min(1f, state.starVisibility));
+        float visibility = resolved <= 0f
+                ? 0f
+                : Math.max(0f, Math.min(1f, (float) Math.pow(resolved, 0.92d)));
+        if (visibility <= 0.001f) return;
 
         GLES20.glEnable(GLES20.GL_BLEND);
         GLES20.glBlendFunc(GLES20.GL_SRC_ALPHA, GLES20.GL_ONE_MINUS_SRC_ALPHA);
