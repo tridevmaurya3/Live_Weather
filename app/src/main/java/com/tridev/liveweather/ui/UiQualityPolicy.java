@@ -329,6 +329,21 @@ public final class UiQualityPolicy {
             int target = dp(view, TOUCH_TARGET_DP);
             if (view.getMinimumHeight() < target) view.setMinimumHeight(target);
             if (view.getMinimumWidth() < target) view.setMinimumWidth(target);
+
+            ViewGroup.LayoutParams params = view.getLayoutParams();
+            if (params != null) {
+                boolean changed = false;
+                if (params.height > 0 && params.height < target) {
+                    params.height = target;
+                    changed = true;
+                }
+                if (params.width > 0 && params.width < target) {
+                    params.width = target;
+                    changed = true;
+                }
+                if (changed) view.setLayoutParams(params);
+            }
+
             if (!(view instanceof EditText)) view.setFocusable(true);
             ensureInteractiveDescription(view);
         }
