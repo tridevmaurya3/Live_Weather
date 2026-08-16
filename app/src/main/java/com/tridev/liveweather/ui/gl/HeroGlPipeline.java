@@ -14,7 +14,7 @@ import com.tridev.liveweather.data.local.WallpaperPreferences;
  * - fixed Java-generated GL-point stars
  * - photoreal weather-selected cloud texture atlas with layered parallax
  * - smooth analytic hills/forest with no texture/profile spikes
- * - portable storm and rain overlays retained after the stable base scene
+ * - portable storm overlay plus depth-aware rain retained after the stable base scene
  */
 public final class HeroGlPipeline {
 
@@ -24,7 +24,7 @@ public final class HeroGlPipeline {
     private final HeroGlAnalyticWorldRenderer worldRenderer = new HeroGlAnalyticWorldRenderer();
     private final HeroGlAtmosphereOverlayRenderer atmosphereRenderer = new HeroGlAtmosphereOverlayRenderer();
     private final HeroGlPortableStormRenderer stormRenderer = new HeroGlPortableStormRenderer();
-    private final HeroGlPortableRainRenderer rainRenderer = new HeroGlPortableRainRenderer();
+    private final HeroGlDepthRainRenderer rainRenderer = new HeroGlDepthRainRenderer();
 
     @Nullable
     private GlSceneSnapshot fullSnapshot;
