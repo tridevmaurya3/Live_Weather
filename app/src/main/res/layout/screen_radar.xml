@@ -12,6 +12,7 @@
         style="@style/TextAppearance.LiveWeather.Title"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
+        android:accessibilityHeading="true"
         android:text="Live Weather Radar" />
 
     <TextView
@@ -67,7 +68,7 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="2dp"
-                android:maxLines="2"
+                android:maxLines="3"
                 android:text="Radar age -- · Model age --"
                 android:textColor="@color/weather_text_secondary" />
         </LinearLayout>
@@ -75,8 +76,11 @@
         <TextView
             android:id="@+id/radarRefreshButton"
             android:layout_width="wrap_content"
-            android:layout_height="40dp"
+            android:layout_height="@dimen/touch_target_min"
             android:background="@drawable/bg_weather_chip"
+            android:clickable="true"
+            android:contentDescription="Refresh observed radar and model overlay data"
+            android:focusable="true"
             android:gravity="center"
             android:minWidth="78dp"
             android:paddingStart="@dimen/space_12"
@@ -100,10 +104,13 @@
         <TextView
             android:id="@+id/radarRecenterButton"
             android:layout_width="wrap_content"
-            android:layout_height="40dp"
+            android:layout_height="@dimen/touch_target_min"
             android:layout_gravity="top|end"
             android:layout_margin="@dimen/space_10"
             android:background="@drawable/bg_weather_chip"
+            android:clickable="true"
+            android:contentDescription="Recenter radar map on active weather location"
+            android:focusable="true"
             android:gravity="center"
             android:minWidth="82dp"
             android:paddingStart="@dimen/space_12"
@@ -143,7 +150,7 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="2dp"
-                android:maxLines="2"
+                android:maxLines="3"
                 android:text="Light → Moderate → Heavy → Intense echoes"
                 android:textColor="@color/weather_text_primary" />
         </LinearLayout>
@@ -153,6 +160,7 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_marginTop="@dimen/space_10"
+        android:fillViewport="false"
         android:overScrollMode="never"
         android:scrollbars="none">
 
@@ -164,8 +172,11 @@
             <TextView
                 android:id="@+id/radarLayerRain"
                 android:layout_width="wrap_content"
-                android:layout_height="40dp"
+                android:layout_height="@dimen/touch_target_min"
                 android:background="@drawable/bg_weather_chip"
+                android:clickable="true"
+                android:contentDescription="Show observed precipitation radar layer"
+                android:focusable="true"
                 android:gravity="center"
                 android:minWidth="94dp"
                 android:paddingStart="@dimen/space_12"
@@ -178,9 +189,12 @@
             <TextView
                 android:id="@+id/radarLayerClouds"
                 android:layout_width="wrap_content"
-                android:layout_height="40dp"
+                android:layout_height="@dimen/touch_target_min"
                 android:layout_marginStart="@dimen/space_8"
                 android:background="@drawable/bg_weather_chip"
+                android:clickable="true"
+                android:contentDescription="Show current model cloud field layer"
+                android:focusable="true"
                 android:gravity="center"
                 android:minWidth="108dp"
                 android:paddingStart="@dimen/space_12"
@@ -192,9 +206,12 @@
             <TextView
                 android:id="@+id/radarLayerWind"
                 android:layout_width="wrap_content"
-                android:layout_height="40dp"
+                android:layout_height="@dimen/touch_target_min"
                 android:layout_marginStart="@dimen/space_8"
                 android:background="@drawable/bg_weather_chip"
+                android:clickable="true"
+                android:contentDescription="Show current model wind field layer"
+                android:focusable="true"
                 android:gravity="center"
                 android:minWidth="72dp"
                 android:paddingStart="@dimen/space_12"
@@ -206,9 +223,12 @@
             <TextView
                 android:id="@+id/radarLayerTemp"
                 android:layout_width="wrap_content"
-                android:layout_height="40dp"
+                android:layout_height="@dimen/touch_target_min"
                 android:layout_marginStart="@dimen/space_8"
                 android:background="@drawable/bg_weather_chip"
+                android:clickable="true"
+                android:contentDescription="Show current model temperature field layer"
+                android:focusable="true"
                 android:gravity="center"
                 android:minWidth="104dp"
                 android:paddingStart="@dimen/space_12"
@@ -237,8 +257,11 @@
             <TextView
                 android:id="@+id/radarPlayButton"
                 android:layout_width="78dp"
-                android:layout_height="38dp"
+                android:layout_height="@dimen/touch_target_min"
                 android:background="@drawable/bg_weather_chip"
+                android:clickable="true"
+                android:contentDescription="Replay observed radar history"
+                android:focusable="true"
                 android:gravity="center"
                 android:text="Replay"
                 android:textColor="@color/weather_text_primary"
@@ -251,7 +274,7 @@
                 android:layout_height="wrap_content"
                 android:layout_marginStart="@dimen/space_10"
                 android:layout_weight="1"
-                android:maxLines="2"
+                android:maxLines="3"
                 android:text="Latest observed frame"
                 android:textColor="@color/weather_text_secondary"
                 android:textSize="@dimen/text_caption" />
@@ -270,7 +293,7 @@
         <SeekBar
             android:id="@+id/radarTimelineSeek"
             android:layout_width="match_parent"
-            android:layout_height="wrap_content"
+            android:layout_height="@dimen/touch_target_min"
             android:layout_marginTop="@dimen/space_4"
             android:contentDescription="Observed radar history timeline"
             android:max="0"
