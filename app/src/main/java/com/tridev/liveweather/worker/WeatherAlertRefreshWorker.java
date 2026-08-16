@@ -11,6 +11,7 @@ import com.tridev.liveweather.data.local.AlertPreferences;
 import com.tridev.liveweather.data.local.WeatherCache;
 import com.tridev.liveweather.domain.alert.AlertLocation;
 import com.tridev.liveweather.domain.alert.AlertMerger;
+import com.tridev.liveweather.domain.alert.AlertTruthPolicy;
 import com.tridev.liveweather.domain.alert.SmartAlertEngine;
 import com.tridev.liveweather.domain.alert.WeatherAlert;
 import com.tridev.liveweather.notification.AlertNotificationManager;
@@ -43,9 +44,13 @@ public final class WeatherAlertRefreshWorker extends Worker {
             AlertPreferences preferences = new AlertPreferences(context);
             AlertLocation alertLocation = preferences.loadLocation();
             List<WeatherAlert> official = new ArrayList<>();
+            AlertTruthPolicy.OfficialDelivery officialDelivery =
+                    AlertTruthPolicy.OfficialDelivery.UNAVAILABLE;
+            long officialSavedAt = 0L;
 
-            if (alertLocation != null
-                    && alertLocation.isIndia()
+            if (alertLocation != null && !alertLocation.isIndia()) {
+                officialDelivery = AlertTruthPolicy.OfficialDelivery.NOT_APPLICABLE;
+            } else if (alertLocation != null
                     && close(alertLocation.getLatitude(), cachedWeather.getLatitude())
                     && close(alertLocation.getLongitude(), cachedWeather.getLongitude())) {
                 AlertCache alertCache = new AlertCache(context);
@@ -56,25 +61,47 @@ public final class WeatherAlertRefreshWorker extends Worker {
                 try {
                     CapAlertRepository.Result capResult = new CapAlertRepository()
                             .loadImdAlertsBlocking(alertLocation, cachedAlerts.getEtag());
+                    String etag = capResult.getEtag() == null
+                            ? cachedAlerts.getEtag()
+                            : capResult.getEtag();
+
                     if (capResult.isNotModified()) {
                         official = cachedAlerts.getAlerts();
                     } else {
                         official = capResult.getAlerts();
-                        alertCache.saveOfficial(
-                                cachedWeather.getLatitude(),
-                                cachedWeather.getLongitude(),
-                                official,
-                                capResult.getEtag(),
-                                now
-                        );
                     }
+
+                    // A successful 200 or 304 is a fresh validation of the
+                    // provider state. Save the validation time even if alert
+                    // content itself did not change.
+                    alertCache.saveOfficial(
+                            cachedWeather.getLatitude(),
+                            cachedWeather.getLongitude(),
+                            official,
+                            etag,
+                            now
+                    );
+                    officialSavedAt = now;
+                    officialDelivery = official.isEmpty()
+                            ? AlertTruthPolicy.OfficialDelivery.NETWORK_EMPTY
+                            : AlertTruthPolicy.OfficialDelivery.NETWORK;
                 } catch (Exception ignored) {
                     official = cachedAlerts.getAlerts();
+                    officialSavedAt = cachedAlerts.getSavedAt();
+                    officialDelivery = officialSavedAt > 0L
+                            ? AlertTruthPolicy.OfficialDelivery.CACHE
+                            : AlertTruthPolicy.OfficialDelivery.UNAVAILABLE;
                 }
             }
 
             List<WeatherAlert> merged = AlertMerger.merge(official, smart, now);
-            new AlertNotificationManager(context).notifyNewAlerts(merged);
+            List<WeatherAlert> candidates = AlertTruthPolicy.notificationCandidates(
+                    merged,
+                    officialDelivery,
+                    officialSavedAt,
+                    now
+            );
+            new AlertNotificationManager(context).notifyNewAlerts(candidates);
             return Result.success();
         } catch (RuntimeException exception) {
             return Result.failure();
