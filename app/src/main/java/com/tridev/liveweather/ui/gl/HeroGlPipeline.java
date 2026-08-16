@@ -18,6 +18,7 @@ import com.tridev.liveweather.data.local.WallpaperPreferences;
  * - storm/lightning overlay
  * - depth-aware rain
  * - depth-aware snow
+ * - read-only renderer/weather diagnostics
  */
 public final class HeroGlPipeline {
 
@@ -29,6 +30,7 @@ public final class HeroGlPipeline {
     private final HeroGlPortableStormRenderer stormRenderer = new HeroGlPortableStormRenderer();
     private final HeroGlDepthRainRenderer rainRenderer = new HeroGlDepthRainRenderer();
     private final HeroGlSnowRenderer snowRenderer = new HeroGlSnowRenderer();
+    private final HeroGlDiagnostics diagnostics = new HeroGlDiagnostics();
 
     @Nullable
     private GlSceneSnapshot fullSnapshot;
@@ -47,6 +49,7 @@ public final class HeroGlPipeline {
         stormRenderer.onSurfaceCreated();
         rainRenderer.onSurfaceCreated();
         snowRenderer.onSurfaceCreated();
+        diagnostics.onSurfaceCreated();
         applySnapshot();
     }
 
@@ -59,16 +62,29 @@ public final class HeroGlPipeline {
         stormRenderer.onSurfaceChanged(width, height);
         rainRenderer.onSurfaceChanged(width, height);
         snowRenderer.onSurfaceChanged(width, height);
+        diagnostics.onSurfaceChanged(width, height);
     }
 
     public void setSnapshot(@Nullable GlSceneSnapshot snapshot) {
         fullSnapshot = snapshot;
+        diagnostics.setSnapshot(snapshot);
         applySnapshot();
     }
 
     public void setOptions(@NonNull WallpaperPreferences.Options options) {
         this.options = options;
+        diagnostics.setOptions(options);
         applySnapshot();
+    }
+
+    @NonNull
+    public HeroGlDiagnostics.Snapshot captureDiagnostics() {
+        return diagnostics.capture();
+    }
+
+    @NonNull
+    public String buildDiagnosticsReport() {
+        return diagnostics.buildReport();
     }
 
     public void drawFrame() {
