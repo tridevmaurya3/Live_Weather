@@ -2,6 +2,39 @@ plugins {
     alias(libs.plugins.android.application)
 }
 
+val radarLeafletRuntime by configurations.creating {
+    isCanBeConsumed = false
+    isCanBeResolved = true
+    isTransitive = false
+}
+
+val generatedRadarLeafletAssets = layout.buildDirectory.dir("generated/radarLeafletAssets")
+
+val prepareRadarLeafletRuntime by tasks.registering(Copy::class) {
+    val webJarPrefix = "META-INF/resources/webjars/leaflet/1.9.4/dist/"
+
+    from({ radarLeafletRuntime.files.map { zipTree(it) } }) {
+        include("${webJarPrefix}**")
+        eachFile {
+            path = "radar/vendor/leaflet/" + path.removePrefix(webJarPrefix)
+        }
+        includeEmptyDirs = false
+    }
+
+    into(generatedRadarLeafletAssets)
+
+    doLast {
+        val outputRoot = generatedRadarLeafletAssets.get().asFile
+        val leafletJs = outputRoot.resolve("radar/vendor/leaflet/leaflet.js")
+        val leafletCss = outputRoot.resolve("radar/vendor/leaflet/leaflet.css")
+        if (!leafletJs.isFile || !leafletCss.isFile) {
+            throw GradleException(
+                "Leaflet 1.9.4 WebJar layout changed; Radar local runtime assets were not generated."
+            )
+        }
+    }
+}
+
 android {
     namespace = "com.tridev.liveweather"
     compileSdk {
@@ -35,6 +68,14 @@ android {
         sourceCompatibility = JavaVersion.VERSION_11
         targetCompatibility = JavaVersion.VERSION_11
     }
+
+    sourceSets {
+        getByName("main").assets.srcDir(generatedRadarLeafletAssets)
+    }
+}
+
+tasks.named("preBuild").configure {
+    dependsOn(prepareRadarLeafletRuntime)
 }
 
 dependencies {
@@ -62,10 +103,10 @@ dependencies {
     // Accurate local astronomical calculations for Sun/Moon/sky reality state.
     implementation(libs.astronomy)
 
-    // Radar Pro 20B.8: package the Leaflet engine inside the APK classpath.
-    // Phase9Renderer serves these WebJar resources to the WebView through a
-    // private local HTTPS origin, removing the runtime unpkg/CDN dependency.
-    implementation("org.webjars.npm:leaflet:1.9.4")
+    // Radar Pro 20B.8: resolved only at build time. The task above extracts
+    // Leaflet's distributable JS/CSS/images into generated APK assets, so the
+    // Radar map engine itself has no runtime CDN dependency.
+    radarLeafletRuntime("org.webjars.npm:leaflet:1.9.4")
 
     testImplementation(libs.junit)
     androidTestImplementation(libs.espresso.core)
