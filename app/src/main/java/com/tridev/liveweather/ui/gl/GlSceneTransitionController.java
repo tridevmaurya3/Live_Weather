@@ -47,10 +47,6 @@ final class GlSceneTransitionController {
         return current;
     }
 
-    /**
-     * Advances the reusable display state. Returns true only when renderer-facing
-     * values changed and therefore need copying into the renderer-specific views.
-     */
     public boolean advance() {
         GlSceneSnapshot from = current;
         GlSceneSnapshot to = target;
@@ -69,7 +65,6 @@ final class GlSceneTransitionController {
         lastFrameNanos = now;
         if (dt <= 0f) return false;
 
-        // Sky / ambient light: slow enough to feel atmospheric, not like a page refresh.
         from.topR = approach(from.topR, to.topR, dt, 3.2f, 3.2f);
         from.topG = approach(from.topG, to.topG, dt, 3.2f, 3.2f);
         from.topB = approach(from.topB, to.topB, dt, 3.2f, 3.2f);
@@ -80,7 +75,6 @@ final class GlSceneTransitionController {
         from.horizonG = approach(from.horizonG, to.horizonG, dt, 2.8f, 2.8f);
         from.horizonB = approach(from.horizonB, to.horizonB, dt, 2.8f, 2.8f);
 
-        // Celestial positions use wrap-safe interpolation across azimuth 0/360.
         from.sunX = approachUnitCycle(from.sunX, to.sunX, dt, 1.4f);
         from.sunY = approach(from.sunY, to.sunY, dt, 1.4f, 1.4f);
         from.sunVisibility = approach(from.sunVisibility, to.sunVisibility, dt, 1.8f, 2.4f);
@@ -99,7 +93,6 @@ final class GlSceneTransitionController {
         from.moonAltitude = approach(from.moonAltitude, to.moonAltitude, dt, 1.5f, 1.5f);
         from.starVisibility = approach(from.starVisibility, to.starVisibility, dt, 2.2f, 2.0f);
 
-        // Clouds build and clear gradually like a real sky mass rather than switching sprites.
         from.cloudCover = approach(from.cloudCover, to.cloudCover, dt, 3.4f, 4.4f);
         from.cloudDensity = approach(from.cloudDensity, to.cloudDensity, dt, 3.2f, 4.0f);
         from.cloudFarLayer = approach(from.cloudFarLayer, to.cloudFarLayer, dt, 3.8f, 4.6f);
@@ -108,7 +101,6 @@ final class GlSceneTransitionController {
         from.cloudStormCeiling = approach(from.cloudStormCeiling, to.cloudStormCeiling, dt, 1.2f, 3.0f);
         from.cloudBrightness = approach(from.cloudBrightness, to.cloudBrightness, dt, 2.6f, 2.8f);
 
-        // Confirmed precipitation appears promptly, then decays more softly after it stops.
         from.rainIntensity = approach(from.rainIntensity, to.rainIntensity, dt, 0.75f, 2.1f);
         from.drizzleIntensity = approach(from.drizzleIntensity, to.drizzleIntensity, dt, 0.95f, 1.8f);
         from.snowIntensity = approach(from.snowIntensity, to.snowIntensity, dt, 1.0f, 2.4f);
@@ -124,9 +116,8 @@ final class GlSceneTransitionController {
                 1.8f
         );
         from.sceneLight = approach(from.sceneLight, to.sceneLight, dt, 2.2f, 2.6f);
+        from.thermalBias = approach(from.thermalBias, to.thermalBias, dt, 4.8f, 4.8f);
         from.visibilityFactor = approach(from.visibilityFactor, to.visibilityFactor, dt, 2.0f, 3.2f);
-
-        // Launcher parallax must stay responsive; this is deliberately much faster.
         from.parallax = approach(from.parallax, to.parallax, dt, 0.10f, 0.10f);
 
         if (isVisuallySettled(from, to)) {
@@ -198,6 +189,7 @@ final class GlSceneTransitionController {
                 && near(a.windStrength, b.windStrength, 0.002f)
                 && Math.abs(wrapRadians(a.windDirectionRadians - b.windDirectionRadians)) < 0.008f
                 && near(a.sceneLight, b.sceneLight, 0.002f)
+                && near(a.thermalBias, b.thermalBias, 0.002f)
                 && near(a.visibilityFactor, b.visibilityFactor, 0.002f)
                 && near(a.parallax, b.parallax, 0.001f);
     }
