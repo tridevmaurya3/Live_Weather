@@ -44,7 +44,7 @@ public final class AdaptiveFrameTimeGuard {
         baseDetailScale = boundedDetail;
         adaptiveMultiplier = 1f;
         effectiveDetailScale = baseDetailScale;
-        resetSamples();
+        resetMeasurements();
         return effectiveDetailScale;
     }
 
@@ -113,6 +113,15 @@ public final class AdaptiveFrameTimeGuard {
         return effectiveDetailScale;
     }
 
+    /** Clears stale surface/visibility timing without changing the selected profile. */
+    public void resetMeasurements() {
+        ewmaCostMillis = 0f;
+        sampleCount = 0;
+        pressureWindows = 0;
+        stableWindows = 0;
+        hasSample = false;
+    }
+
     private float applyMultiplierIfChanged(float nextMultiplier) {
         nextMultiplier = clamp(nextMultiplier, MIN_MULTIPLIER, 1f);
         float nextDetail = clamp(
@@ -128,14 +137,6 @@ public final class AdaptiveFrameTimeGuard {
         adaptiveMultiplier = nextMultiplier;
         effectiveDetailScale = nextDetail;
         return effectiveDetailScale;
-    }
-
-    private void resetSamples() {
-        ewmaCostMillis = 0f;
-        sampleCount = 0;
-        pressureWindows = 0;
-        stableWindows = 0;
-        hasSample = false;
     }
 
     private static float clamp(float value, float min, float max) {
