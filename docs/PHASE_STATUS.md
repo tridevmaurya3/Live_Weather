@@ -1,8 +1,8 @@
 # Live Weather — Current Development Status
 
-Status: ACTIVE DEVELOPMENT — Phase 25 source implementation complete; Phase 26 release gate not started.
+Status: PHASE 26 ACTIVE — automated release gate passed; consolidated real-device acceptance + explicit final approval pending.
 
-The project must not be labelled Final, Complete, Production Ready or Release Candidate until Phase 26 is completed and the user explicitly approves finalization.
+The project must not be labelled Final, Complete, Production Ready or Release Candidate until the remaining Phase 26 real-device gate passes and the user explicitly approves finalization.
 
 ## Foundation through Phase 15
 
@@ -23,172 +23,107 @@ Completed foundations:
 - Phase 15 — Production-foundation pass
 
 ## Phase 16 — Settings & Units Pro
-Status: IMPLEMENTED — device verification backlog remains in final regression.
+Status: IMPLEMENTED — final device regression pending.
 
-Implemented:
-- Celsius/Fahrenheit;
-- km/h, mph, m/s, knots;
-- hPa/mbar/inHg;
-- mm/inch;
-- km/miles;
-- Metric, Imperial and custom profiles;
-- Auto / Smooth / Battery performance selector;
-- shared formatter repaint across app/widgets/Radar labels.
+Implemented Celsius/Fahrenheit; km/h, mph, m/s, knots; hPa/mbar/inHg; mm/inch; km/miles; Metric/Imperial/custom profiles; Auto/Smooth/Battery performance modes; and shared formatting across app/widgets/Radar.
 
 ## Phase 17 — Widget Pro
-Status: IMPLEMENTED — launcher/device regression remains in final regression.
+Status: IMPLEMENTED — final launcher/device regression pending.
 
-Implemented:
-- per-widget configuration;
-- active-weather or fixed-city source;
-- glass/transparent appearance;
-- compact/wide responsive layouts;
-- refresh/status/source isolation;
-- fixed-city refresh that does not move the app/wallpaper active location.
+Implemented per-widget source/configuration, active/fixed city isolation, glass/transparent modes, responsive compact/wide layouts, manual/background refresh and cleanup.
 
 ## Phase 18 — Weather Intelligence 2.0
-Status: IMPLEMENTED — device verification backlog remains in final regression.
+Status: IMPLEMENTED — final device regression pending.
 
-Implemented:
-- shared weather-intelligence report;
-- current precipitation separated from forecast probability;
-- rain-soon/later semantics;
-- feels-like/humidity/dew point/wind/gust/visibility/pressure interpretation;
-- saved/offline model freshness wording;
-- Smart Risk protection against false rain-now claims.
+Current precipitation remains separate from forecast probability; shared comfort/wind/visibility/pressure/freshness intelligence and Smart Risk truth protections are integrated.
 
 ## Phase 19 — Forecast Pro
-Status: IMPLEMENTED — device verification backlog remains in final regression.
+Status: IMPLEMENTED — final device regression pending.
 
-Implemented:
-- interactive 24-hour forecast selection;
-- temperature/precipitation charts;
-- rain-risk timeline;
-- expandable 10-day forecast;
-- detailed daily weather, Sun/Moon and astronomical events;
-- truthful live/refreshing/saved/stale/unavailable state handling.
+Interactive 24-hour selection, charts, rain-risk timeline, expandable 10-day forecast, daily details and Sun/Moon events are integrated with truthful live/saved/stale states.
 
 ## Phase 20A — Accurate Live Weather Reality Foundation
-Status: SOURCE IMPLEMENTATION COMPLETE — real-device visual acceptance remains in final regression.
+Status: SOURCE IMPLEMENTATION COMPLETE — final real-device visual acceptance pending.
 
-Implemented:
-- current-weather truth as renderer authority;
-- photoreal cloud atlas and multi-depth clouds;
-- depth-aware rain/drizzle;
-- storm/lightning realism;
-- Sun/Moon/stars/twilight improvements;
-- fog/haze/snow;
-- gust response;
-- OpenGL diagnostics, renderer isolation, bounded EGL recovery;
-- temporal smoothing and adaptive frame-time guard.
+Current-weather truth drives the shared cloud/rain/storm/astronomy/fog/snow renderer with diagnostics, temporal smoothing, fault isolation, EGL recovery and adaptive secondary detail.
 
 ## Phase 20B — Radar Pro
-Status: SOURCE IMPLEMENTATION COMPLETE — Gradle Sync/debug integration has passed; full real-device Radar acceptance remains.
+Status: SOURCE IMPLEMENTATION COMPLETE — automated Debug/Release build gate passed; final real-device Radar acceptance pending.
 
-Implemented:
-- RainViewer observed radar truth boundary;
-- Open-Meteo model Clouds/Wind/Temperature layers;
-- professional layers/legends;
-- observed timeline/replay;
-- freshness/provenance/fallback states;
-- WebView lifecycle and tile-health guards;
-- bundled local Leaflet runtime;
-- persistent bounded Radar metadata/model fallback from Phase 23.
+Observed RainViewer radar, Open-Meteo model layers, timeline/replay, freshness/provenance, local Leaflet runtime, WebView lifecycle/tile-health guards and bounded persistent metadata/model fallback are integrated.
 
 ## Phase 21 — Alerts Pro
-Status: SOURCE IMPLEMENTATION COMPLETE — device regression remains.
+Status: SOURCE IMPLEMENTATION COMPLETE — automated Debug/Release build gate passed; final device regression pending.
 
-Implemented:
-- official-warning truth/freshness policy;
-- saved/stale/unavailable source states;
-- source and severity filters;
-- master/per-source notification controls;
-- Android notification/channel block awareness;
-- IMD Official vs Smart Risk notification labels;
-- detailed alert dialog and notification settings entry;
-- stale-background guards.
+Official warning truth/freshness, Smart Risk separation, filters, notification controls/channels, details and stale-background guards are integrated.
 
 ## Phase 22 — App UX, Responsive & Accessibility Audit
-Status: SOURCE IMPLEMENTATION COMPLETE — full accessibility/device regression remains.
+Status: SOURCE IMPLEMENTATION COMPLETE — automated Debug/Release build gate passed; final accessibility/device regression pending.
 
-Implemented:
-- central `UiQualityPolicy`;
-- 48dp touch target baseline;
-- narrow/large-text card reflow;
-- responsive phone/tablet padding;
-- Home temperature autosizing;
-- adaptive Radar height;
-- TalkBack pane/action descriptions;
-- decorative GL/chart focus cleanup;
-- consistent loading/live/stale/error semantic treatment.
+Central 48dp touch policy, responsive reflow, tablet padding, large-text behavior, TalkBack semantics and loading/live/stale/error treatment are integrated.
 
 ## Phase 23 — Offline, Cache & Data Reliability 2.0
-Status: SOURCE IMPLEMENTATION COMPLETE — offline/device regression remains.
+Status: SOURCE IMPLEMENTATION COMPLETE — automated Debug/Release build gate passed; final offline/device regression pending.
 
-Implemented:
-- shared cache-age/location reliability policy;
-- selected-city startup identity protection;
-- background old-city race protection;
-- AQI snapshot isolation;
-- bounded WorkManager retry/backoff;
-- persistent bounded Radar metadata/model cache;
-- More-page Data Reliability diagnostics;
-- corrupt cache rejection;
-- app/widget/wallpaper source-identity rules.
+Cache-age/location policy, selected-city identity protection, background race guards, AQI isolation, bounded WorkManager retry, persistent Radar fallback and Data Reliability diagnostics are integrated.
 
 ## Phase 24 — Live Wallpaper Quality Backlog
-Status: SOURCE IMPLEMENTATION COMPLETE — current project debug build passed; real-device OpenGL/visual acceptance remains.
+Status: SOURCE IMPLEMENTATION COMPLETE — automated Debug/Release build gate passed; final real-device OpenGL/visual acceptance pending.
 
-Verified in active shared renderer source:
-- depth/variation/wind response for rain;
-- restrained wet-glass droplets/film;
-- rain-gated wet-world reflections;
-- richer terrain/forest/world depth;
-- improved branched multi-pulse lightning;
-- cloud-density mass, edge wrapping, layered motion and overcast continuity;
-- app Hero and Android Live Wallpaper share `GlRealityAdapter -> GlSceneSnapshot -> HeroGlPipeline`;
-- performance modes change frame pacing/secondary detail, not weather truth.
+Depth rain, wet glass, rain-gated reflections, richer world depth, branched lightning, cloud mass/wrapping/overcast continuity and Hero/Wallpaper shared-pipeline parity are integrated.
 
 ## Phase 25 — Product Completeness Audit
-Status: SOURCE IMPLEMENTATION COMPLETE — current project debug build passed; full real-device product regression remains.
+Status: SOURCE IMPLEMENTATION COMPLETE — automated Debug/Release build gate passed; final full real-device product regression pending.
 
-Verified/fixed:
-- all five primary destinations are real: Home, Forecast, Radar, Wallpaper, More;
-- Home Forecast/Radar/Air Quality/Wallpaper actions are wired;
-- More Alerts and Air Quality compact cards are real actions;
-- Widgets, Units, Performance and Data Reliability have active runtime actions;
-- `LiveWeatherApplication` activates Forecast, Settings, Data Reliability, More-action and UX binders;
-- active UI no longer exposes development/roadmap wording;
-- More/About displays product-facing copy and Version 1.0.0;
-- legitimate waiting/saved/stale/no-results states are retained as data truth;
-- stale repository status documents were synchronized to the actual roadmap.
+All five primary destinations and actions are wired; More/Settings/Data Reliability binders are active; product-facing copy/version are cleaned up; no extra unbound primary page remains in the roadmap shell.
 
-See `PHASE_25_PRODUCT_COMPLETENESS_AUDIT.md` for the detailed audit and regression matrix.
-
-## Current build checkpoint
-
-The user's latest local Android Studio debug-build checkpoint passed after the Phase 25 source commits were already present in `main`.
-
-This confirms Java/XML/resource integration for the current source line, but it does not replace real-device regression or the release/R8 gate.
+See `PHASE_25_PRODUCT_COMPLETENESS_AUDIT.md` for the detailed product audit.
 
 ## Phase 26 — Final Release Gate
-Status: NOT STARTED.
+Status: AUTOMATED RELEASE GATE PASSED — real-device acceptance + explicit user final approval pending.
 
-Phase 26 may begin only when the user wants to enter final release validation.
+Completed automated gate:
+- latest Debug APK build: PASS;
+- Debug unit tests: PASS;
+- Release lint: PASS;
+- minified/resource-shrunk Release/R8 APK: PASS;
+- Release AAB: PASS;
+- R8 mapping output: PASS;
+- APK/AAB/lint output checks: PASS;
+- configuration-cache-enabled build: PASS;
+- release verification artifact upload: PASS.
 
-Required release gate:
-- latest Debug build pass;
-- Release/R8 build pass;
-- real-device smoke/regression pass;
-- Widgets pass;
-- Live Wallpaper/OpenGL pass;
-- Radar pass;
-- Alerts/notification pass;
-- offline/cache pass;
-- final versionCode/versionName decision;
-- release/Play Store preparation if requested;
-- explicit user approval before the project is called final.
+Authoritative GitHub Actions run:
+- run `#9` / ID `31965101892`;
+- head `b8a6a0f483ed253f49a89ab8cb14e3793916314a`;
+- verification artifact ID `9268321760`;
+- artifact digest `sha256:5e5dadb31ea6f9757274593aaf55669195511cb870572ee7de5e3e32563027be`.
+
+Release hardening completed in Phase 26:
+- strict lint gate exposed two API-27 navigation-bar theme errors instead of hiding them;
+- base API-26 themes were fixed and API-27+ qualified day/night themes added;
+- signing material patterns (`*.jks`, `*.keystore`, `keystore.properties`, `signing.properties`) are ignored;
+- CI release gate added and modernized to `checkout@v7`, `setup-java@v5`, `upload-artifact@v7`;
+- privacy/backup/cleartext/R8/provider-attribution release hygiene audited.
+
+Current version checkpoint:
+- `versionName = 1.0.0`;
+- `versionCode = 1`.
+
+Remaining Phase 26 gate:
+- consolidated real-device Home/location/Forecast pass;
+- Radar provider/lifecycle/offline-warning pass;
+- Alerts permission/channel/notification pass;
+- Widget launcher/configuration pass;
+- Live Wallpaper/OpenGL visual/parity/performance pass;
+- offline/cache/city-switch reliability pass;
+- narrow/large-font/TalkBack pass;
+- lifecycle/background/foreground smoke pass;
+- final Play versionCode/signing/provider-terms decision if publishing;
+- explicit user approval before final status.
+
+See `PHASE_26_FINAL_RELEASE_GATE.md` for the authoritative release-gate record and device acceptance matrix.
 
 ## Next
 
-**Phase 26 — Final Release Gate**, only after explicit user instruction to start it.
+Run the single consolidated Phase 26 real-device acceptance matrix. If it passes, obtain explicit user final approval before changing the project status to Final / Complete / Production Ready / Release Candidate.
