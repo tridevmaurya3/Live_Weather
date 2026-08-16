@@ -157,6 +157,29 @@ Permanent rules:
 This checkpoint is a source-level safety audit. A local Android Gradle build and
 real-device GPU validation are still required before Phase 20A visual acceptance.
 
+## Checkpoint 20A.12 — cinematic performance governor
+
+- Added `CinematicPerformanceGovernor` with CINEMATIC, BALANCED and ECO profiles.
+- Profiles are resolved separately for the in-app Hero and Android Live Wallpaper.
+- SMOOTH mode can use the CINEMATIC profile; AUTO stays balanced unless battery or
+  power-saver conditions require a lower-cost profile; BATTERY explicitly selects ECO.
+- The app Hero and Live Wallpaper keep separate frame targets so the app can feel
+  more fluid without forcing the system wallpaper to render at the same cost.
+- Performance detail is passed into the shared HeroGlPipeline instead of changing
+  the weather snapshot.
+- Cloud rendering keeps the primary far/mid/near structure at every profile and
+  drops only extra secondary sprite samples when detail is reduced.
+- Rain keeps confirmed precipitation, wind lean, depth veil and core far/mid rain;
+  ECO/BALANCED may reduce near-particle and secondary wet-lens sampling.
+- Snow keeps current snow truth and core depth layers; the closest secondary flake
+  layer is omitted only at the lowest detail profile.
+- Storm darkness, current storm intensity and the main lightning bolt are retained;
+  lower profiles reduce only secondary texture/fork samples.
+- No profile changes current-condition classification, cloud cover, rain/snow/storm
+  intensity, Sun/Moon astronomy, wind direction, or forecast/current truth.
+- Profile changes use uniforms/state updates and do not recreate GL programs,
+  textures, activities, fragments or weather pages.
+
 ## Acceptance required
 
 Source implementation is complete, but Phase 20A is not accepted until it is
@@ -177,6 +200,8 @@ Confirm:
 - Home Hero and applied Live Wallpaper remain visually consistent;
 - `LiveWeatherGL` diagnostics match the weather actually being displayed;
 - launcher swipes/parallax do not cause stutter or visible scene resets;
-- unchanged cached weather does not cause a visible refresh/flicker.
+- unchanged cached weather does not cause a visible refresh/flicker;
+- switching AUTO / SMOOTH / BATTERY changes smoothness/cost without changing the
+  actual weather state shown on screen.
 
 Source implementation alone is not visual acceptance.
