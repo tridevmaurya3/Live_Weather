@@ -134,7 +134,7 @@ Acceptance checkpoint: debug build, real-phone Radar layers, replay/timeline, re
 
 ## Phase 21 — Alerts Pro
 
-Status: IMPLEMENTATION STARTED — Step 21.1 source implementation complete; build/device verification pending.
+Status: IMPLEMENTATION STARTED — Steps 21.1–21.2 source implementation complete; build/device verification pending.
 
 Step 21.1 implemented:
 - Central `AlertTruthPolicy` for official warning source delivery/freshness state
@@ -147,13 +147,23 @@ Step 21.1 implemented:
 - Saved stale official warnings are visibly marked `SAVED OFFICIAL`
 - Smart Risk remains explicitly app-derived and separate from official warnings
 
+Step 21.2 implemented:
+- Persistent Official and Smart Risk source filters with safe enabled defaults
+- Persistent minimum severity filter: All / Yellow+ / Orange+ / Red only
+- Compact Alerts Center filter controls with immediate no-network re-render
+- Source/severity filters apply to Alerts Center, Home alert card and notification eligibility
+- Filter-hidden alerts are disclosed instead of being described as nonexistent
+- Official push floor remains Yellow+; Smart Risk push floor remains high-confidence Orange/Red
+- User severity preference may make notifications stricter but cannot loosen Smart Risk push confidence
+- Background alert worker now uses the same official freshness/truth notification candidate policy
+- Successful background 200/304 official checks refresh validation time; stale fallback does not create a new official push
+
 Remaining Phase 21 scope:
-- Alert settings surface
-- Official warning vs Smart Risk filters
-- Severity preferences
-- Notification preferences and clear source labels
+- Master notification/Android permission status polish
+- Per-source notification explanation/status
 - Alert detail/navigation polish
-- Background/cached/stale warning-state hardening
+- Source/severity/validity detail presentation
+- Background/cached/stale warning-state final audit
 - Final Alerts Pro integration and device verification
 
 ## Phase 22 — App UX, Responsive & Accessibility Audit
