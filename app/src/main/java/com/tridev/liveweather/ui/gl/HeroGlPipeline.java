@@ -42,6 +42,7 @@ public final class HeroGlPipeline {
     @Nullable private GlSceneSnapshot rainView;
     @Nullable private GlSceneSnapshot snowView;
 
+    private boolean rendererViewsBound;
     private volatile float performanceDetailScale = 1f;
 
     private boolean sceneHealthy = true;
@@ -60,6 +61,7 @@ public final class HeroGlPipeline {
 
     public void onSurfaceCreated() {
         resetRendererHealth();
+        rendererViewsBound = false;
         diagnostics.resetRendererFaults();
         diagnostics.onSurfaceCreated();
 
@@ -336,8 +338,8 @@ public final class HeroGlPipeline {
 
     /**
      * Copies the smoothed master scene into renderer-specific reusable views.
-     * This replaces the old per-update withVisualOptions object fan-out and keeps
-     * the per-frame transition path allocation-free.
+     * The views stay bound to their renderers; the transition hot path mutates
+     * only primitive fields and does not repeat volatile snapshot assignments.
      */
     private void applyVisualSnapshot(@NonNull GlSceneSnapshot state) {
         ensureRendererViews(state);
@@ -370,16 +372,19 @@ public final class HeroGlPipeline {
                 state, true, false, true, options.isSnow(), true, true
         );
 
-        // Rebinding is only reference assignment; renderer views themselves are reused.
-        sceneRenderer.setSnapshot(sceneView);
-        starRenderer.setSnapshot(starView);
-        cloudRenderer.setSnapshot(cloudView);
-        worldRenderer.setSnapshot(worldView);
-        atmosphereRenderer.setSnapshot(atmosphereView);
-        stormRenderer.setSnapshot(stormView);
+        if (!rendererViewsBound) {
+            sceneRenderer.setSnapshot(sceneView);
+            starRenderer.setSnapshot(starView);
+            cloudRenderer.setSnapshot(cloudView);
+            worldRenderer.setSnapshot(worldView);
+            atmosphereRenderer.setSnapshot(atmosphereView);
+            stormRenderer.setSnapshot(stormView);
+            rainRenderer.setSnapshot(rainView);
+            snowRenderer.setSnapshot(snowView);
+            rendererViewsBound = true;
+        }
+
         stormRenderer.setElectricalEnabled(options.isLightning());
-        rainRenderer.setSnapshot(rainView);
-        snowRenderer.setSnapshot(snowView);
     }
 
     private void ensureRendererViews(@NonNull GlSceneSnapshot state) {
@@ -402,6 +407,7 @@ public final class HeroGlPipeline {
         stormRenderer.setSnapshot(null);
         rainRenderer.setSnapshot(null);
         snowRenderer.setSnapshot(null);
+        rendererViewsBound = false;
     }
 
     private void resetRendererHealth() {
