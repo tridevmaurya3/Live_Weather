@@ -1,6 +1,6 @@
 # Phase 20B — Radar Pro
 
-Status: IMPLEMENTATION STARTED — Steps 20B.1–20B.6 source implementation complete; visual/device verification pending.
+Status: IMPLEMENTATION STARTED — Steps 20B.1–20B.7 source implementation complete; visual/device verification pending.
 
 ## Product contract
 
@@ -120,9 +120,28 @@ Implemented:
 - No weather evidence, radar observation, model field, timeline truth or forecast/current-weather rule was changed.
 - No new network polling was introduced by lifecycle recovery.
 
+## Step 20B.7 — tile failure guard + static integration preflight
+
+Implemented:
+- OpenStreetMap base tiles and RainViewer radar tiles now have separate aggregate delivery-health windows driven by Leaflet `loading`, `tileload`, `tileerror`, and `load` events.
+- A single failed image is not treated as provider failure. Degraded state requires a bounded sample window, at least three tile errors and a failure ratio of at least 60% across at least four completed tile requests.
+- Recovery also uses hysteresis: a degraded source is cleared only after a later window has enough successful tile loads. This avoids warning flicker from one transient tile.
+- Tile failures are aggregated inside the WebView. There is no Android bridge call or log entry per tile, avoiding error-spam and Java/Chromium churn during a bad network period.
+- Base-map degradation is reported separately from radar-tile degradation. Weather overlays can remain usable when OpenStreetMap tiles fail.
+- Radar-tile degradation explicitly says that image delivery failed and **does not infer no rain**. A successfully delivered transparent/empty RainViewer tile remains a valid observed radar tile and is not classified as failure.
+- If both base and radar tiles degrade, one combined compact warning is shown. The warning is non-interactive and does not block map gestures.
+- Radar tile health is attached once to the persistent reusable RainViewer tile layer, so timeline playback does not create new health listeners per frame.
+- The existing persistent tile-layer playback optimization remains intact; changing frames continues to use `setUrl()`.
+- Static cross-check covered `screen_radar.xml`, `Phase9Renderer`, `RadarPageLayout`, `RadarViewModel`, `RadarUiState`, `RadarRepository`, `RadarObservedDataPolicy`, and `radar_map.html`.
+- All native view IDs currently referenced by `Phase9Renderer` are present in `screen_radar.xml`.
+- Repository callback signatures match the ViewModel implementations: value + delivery source + saved-at time on success, message + throwable on failure.
+- `RadarUiState` still derives WebView frames only through `RadarObservedDataPolicy.sanitizePastFrames(...)`, preserving the observed-past truth boundary.
+- The JavaScript bridge methods used by Android remain present: `setData`, `setLayer`, `setFrame`, `recenter`, `suspend`, `resume`, and `retryEngine`.
+- No future radar frame, forecast-probability conversion, model-to-radar promotion, new network polling, or per-frame health polling was added.
+
 ## Verification boundary
 
 - Source changes are on `main`.
-- No local Android Studio / Gradle build was run in these Radar Pro steps.
-- No real-device WebView/radar playback/cloud-surface/legend/freshness/lifecycle validation was run yet.
+- Static source contracts were cross-checked in Step 20B.7, but no local Android Studio / Gradle build was run in these Radar Pro steps.
+- No real-device WebView/radar playback/cloud-surface/legend/freshness/lifecycle/tile-failure validation was run yet.
 - Phase 20B is not complete.
