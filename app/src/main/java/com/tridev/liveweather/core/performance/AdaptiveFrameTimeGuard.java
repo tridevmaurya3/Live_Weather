@@ -7,6 +7,10 @@ package com.tridev.liveweather.core.performance;
  * steady GL draw + buffer-swap cost and gently trims secondary renderer detail
  * after sustained pressure. Detail is restored more slowly after the renderer
  * remains comfortably inside budget, preventing quality oscillation.
+ *
+ * eglSwapBuffers may legitimately block for display/vsync pacing on some Android
+ * GPUs. The guard therefore compares the smoothed cost against the selected frame
+ * interval itself instead of treating normal vsync wait as immediate GPU overload.
  */
 public final class AdaptiveFrameTimeGuard {
 
@@ -73,11 +77,16 @@ public final class AdaptiveFrameTimeGuard {
         if (sampleCount < WINDOW_SAMPLES) return Float.NaN;
         sampleCount = 0;
 
-        // Leave headroom for handler scheduling and occasional lightweight state work.
-        float pressureBudget = Math.max(8f, baseFrameIntervalMillis * 0.82f);
+        /*
+         * Swap can block until display presentation. Pressure is therefore based
+         * on actually exceeding the selected frame interval, not on an artificial
+         * sub-frame "headroom" budget that could downgrade a healthy 60/90/120 Hz
+         * device simply because eglSwapBuffers waited for vsync.
+         */
+        float pressureBudget = Math.max(8f, (float) baseFrameIntervalMillis);
         float pressureRatio = ewmaCostMillis / pressureBudget;
 
-        if (pressureRatio >= 0.94f) {
+        if (pressureRatio >= 1.02f) {
             pressureWindows++;
             stableWindows = 0;
             if (pressureWindows >= PRESSURE_WINDOWS_TO_STEP_DOWN) {
@@ -92,7 +101,7 @@ public final class AdaptiveFrameTimeGuard {
             return Float.NaN;
         }
 
-        if (pressureRatio <= 0.62f) {
+        if (pressureRatio <= 0.84f) {
             stableWindows++;
             pressureWindows = 0;
             if (stableWindows >= STABLE_WINDOWS_TO_STEP_UP) {
