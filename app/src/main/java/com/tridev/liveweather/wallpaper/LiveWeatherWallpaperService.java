@@ -6,6 +6,7 @@ import android.service.wallpaper.WallpaperService;
 import android.view.SurfaceHolder;
 
 import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
 
 import com.tridev.liveweather.core.performance.PerformancePolicy;
 import com.tridev.liveweather.data.local.AirQualityCache;
@@ -18,9 +19,9 @@ import com.tridev.liveweather.worker.WallpaperWeatherScheduler;
 /**
  * Android system Live Wallpaper backed by the shared Hero OpenGL weather engine.
  *
- * Phase 14 uses the same adaptive frame policy as in-app live scenes. Rendering
- * still runs only while the wallpaper is visible; network/cache refresh remains
- * outside the frame loop.
+ * Rendering runs only while the wallpaper is visible. Network refresh remains
+ * fully outside the frame loop. The lightweight cache poll is change-detected,
+ * so an unchanged cached snapshot is never pushed back through the GL pipeline.
  */
 public final class LiveWeatherWallpaperService extends WallpaperService {
 
@@ -32,6 +33,7 @@ public final class LiveWeatherWallpaperService extends WallpaperService {
     private final class LiveWeatherEngine extends Engine {
 
         private static final long CACHE_RELOAD_MILLIS = 45_000L;
+        private static final long NO_CACHE_VERSION = Long.MIN_VALUE;
 
         private final Handler handler = new Handler(Looper.getMainLooper());
         private final GlWallpaperRenderThread glRenderer = new GlWallpaperRenderThread();
@@ -42,7 +44,14 @@ public final class LiveWeatherWallpaperService extends WallpaperService {
                 new PerformancePreferences(LiveWeatherWallpaperService.this);
 
         private boolean visible;
-        private WallpaperPreferences.Options options = preferences.load();
+
+        @Nullable
+        private WallpaperPreferences.Options appliedOptions;
+
+        private long appliedWeatherSavedAt = NO_CACHE_VERSION;
+        private long appliedAirSavedAt = NO_CACHE_VERSION;
+        private double appliedLatitude = Double.NaN;
+        private double appliedLongitude = Double.NaN;
 
         private final Runnable cacheRefreshRunnable = new Runnable() {
             @Override
@@ -57,7 +66,6 @@ public final class LiveWeatherWallpaperService extends WallpaperService {
         public void onCreate(@NonNull SurfaceHolder surfaceHolder) {
             super.onCreate(surfaceHolder);
             setTouchEventsEnabled(false);
-            applyOptions(preferences.load());
             reloadCache();
             WallpaperWeatherScheduler.schedule(LiveWeatherWallpaperService.this);
         }
@@ -69,7 +77,6 @@ public final class LiveWeatherWallpaperService extends WallpaperService {
             glRenderer.setVisible(visible);
 
             if (visible) {
-                applyOptions(preferences.load());
                 reloadCache();
                 handler.postDelayed(cacheRefreshRunnable, CACHE_RELOAD_MILLIS);
             }
@@ -110,12 +117,15 @@ public final class LiveWeatherWallpaperService extends WallpaperService {
         }
 
         private void reloadCache() {
-            options = preferences.load();
-            applyOptions(options);
+            WallpaperPreferences.Options latestOptions = preferences.load();
+            applyOptions(latestOptions);
 
             WeatherCache.CachedWeather weather = weatherCache.load();
             if (weather == null) {
-                glRenderer.clearWeatherData();
+                if (appliedWeatherSavedAt != NO_CACHE_VERSION) {
+                    glRenderer.clearWeatherData();
+                    resetAppliedWeatherIdentity();
+                }
                 return;
             }
 
@@ -123,19 +133,40 @@ public final class LiveWeatherWallpaperService extends WallpaperService {
                     weather.getLatitude(),
                     weather.getLongitude()
             );
-            AirQualityResponse airResponse = air == null ? null : air.getResponse();
 
+            long weatherSavedAt = weather.getSavedAt();
+            long airSavedAt = air == null ? NO_CACHE_VERSION : air.getSavedAt();
+            boolean locationChanged = !sameCoordinate(appliedLatitude, weather.getLatitude())
+                    || !sameCoordinate(appliedLongitude, weather.getLongitude());
+            boolean weatherChanged = weatherSavedAt != appliedWeatherSavedAt;
+            boolean airChanged = airSavedAt != appliedAirSavedAt;
+
+            if (!locationChanged && !weatherChanged && !airChanged) {
+                return;
+            }
+
+            AirQualityResponse airResponse = air == null ? null : air.getResponse();
             glRenderer.setWeatherData(
                     weather.getWeather(),
                     airResponse,
                     weather.getLatitude(),
                     weather.getLongitude()
             );
+
+            appliedWeatherSavedAt = weatherSavedAt;
+            appliedAirSavedAt = airSavedAt;
+            appliedLatitude = weather.getLatitude();
+            appliedLongitude = weather.getLongitude();
         }
 
         private void applyOptions(@NonNull WallpaperPreferences.Options newOptions) {
-            options = newOptions;
-            glRenderer.setVisualOptions(newOptions);
+            if (appliedOptions == null || !sameOptions(appliedOptions, newOptions)) {
+                glRenderer.setVisualOptions(newOptions);
+                appliedOptions = newOptions;
+            }
+
+            // Keep battery / performance policy adaptive without re-sending the
+            // visual state or rebuilding the weather snapshot.
             glRenderer.setFrameIntervalMillis(
                     PerformancePolicy.frameIntervalMillis(
                             LiveWeatherWallpaperService.this,
@@ -143,6 +174,31 @@ public final class LiveWeatherWallpaperService extends WallpaperService {
                             newOptions.isBatteryAdaptive()
                     )
             );
+        }
+
+        private void resetAppliedWeatherIdentity() {
+            appliedWeatherSavedAt = NO_CACHE_VERSION;
+            appliedAirSavedAt = NO_CACHE_VERSION;
+            appliedLatitude = Double.NaN;
+            appliedLongitude = Double.NaN;
+        }
+
+        private boolean sameOptions(
+                @NonNull WallpaperPreferences.Options first,
+                @NonNull WallpaperPreferences.Options second
+        ) {
+            return first.isRain() == second.isRain()
+                    && first.isClouds() == second.isClouds()
+                    && first.isLightning() == second.isLightning()
+                    && first.isSnow() == second.isSnow()
+                    && first.isFog() == second.isFog()
+                    && first.isStars() == second.isStars()
+                    && first.isBatteryAdaptive() == second.isBatteryAdaptive();
+        }
+
+        private boolean sameCoordinate(double first, double second) {
+            if (Double.isNaN(first) || Double.isNaN(second)) return false;
+            return Math.abs(first - second) < 0.000001d;
         }
     }
 }
