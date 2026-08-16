@@ -16,6 +16,13 @@ import retrofit2.Call;
 import retrofit2.Callback;
 import retrofit2.Response;
 
+/**
+ * Radar Pro repository.
+ *
+ * RainViewer is treated as observed past radar imagery. Open-Meteo is a sampled
+ * atmospheric model field for cloud/wind/temperature context; it is never
+ * promoted to observed radar truth or used to fabricate future radar frames.
+ */
 public final class RadarRepository {
 
     private static final long RADAR_CACHE_MILLIS = 5L * 60L * 1000L;
@@ -38,7 +45,10 @@ public final class RadarRepository {
 
     public void loadRadar(boolean force, @NonNull ResultCallback<RainViewerResponse> callback) {
         long now = System.currentTimeMillis();
-        if (!force && cachedRadar != null && now - cachedRadarAt < RADAR_CACHE_MILLIS) {
+        if (!force
+                && cachedRadar != null
+                && now - cachedRadarAt < RADAR_CACHE_MILLIS
+                && RadarObservedDataPolicy.hasUsableObservedTimeline(cachedRadar, now)) {
             callback.onSuccess(cachedRadar, true);
             return;
         }
@@ -49,18 +59,26 @@ public final class RadarRepository {
                     @NonNull Call<RainViewerResponse> call,
                     @NonNull Response<RainViewerResponse> response
             ) {
+                long receivedAt = System.currentTimeMillis();
                 RainViewerResponse body = response.body();
-                if (response.isSuccessful() && body != null) {
+                if (response.isSuccessful()
+                        && body != null
+                        && RadarObservedDataPolicy.hasUsableObservedTimeline(body, receivedAt)) {
                     cachedRadar = body;
-                    cachedRadarAt = System.currentTimeMillis();
+                    cachedRadarAt = receivedAt;
                     callback.onSuccess(body, false);
                     return;
                 }
-                if (cachedRadar != null) {
+                if (cachedRadar != null
+                        && RadarObservedDataPolicy.hasUsableObservedTimeline(cachedRadar, receivedAt)) {
                     callback.onSuccess(cachedRadar, true);
                     return;
                 }
-                callback.onError("Radar timeline unavailable (HTTP " + response.code() + ")", null);
+                if (response.isSuccessful() && body != null) {
+                    callback.onError("Radar metadata contained no usable observed frames", null);
+                } else {
+                    callback.onError("Radar timeline unavailable (HTTP " + response.code() + ")", null);
+                }
             }
 
             @Override
@@ -68,11 +86,13 @@ public final class RadarRepository {
                     @NonNull Call<RainViewerResponse> call,
                     @NonNull Throwable throwable
             ) {
-                if (cachedRadar != null) {
+                long failedAt = System.currentTimeMillis();
+                if (cachedRadar != null
+                        && RadarObservedDataPolicy.hasUsableObservedTimeline(cachedRadar, failedAt)) {
                     callback.onSuccess(cachedRadar, true);
                     return;
                 }
-                callback.onError("Radar network unavailable", throwable);
+                callback.onError("Observed radar network unavailable", throwable);
             }
         });
     }
@@ -118,7 +138,7 @@ public final class RadarRepository {
                     callback.onSuccess(cachedField, true);
                     return;
                 }
-                callback.onError("Cloud/wind field unavailable (HTTP " + response.code() + ")", null);
+                callback.onError("Atmospheric model field unavailable (HTTP " + response.code() + ")", null);
             }
 
             @Override
@@ -130,7 +150,7 @@ public final class RadarRepository {
                     callback.onSuccess(cachedField, true);
                     return;
                 }
-                callback.onError("Cloud/wind field network unavailable", throwable);
+                callback.onError("Atmospheric model field network unavailable", throwable);
             }
         });
     }
