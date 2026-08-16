@@ -1,6 +1,6 @@
 # Phase 24 — Live Wallpaper Quality Backlog
 
-Status: SOURCE IMPLEMENTATION COMPLETE — build/real-device visual acceptance pending.
+Status: SOURCE IMPLEMENTATION COMPLETE — current project debug build passed; real-device OpenGL / visual acceptance pending.
 
 ## Product contract
 
@@ -117,7 +117,7 @@ Preserved:
 
 ## 24.9 — Source integration preflight
 
-Checked after remote writes:
+Checked against the current `main` source:
 - cloud shader declarations match Java uniform lookups/uploads;
 - rain shader declarations match Java uniform lookups/uploads;
 - storm shader declarations match Java uniform lookups/uploads;
@@ -125,13 +125,16 @@ Checked after remote writes:
 - all new effects use existing `GlSceneSnapshot` truth fields;
 - no `GlSceneSnapshot` constructor/signature migration was required;
 - no `HeroGlPipeline` draw-order rewrite was required;
-- app and wallpaper therefore automatically receive the same upgraded renderer classes;
-- no Phase 23 reliability files were changed;
-- no Phase 25 product-completeness work was started.
+- app and wallpaper automatically receive the same upgraded renderer classes;
+- `LiveSkyView` and `GlWallpaperRenderThread` both compose through `GlRealityAdapter` into the same `HeroGlPipeline`;
+- the current project Pull / Gradle Sync / Debug build was reported successful by the user after the Phase 23 checkpoint, and these Phase 24 Java renderer sources were already part of that `main` build;
+- no Phase 23 reliability files were changed by this Phase 24 verification pass.
+
+A successful Android project build confirms Java/resource integration, but it does not prove device GPU shader compilation or visual quality because the GLSL programs compile at runtime when the OpenGL surfaces are created.
 
 ## Real-device acceptance gate still required
 
-After pull/build, verify on a real phone:
+Verify on a real phone:
 
 1. Clear/dry scene: no rain streaks, wet glass or rain-driven ground sheen.
 2. Light drizzle: fine/far rain appears without heavy near streaks or exaggerated droplets.
@@ -155,5 +158,6 @@ After pull/build, verify on a real phone:
 - All Phase 24 source changes are on `main` only.
 - No new branch was created.
 - Source implementation is complete.
-- No local Android Studio build, GPU shader compilation on the user's device, or real-device visual acceptance has been run for these final Phase 24 changes from this environment.
-- Phase 25 has not started.
+- The user has reported the current project Pull / Gradle Sync / Debug build successful; Phase 24 Java/resource integration is therefore build-checked on that source baseline.
+- Runtime OpenGL shader compilation, actual GPU behavior and the real-device visual acceptance matrix above remain pending until exercised on the phone.
+- This Phase 24 verification pass did not modify the separately tracked Phase 25 product-completeness implementation.
