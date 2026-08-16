@@ -35,14 +35,35 @@ public final class AirQualityCache {
             double longitude,
             long savedAt
     ) {
+        saveInternal(response, latitude, longitude, savedAt, true);
+    }
+
+    /** Save a location snapshot without moving the generic last-location pointer. */
+    public void saveSnapshot(
+            @NonNull AirQualityResponse response,
+            double latitude,
+            double longitude,
+            long savedAt
+    ) {
+        saveInternal(response, latitude, longitude, savedAt, false);
+    }
+
+    private void saveInternal(
+            @NonNull AirQualityResponse response,
+            double latitude,
+            double longitude,
+            long savedAt,
+            boolean makeActive
+    ) {
         String key = key(latitude, longitude);
-        preferences.edit()
+        long safeSavedAt = savedAt > 0L ? savedAt : System.currentTimeMillis();
+        SharedPreferences.Editor editor = preferences.edit()
                 .putString(PREFIX_DATA + key, gson.toJson(response))
                 .putString(PREFIX_LAT + key, Double.toString(latitude))
                 .putString(PREFIX_LON + key, Double.toString(longitude))
-                .putLong(PREFIX_TIME + key, savedAt)
-                .putString(KEY_LAST_LOCATION, key)
-                .apply();
+                .putLong(PREFIX_TIME + key, safeSavedAt);
+        if (makeActive) editor.putString(KEY_LAST_LOCATION, key);
+        editor.apply();
     }
 
     @Nullable
@@ -67,6 +88,7 @@ public final class AirQualityCache {
         try {
             AirQualityResponse response = gson.fromJson(json, AirQualityResponse.class);
             if (response == null) {
+                clearLocationKey(key);
                 return null;
             }
             return new CachedAirQuality(
@@ -76,8 +98,20 @@ public final class AirQualityCache {
                     preferences.getLong(PREFIX_TIME + key, 0L)
             );
         } catch (JsonSyntaxException | NumberFormatException exception) {
+            clearLocationKey(key);
             return null;
         }
+    }
+
+    private void clearLocationKey(@NonNull String key) {
+        SharedPreferences.Editor editor = preferences.edit()
+                .remove(PREFIX_DATA + key)
+                .remove(PREFIX_LAT + key)
+                .remove(PREFIX_LON + key)
+                .remove(PREFIX_TIME + key);
+        String active = preferences.getString(KEY_LAST_LOCATION, null);
+        if (key.equals(active)) editor.remove(KEY_LAST_LOCATION);
+        editor.apply();
     }
 
     @NonNull

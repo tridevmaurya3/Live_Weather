@@ -5,6 +5,7 @@ import android.content.ComponentName;
 import android.content.Context;
 
 import androidx.annotation.NonNull;
+import androidx.work.BackoffPolicy;
 import androidx.work.Constraints;
 import androidx.work.Data;
 import androidx.work.ExistingWorkPolicy;
@@ -14,14 +15,16 @@ import androidx.work.WorkManager;
 import androidx.work.Worker;
 import androidx.work.WorkerParameters;
 
+import com.tridev.liveweather.core.DataReliabilityPolicy;
 import com.tridev.liveweather.data.local.WeatherCache;
 import com.tridev.liveweather.data.remote.dto.WeatherResponse;
 import com.tridev.liveweather.repository.WeatherRepository;
 
 import java.io.IOException;
 import java.util.LinkedHashMap;
-import java.util.Map;
 import java.util.Locale;
+import java.util.Map;
+import java.util.concurrent.TimeUnit;
 
 /** Source-aware widget weather refresh. AQI is intentionally not fetched here. */
 public final class WidgetRefreshWorker extends Worker {
@@ -51,6 +54,7 @@ public final class WidgetRefreshWorker extends Worker {
         OneTimeWorkRequest request = new OneTimeWorkRequest.Builder(WidgetRefreshWorker.class)
                 .setInputData(data)
                 .setConstraints(constraints)
+                .setBackoffCriteria(BackoffPolicy.EXPONENTIAL, 30L, TimeUnit.SECONDS)
                 .build();
         String workName = appWidgetId == AppWidgetManager.INVALID_APPWIDGET_ID
                 ? "live_weather_widget_manual_refresh_all"
@@ -102,13 +106,20 @@ public final class WidgetRefreshWorker extends Worker {
             WeatherResponse weather = new WeatherRepository()
                     .loadWeatherBlocking(latitude, longitude);
             long now = System.currentTimeMillis();
-            if (fixed) cache.saveSnapshot(weather, latitude, longitude, now);
-            else cache.save(weather, latitude, longitude, now);
+            if (fixed) {
+                cache.saveSnapshot(weather, latitude, longitude, now);
+            } else {
+                // A follow-active widget must not move the app/wallpaper active
+                // pointer back if the user changed city while this request ran.
+                cache.saveIfStillActive(weather, latitude, longitude, now);
+            }
             WeatherWidgetUpdater.updateOne(context, appWidgetId);
             return Result.success();
         } catch (IOException exception) {
             WeatherWidgetUpdater.showOffline(context, appWidgetId);
-            return getRunAttemptCount() == 0 ? Result.retry() : Result.success();
+            return DataReliabilityPolicy.shouldRetryBackground(getRunAttemptCount())
+                    ? Result.retry()
+                    : Result.success();
         } catch (RuntimeException exception) {
             WeatherWidgetUpdater.showOffline(context, appWidgetId);
             return Result.failure();

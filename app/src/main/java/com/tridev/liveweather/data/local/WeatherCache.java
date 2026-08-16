@@ -67,6 +67,32 @@ public final class WeatherCache {
         saveInternal(weather, latitude, longitude, savedAt, false);
     }
 
+    /**
+     * Background-safe write for work that started from the active cache.
+     * If the user changed the active location while network work was running,
+     * the response is retained only as a snapshot and cannot move the active
+     * pointer back to the old location.
+     *
+     * @return true when the requested location was still active at write time.
+     */
+    public boolean saveIfStillActive(
+            @NonNull WeatherResponse weather,
+            double latitude,
+            double longitude,
+            long savedAt
+    ) {
+        String requestedKey = locationKey(latitude, longitude);
+        String activeKey = preferences.getString(KEY_LAST_LOCATION, null);
+        boolean stillActive = requestedKey.equals(activeKey);
+        saveInternal(weather, latitude, longitude, savedAt, stillActive);
+        return stillActive;
+    }
+
+    public boolean isActiveLocation(double latitude, double longitude) {
+        String activeKey = preferences.getString(KEY_LAST_LOCATION, null);
+        return activeKey != null && activeKey.equals(locationKey(latitude, longitude));
+    }
+
     private void saveInternal(
             @NonNull WeatherResponse weather,
             double latitude,
@@ -75,11 +101,12 @@ public final class WeatherCache {
             boolean makeActive
     ) {
         String key = locationKey(latitude, longitude);
+        long safeSavedAt = savedAt > 0L ? savedAt : System.currentTimeMillis();
         SharedPreferences.Editor editor = preferences.edit()
                 .putString(PREFIX_WEATHER + key, gson.toJson(weather))
                 .putString(PREFIX_LATITUDE + key, Double.toString(latitude))
                 .putString(PREFIX_LONGITUDE + key, Double.toString(longitude))
-                .putLong(PREFIX_SAVED_AT + key, savedAt);
+                .putLong(PREFIX_SAVED_AT + key, safeSavedAt);
         if (makeActive) {
             editor.putString(KEY_LAST_LOCATION, key);
         }

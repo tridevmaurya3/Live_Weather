@@ -3,6 +3,8 @@ package com.tridev.liveweather.data.repository;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
+import com.tridev.liveweather.LiveWeatherApplication;
+import com.tridev.liveweather.data.local.RadarPersistentCache;
 import com.tridev.liveweather.data.remote.api.RadarFieldApiClient;
 import com.tridev.liveweather.data.remote.api.RainViewerApiClient;
 import com.tridev.liveweather.data.remote.dto.RadarFieldPointResponse;
@@ -19,21 +21,22 @@ import retrofit2.Response;
 /**
  * Radar Pro repository.
  *
- * RainViewer is treated as observed past radar imagery. Open-Meteo is a sampled
- * atmospheric model field for cloud/wind/temperature context; it is never
- * promoted to observed radar truth or used to fabricate future radar frames.
- *
- * Phase 20B.5 also reports where each successful delivery came from and when
- * the cached/network payload was saved. This lets the UI distinguish a normal
- * in-memory cache hit from a network/server fallback instead of calling every
- * cached response "offline".
+ * RainViewer is observed past radar imagery. Open-Meteo is sampled atmospheric
+ * model context. Phase 23 adds bounded persistent metadata/model fallback after
+ * process restart; it does not cache OSM/RainViewer image tiles or fabricate
+ * future radar frames.
  */
 public final class RadarRepository {
 
     private static final long RADAR_CACHE_MILLIS = 5L * 60L * 1000L;
     private static final long FIELD_CACHE_MILLIS = 10L * 60L * 1000L;
+    private static final long PERSISTENT_RADAR_MAX_MILLIS = 6L * 60L * 60L * 1000L;
+    private static final long PERSISTENT_FIELD_MAX_MILLIS = 3L * 60L * 60L * 1000L;
     private static final String FIELD_VARIABLES =
             "temperature_2m,cloud_cover,wind_speed_10m,wind_direction_10m";
+
+    private final RadarPersistentCache persistentCache =
+            new RadarPersistentCache(LiveWeatherApplication.appContext());
 
     private RainViewerResponse cachedRadar;
     private long cachedRadarAt;
@@ -67,12 +70,7 @@ public final class RadarRepository {
     }
 
     public interface ResultCallback<T> {
-        void onSuccess(
-                @NonNull T value,
-                @NonNull DeliverySource source,
-                long savedAtMillis
-        );
-
+        void onSuccess(@NonNull T value, @NonNull DeliverySource source, long savedAtMillis);
         void onError(@NonNull String message, @Nullable Throwable throwable);
     }
 
@@ -86,6 +84,7 @@ public final class RadarRepository {
             return;
         }
 
+        RadarPersistentCache.CachedRadar persisted = persistentCache.loadRadar();
         RainViewerApiClient.getApiService().getWeatherMaps().enqueue(new Callback<RainViewerResponse>() {
             @Override
             public void onResponse(
@@ -99,17 +98,20 @@ public final class RadarRepository {
                         && RadarObservedDataPolicy.hasUsableObservedTimeline(body, receivedAt)) {
                     cachedRadar = body;
                     cachedRadarAt = receivedAt;
+                    persistentCache.saveRadar(body, receivedAt);
                     callback.onSuccess(body, DeliverySource.NETWORK, cachedRadarAt);
                     return;
                 }
 
                 if (cachedRadar != null
                         && RadarObservedDataPolicy.hasUsableObservedTimeline(cachedRadar, receivedAt)) {
-                    callback.onSuccess(
-                            cachedRadar,
-                            DeliverySource.SERVER_FALLBACK_CACHE,
-                            cachedRadarAt
-                    );
+                    callback.onSuccess(cachedRadar, DeliverySource.SERVER_FALLBACK_CACHE, cachedRadarAt);
+                    return;
+                }
+
+                if (usablePersistentRadar(persisted, receivedAt)) {
+                    adoptPersistentRadar(persisted);
+                    callback.onSuccess(cachedRadar, DeliverySource.SERVER_FALLBACK_CACHE, cachedRadarAt);
                     return;
                 }
 
@@ -128,11 +130,12 @@ public final class RadarRepository {
                 long failedAt = System.currentTimeMillis();
                 if (cachedRadar != null
                         && RadarObservedDataPolicy.hasUsableObservedTimeline(cachedRadar, failedAt)) {
-                    callback.onSuccess(
-                            cachedRadar,
-                            DeliverySource.NETWORK_FALLBACK_CACHE,
-                            cachedRadarAt
-                    );
+                    callback.onSuccess(cachedRadar, DeliverySource.NETWORK_FALLBACK_CACHE, cachedRadarAt);
+                    return;
+                }
+                if (usablePersistentRadar(persisted, failedAt)) {
+                    adoptPersistentRadar(persisted);
+                    callback.onSuccess(cachedRadar, DeliverySource.NETWORK_FALLBACK_CACHE, cachedRadarAt);
                     return;
                 }
                 callback.onError("Observed radar network unavailable", throwable);
@@ -147,15 +150,14 @@ public final class RadarRepository {
             @NonNull ResultCallback<List<RadarFieldPointResponse>> callback
     ) {
         long now = System.currentTimeMillis();
-        boolean sameArea = !Double.isNaN(cachedFieldLatitude)
-                && Math.abs(cachedFieldLatitude - latitude) < 0.08d
-                && Math.abs(cachedFieldLongitude - longitude) < 0.08d;
+        boolean sameArea = sameArea(cachedFieldLatitude, cachedFieldLongitude, latitude, longitude);
         if (!force && sameArea && !cachedField.isEmpty()
                 && now - cachedFieldAt < FIELD_CACHE_MILLIS) {
             callback.onSuccess(cachedField, DeliverySource.MEMORY_CACHE, cachedFieldAt);
             return;
         }
 
+        RadarPersistentCache.CachedField persisted = persistentCache.loadField(latitude, longitude);
         GridQuery grid = buildGrid(latitude, longitude);
         RadarFieldApiClient.getApiService().getCurrentField(
                 grid.latitudes,
@@ -175,16 +177,18 @@ public final class RadarRepository {
                     cachedFieldAt = receivedAt;
                     cachedFieldLatitude = latitude;
                     cachedFieldLongitude = longitude;
+                    persistentCache.saveField(body, latitude, longitude, receivedAt);
                     callback.onSuccess(body, DeliverySource.NETWORK, cachedFieldAt);
                     return;
                 }
 
                 if (sameArea && !cachedField.isEmpty()) {
-                    callback.onSuccess(
-                            cachedField,
-                            DeliverySource.SERVER_FALLBACK_CACHE,
-                            cachedFieldAt
-                    );
+                    callback.onSuccess(cachedField, DeliverySource.SERVER_FALLBACK_CACHE, cachedFieldAt);
+                    return;
+                }
+                if (usablePersistentField(persisted, latitude, longitude, receivedAt)) {
+                    adoptPersistentField(persisted);
+                    callback.onSuccess(cachedField, DeliverySource.SERVER_FALLBACK_CACHE, cachedFieldAt);
                     return;
                 }
                 callback.onError("Atmospheric model field unavailable (HTTP " + response.code() + ")", null);
@@ -195,12 +199,14 @@ public final class RadarRepository {
                     @NonNull Call<List<RadarFieldPointResponse>> call,
                     @NonNull Throwable throwable
             ) {
+                long failedAt = System.currentTimeMillis();
                 if (sameArea && !cachedField.isEmpty()) {
-                    callback.onSuccess(
-                            cachedField,
-                            DeliverySource.NETWORK_FALLBACK_CACHE,
-                            cachedFieldAt
-                    );
+                    callback.onSuccess(cachedField, DeliverySource.NETWORK_FALLBACK_CACHE, cachedFieldAt);
+                    return;
+                }
+                if (usablePersistentField(persisted, latitude, longitude, failedAt)) {
+                    adoptPersistentField(persisted);
+                    callback.onSuccess(cachedField, DeliverySource.NETWORK_FALLBACK_CACHE, cachedFieldAt);
                     return;
                 }
                 callback.onError("Atmospheric model field network unavailable", throwable);
@@ -208,10 +214,61 @@ public final class RadarRepository {
         });
     }
 
+    private boolean usablePersistentRadar(
+            @Nullable RadarPersistentCache.CachedRadar persisted,
+            long now
+    ) {
+        if (persisted == null || persisted.getSavedAt() <= 0L) return false;
+        long age = Math.max(0L, now - persisted.getSavedAt());
+        return age <= PERSISTENT_RADAR_MAX_MILLIS
+                && RadarObservedDataPolicy.hasUsableObservedTimeline(persisted.getResponse(), now);
+    }
+
+    private void adoptPersistentRadar(@NonNull RadarPersistentCache.CachedRadar persisted) {
+        cachedRadar = persisted.getResponse();
+        cachedRadarAt = persisted.getSavedAt();
+    }
+
+    private boolean usablePersistentField(
+            @Nullable RadarPersistentCache.CachedField persisted,
+            double latitude,
+            double longitude,
+            long now
+    ) {
+        if (persisted == null || persisted.getSavedAt() <= 0L || persisted.getField().isEmpty()) {
+            return false;
+        }
+        long age = Math.max(0L, now - persisted.getSavedAt());
+        return age <= PERSISTENT_FIELD_MAX_MILLIS
+                && sameArea(
+                        persisted.getLatitude(),
+                        persisted.getLongitude(),
+                        latitude,
+                        longitude
+                );
+    }
+
+    private void adoptPersistentField(@NonNull RadarPersistentCache.CachedField persisted) {
+        cachedField = persisted.getField();
+        cachedFieldAt = persisted.getSavedAt();
+        cachedFieldLatitude = persisted.getLatitude();
+        cachedFieldLongitude = persisted.getLongitude();
+    }
+
+    private boolean sameArea(
+            double firstLatitude,
+            double firstLongitude,
+            double secondLatitude,
+            double secondLongitude
+    ) {
+        return !Double.isNaN(firstLatitude)
+                && !Double.isNaN(firstLongitude)
+                && Math.abs(firstLatitude - secondLatitude) < 0.08d
+                && Math.abs(firstLongitude - secondLongitude) < 0.08d;
+    }
+
     @NonNull
     private GridQuery buildGrid(double latitude, double longitude) {
-        // 5x5 model field around the active location. One Open-Meteo request is
-        // used for all 25 coordinates, avoiding per-point network calls.
         double[] offsets = {-2.0d, -1.0d, 0.0d, 1.0d, 2.0d};
         StringBuilder latitudes = new StringBuilder();
         StringBuilder longitudes = new StringBuilder();

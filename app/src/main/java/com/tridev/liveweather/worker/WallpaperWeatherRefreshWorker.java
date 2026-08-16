@@ -6,6 +6,7 @@ import androidx.annotation.NonNull;
 import androidx.work.Worker;
 import androidx.work.WorkerParameters;
 
+import com.tridev.liveweather.core.DataReliabilityPolicy;
 import com.tridev.liveweather.data.local.AirQualityCache;
 import com.tridev.liveweather.data.local.WeatherCache;
 import com.tridev.liveweather.data.remote.dto.AirQualityResponse;
@@ -39,13 +40,16 @@ public final class WallpaperWeatherRefreshWorker extends Worker {
         double latitude = cached.getLatitude();
         double longitude = cached.getLongitude();
         long now = System.currentTimeMillis();
+        boolean remainedActive;
 
         try {
             WeatherResponse weather = new WeatherRepository().loadWeatherBlocking(latitude, longitude);
-            weatherCache.save(weather, latitude, longitude, now);
+            remainedActive = weatherCache.saveIfStillActive(weather, latitude, longitude, now);
         } catch (IOException exception) {
             WeatherWidgetUpdater.updateAll(context);
-            return Result.retry();
+            return DataReliabilityPolicy.shouldRetryBackground(getRunAttemptCount())
+                    ? Result.retry()
+                    : Result.success();
         } catch (RuntimeException exception) {
             WeatherWidgetUpdater.updateAll(context);
             return Result.failure();
@@ -54,13 +58,19 @@ public final class WallpaperWeatherRefreshWorker extends Worker {
         try {
             AirQualityResponse airQuality = new AirQualityRepository()
                     .loadAirQualityBlocking(latitude, longitude);
-            new AirQualityCache(context)
-                    .save(airQuality, latitude, longitude, now);
+            AirQualityCache airCache = new AirQualityCache(context);
+            if (remainedActive) {
+                airCache.save(airQuality, latitude, longitude, now);
+            } else {
+                airCache.saveSnapshot(airQuality, latitude, longitude, now);
+            }
         } catch (IOException | RuntimeException ignored) {
             // Weather remains useful even if the separate CAMS AQI model is unavailable.
         }
 
-        // Phase 10: widgets and Live Wallpaper consume the same refreshed cache.
+        // Widgets and Live Wallpaper consume the same refreshed active cache.
+        // If the user changed location during this worker, the old result was
+        // stored only as a snapshot and cannot overwrite the new active identity.
         WeatherWidgetUpdater.updateAll(context);
         return Result.success();
     }

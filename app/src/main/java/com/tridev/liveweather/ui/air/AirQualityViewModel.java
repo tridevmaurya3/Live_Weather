@@ -7,6 +7,7 @@ import androidx.lifecycle.AndroidViewModel;
 import androidx.lifecycle.LiveData;
 import androidx.lifecycle.MutableLiveData;
 
+import com.tridev.liveweather.core.DataReliabilityPolicy;
 import com.tridev.liveweather.data.local.AirQualityCache;
 import com.tridev.liveweather.data.remote.dto.AirQualityResponse;
 import com.tridev.liveweather.domain.AirQualityUiState;
@@ -17,7 +18,6 @@ import retrofit2.Call;
 public final class AirQualityViewModel extends AndroidViewModel {
 
     private static final long REUSE_WINDOW_MILLIS = 15 * 60 * 1000L;
-    private static final double SAME_AREA_DELTA = 0.01d;
 
     private final MutableLiveData<AirQualityUiState> state = new MutableLiveData<>();
     private final AirQualityRepository repository = new AirQualityRepository();
@@ -27,10 +27,6 @@ public final class AirQualityViewModel extends AndroidViewModel {
     public AirQualityViewModel(@NonNull Application application) {
         super(application);
         cache = new AirQualityCache(application);
-
-        // Do not publish a generic "last AQI" before the active weather location
-        // is known. refresh(latitude, longitude) resolves the exact per-location
-        // cache first, preventing a saved city's AQI from appearing on another city.
         state.setValue(new AirQualityUiState(
                 false,
                 null,
@@ -49,12 +45,8 @@ public final class AirQualityViewModel extends AndroidViewModel {
 
     public void refresh(double latitude, double longitude, boolean force) {
         AirQualityUiState current = state.getValue();
-        if (!force && canReuse(current, latitude, longitude)) {
-            return;
-        }
-        if (activeCall != null) {
-            activeCall.cancel();
-        }
+        if (!force && canReuse(current, latitude, longitude)) return;
+        if (activeCall != null) activeCall.cancel();
 
         AirQualityResponse existing = null;
         long existingTime = 0L;
@@ -71,11 +63,18 @@ public final class AirQualityViewModel extends AndroidViewModel {
             fromCache = current.isFromCache();
         }
 
+        String loadingMessage = existing == null
+                ? "Loading air quality…"
+                : fromCache
+                ? "Refreshing air quality · saved data "
+                        + DataReliabilityPolicy.ageLabel(existingTime, System.currentTimeMillis()) + "."
+                : "Refreshing air quality…";
+
         state.setValue(new AirQualityUiState(
                 true,
                 existing,
                 fromCache,
-                existing == null ? "Loading air quality…" : "Refreshing air quality…",
+                loadingMessage,
                 existingTime,
                 latitude,
                 longitude
@@ -105,20 +104,26 @@ public final class AirQualityViewModel extends AndroidViewModel {
                     public void onError(@NonNull String message, Throwable throwable) {
                         activeCall = null;
                         AirQualityUiState latest = state.getValue();
-                        AirQualityResponse fallback = latest != null
-                                && sameArea(latest, latitude, longitude)
+                        boolean sameRequestedArea = sameArea(latest, latitude, longitude);
+                        AirQualityResponse fallback = sameRequestedArea && latest != null
                                 ? latest.getData()
                                 : null;
-                        long fallbackTime = latest != null
-                                && sameArea(latest, latitude, longitude)
+                        long fallbackTime = sameRequestedArea && latest != null
                                 ? latest.getUpdatedAt()
                                 : 0L;
+                        String reliabilityMessage = fallback == null
+                                ? message
+                                : message + " Showing saved AQI · "
+                                        + DataReliabilityPolicy.ageLabel(
+                                                fallbackTime,
+                                                System.currentTimeMillis()
+                                        ) + ".";
 
                         state.setValue(new AirQualityUiState(
                                 false,
                                 fallback,
                                 fallback != null,
-                                message,
+                                reliabilityMessage,
                                 fallbackTime,
                                 latitude,
                                 longitude
@@ -138,8 +143,7 @@ public final class AirQualityViewModel extends AndroidViewModel {
                 && !current.isLoading()
                 && !current.isFromCache()
                 && sameArea(current, latitude, longitude)
-                && System.currentTimeMillis() - current.getUpdatedAt()
-                <= REUSE_WINDOW_MILLIS;
+                && System.currentTimeMillis() - current.getUpdatedAt() <= REUSE_WINDOW_MILLIS;
     }
 
     private boolean sameArea(
@@ -147,18 +151,17 @@ public final class AirQualityViewModel extends AndroidViewModel {
             double latitude,
             double longitude
     ) {
-        return current != null
-                && !Double.isNaN(current.getLatitude())
-                && !Double.isNaN(current.getLongitude())
-                && Math.abs(current.getLatitude() - latitude) <= SAME_AREA_DELTA
-                && Math.abs(current.getLongitude() - longitude) <= SAME_AREA_DELTA;
+        return current != null && DataReliabilityPolicy.sameLocation(
+                current.getLatitude(),
+                current.getLongitude(),
+                latitude,
+                longitude
+        );
     }
 
     @Override
     protected void onCleared() {
-        if (activeCall != null) {
-            activeCall.cancel();
-        }
+        if (activeCall != null) activeCall.cancel();
         super.onCleared();
     }
 }

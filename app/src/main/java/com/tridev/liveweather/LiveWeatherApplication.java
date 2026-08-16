@@ -11,6 +11,7 @@ import androidx.annotation.Nullable;
 import com.tridev.liveweather.data.local.UnitPreferences;
 import com.tridev.liveweather.ui.UiQualityPolicy;
 import com.tridev.liveweather.ui.forecast.ForecastProBinder;
+import com.tridev.liveweather.ui.settings.DataReliabilityBinder;
 import com.tridev.liveweather.ui.settings.SettingsCardBinder;
 import com.tridev.liveweather.ui.weather.WeatherFormatter;
 import com.tridev.liveweather.widget.WeatherWidgetUpdater;
@@ -46,6 +47,7 @@ public final class LiveWeatherApplication extends Application
         if (activity instanceof MainActivity) {
             SettingsCardBinder.bind(activity);
             ForecastProBinder.bind((MainActivity) activity);
+            DataReliabilityBinder.bind(activity);
             UiQualityPolicy.install(activity);
         }
     }
