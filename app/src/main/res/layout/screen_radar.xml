@@ -60,6 +60,16 @@
                 android:layout_height="wrap_content"
                 android:layout_marginTop="2dp"
                 android:text="Radar loads when this tab becomes visible." />
+
+            <TextView
+                android:id="@+id/radarFreshnessValue"
+                style="@style/TextAppearance.LiveWeather.Caption"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="2dp"
+                android:maxLines="2"
+                android:text="Radar age -- · Model age --"
+                android:textColor="@color/weather_text_secondary" />
         </LinearLayout>
 
         <TextView
@@ -68,7 +78,7 @@
             android:layout_height="40dp"
             android:background="@drawable/bg_weather_chip"
             android:gravity="center"
-            android:minWidth="72dp"
+            android:minWidth="78dp"
             android:paddingStart="@dimen/space_12"
             android:paddingEnd="@dimen/space_12"
             android:text="Refresh"
