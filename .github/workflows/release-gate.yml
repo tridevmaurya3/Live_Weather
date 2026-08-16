@@ -34,22 +34,24 @@ jobs:
       - name: Verify Gradle wrapper
         run: ./gradlew --version
 
-      - name: Debug build, unit tests, lint, and minified Release/R8 build
+      - name: Debug, tests, Release lint, APK, AAB and R8 gate
         run: >-
-          ./gradlew --no-daemon --stacktrace
+          ./gradlew --no-daemon --stacktrace --configuration-cache
           assembleDebug
           testDebugUnitTest
-          lintDebug
+          lintRelease
           assembleRelease
+          bundleRelease
 
       - name: Verify release outputs
         shell: bash
         run: |
           set -euo pipefail
-          test -d app/build/outputs/apk/release
+          find app/build/outputs/apk/debug -maxdepth 1 -type f -name '*.apk' -print -quit | grep -q .
           find app/build/outputs/apk/release -maxdepth 1 -type f -name '*.apk' -print -quit | grep -q .
-          test -d app/build/outputs/mapping/release
+          find app/build/outputs/bundle/release -maxdepth 1 -type f -name '*.aab' -print -quit | grep -q .
           test -f app/build/outputs/mapping/release/mapping.txt
+          test -f app/build/reports/lint-results-release.html
 
       - name: Upload release verification artifacts
         if: always()
@@ -61,6 +63,7 @@ jobs:
           path: |
             app/build/outputs/apk/debug/*.apk
             app/build/outputs/apk/release/*.apk
+            app/build/outputs/bundle/release/*.aab
             app/build/outputs/mapping/release/mapping.txt
-            app/build/reports/lint-results-debug.html
+            app/build/reports/lint-results-release.html
             app/build/reports/tests/testDebugUnitTest/**
