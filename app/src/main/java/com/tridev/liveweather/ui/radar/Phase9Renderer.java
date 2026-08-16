@@ -4,6 +4,9 @@ import android.app.Activity;
 import android.content.Intent;
 import android.graphics.Typeface;
 import android.net.Uri;
+import android.os.Handler;
+import android.os.Looper;
+import android.os.SystemClock;
 import android.util.Log;
 import android.view.HapticFeedbackConstants;
 import android.view.View;
@@ -17,9 +20,6 @@ import android.webkit.WebViewClient;
 import android.widget.FrameLayout;
 import android.widget.SeekBar;
 import android.widget.TextView;
-
-import android.os.Handler;
-import android.os.Looper;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
@@ -66,6 +66,7 @@ public final class Phase9Renderer {
     private static final long PLAY_INTERVAL_MILLIS = 1_100L;
     private static final long FRESHNESS_TICK_MILLIS = 60_000L;
     private static final long WEB_RECOVERY_DELAY_MILLIS = 650L;
+    private static final long WEB_RECOVERY_WINDOW_MILLIS = 30_000L;
     private static final int MAX_WEB_RECOVERY_ATTEMPTS = 2;
 
     private static final DateTimeFormatter FRAME_TIME_FORMATTER =
@@ -108,6 +109,7 @@ public final class Phase9Renderer {
     private boolean webRecoveryScheduled;
     private boolean webRecoveryExhausted;
     private int webRecoveryAttempts;
+    private long webRecoveryWindowStartedAtMillis;
     private int frameIndex = -1;
     private int lastDeliveredFrame = Integer.MIN_VALUE;
     private String activeLayer = "rain";
@@ -325,7 +327,6 @@ public final class Phase9Renderer {
 
                 webReady = true;
                 webRecoveryScheduled = false;
-                webRecoveryAttempts = 0;
                 webRecoveryExhausted = false;
                 resetDeliveredBridgeState();
                 evaluate("RadarApp.resume();");
@@ -415,6 +416,13 @@ public final class Phase9Renderer {
         mapWebView = null;
         destroyWebView(failedView);
 
+        long now = SystemClock.elapsedRealtime();
+        if (webRecoveryWindowStartedAtMillis <= 0L
+                || now - webRecoveryWindowStartedAtMillis > WEB_RECOVERY_WINDOW_MILLIS) {
+            webRecoveryWindowStartedAtMillis = now;
+            webRecoveryAttempts = 0;
+        }
+
         if (webRecoveryAttempts >= MAX_WEB_RECOVERY_ATTEMPTS) {
             webRecoveryExhausted = true;
             webRecoveryScheduled = false;
@@ -466,6 +474,7 @@ public final class Phase9Renderer {
 
         if (mapWebView == null) {
             webRecoveryAttempts = 0;
+            webRecoveryWindowStartedAtMillis = 0L;
             webRecoveryExhausted = false;
             createWebView();
             return;
