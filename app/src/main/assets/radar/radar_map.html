@@ -41,6 +41,30 @@
         .shell-title { color:#7ce8e1; font-size:13px; font-weight:800; letter-spacing:.05em; }
         .shell-card.warning .shell-title { color:#ffd27a; }
         .shell-body { margin-top:6px; color:#b8c7d9; font-size:11px; line-height:1.45; }
+        #tileHealth {
+            position:absolute;
+            z-index:1450;
+            top:10px;
+            left:50%;
+            transform:translateX(-50%);
+            width:max-content;
+            max-width:calc(100% - 210px);
+            pointer-events:none;
+        }
+        #tileHealth.hidden { display:none; }
+        .tile-health-card {
+            border:1px solid rgba(255,210,122,.45);
+            border-radius:12px;
+            padding:7px 10px;
+            background:rgba(20,34,48,.92);
+            box-shadow:0 6px 18px rgba(0,0,0,.24);
+            color:#ffd27a;
+            text-align:center;
+            font-size:10px;
+            line-height:1.35;
+            font-weight:700;
+        }
+        .tile-health-detail { display:block; margin-top:2px; color:#d9e4ee; font-weight:500; }
         .leaflet-control-attribution { background:rgba(6,16,29,.78)!important; color:#dbe9f4!important; font-size:9px!important; }
         .leaflet-control-attribution a { color:#8ed9ff!important; }
         .leaflet-base-pane img { filter:saturate(.72) brightness(.78) contrast(1.06); }
@@ -53,6 +77,9 @@
 </head>
 <body>
 <div id="map"></div>
+<div id="tileHealth" class="hidden" role="status" aria-live="polite">
+    <div id="tileHealthBody" class="tile-health-card"></div>
+</div>
 <div id="mapShell" role="status" aria-live="polite">
     <div id="mapShellCard" class="shell-card">
         <div id="mapShellTitle" class="shell-title">PREPARING RADAR MAP</div>
@@ -68,11 +95,18 @@
     const LEAFLET_CSS_URL = 'https://unpkg.com/leaflet@' + LEAFLET_VERSION + '/dist/leaflet.css';
     const LEAFLET_LOAD_TIMEOUT_MILLIS = 9000;
     const CLOUD_SURFACE_SIZE = 144;
+    const TILE_HEALTH_SETTLE_MILLIS = 4200;
+    const TILE_HEALTH_MIN_SAMPLES = 4;
+    const TILE_HEALTH_MIN_ERRORS = 3;
+    const TILE_HEALTH_ERROR_RATIO = 0.60;
+    const TILE_HEALTH_RECOVERY_SUCCESSES = 3;
 
     const shell = document.getElementById('mapShell');
     const shellCard = document.getElementById('mapShellCard');
     const shellTitle = document.getElementById('mapShellTitle');
     const shellBody = document.getElementById('mapShellBody');
+    const tileHealthView = document.getElementById('tileHealth');
+    const tileHealthBody = document.getElementById('tileHealthBody');
 
     let map = null;
     let baseLayer = null;
@@ -89,6 +123,20 @@
     let locationMarker = null;
     let suspended = false;
 
+    const tileHealth = {
+        base:createTileHealthState(),
+        radar:createTileHealthState()
+    };
+
+    function createTileHealthState() {
+        return {
+            loads:0,
+            errors:0,
+            degraded:false,
+            timerId:0
+        };
+    }
+
     function showShell(title, body, warning) {
         shellTitle.textContent = title;
         shellBody.textContent = body;
@@ -98,6 +146,78 @@
 
     function hideShell() {
         shell.classList.add('hidden');
+    }
+
+    function renderTileHealth() {
+        const baseDegraded = tileHealth.base.degraded;
+        const radarDegraded = activeLayer === 'rain' && tileHealth.radar.degraded;
+
+        if (!baseDegraded && !radarDegraded) {
+            tileHealthView.classList.add('hidden');
+            tileHealthBody.textContent = '';
+            return;
+        }
+
+        if (baseDegraded && radarDegraded) {
+            tileHealthBody.innerHTML = 'MAP + RADAR TILE DELIVERY DEGRADED'
+                + '<span class="tile-health-detail">Tile requests are failing. This does not mean the observed frame has no rain.</span>';
+        } else if (radarDegraded) {
+            tileHealthBody.innerHTML = 'RADAR TILES TEMPORARILY UNAVAILABLE'
+                + '<span class="tile-health-detail">Observed frame metadata is valid, but image tiles are failing. Empty rain echoes are not inferred.</span>';
+        } else {
+            tileHealthBody.innerHTML = 'BASE MAP TILES TEMPORARILY UNAVAILABLE'
+                + '<span class="tile-health-detail">Weather overlays may still be usable while OpenStreetMap tiles recover.</span>';
+        }
+        tileHealthView.classList.remove('hidden');
+    }
+
+    function resetTileHealthWindow(kind) {
+        const state = tileHealth[kind];
+        if (!state) return;
+        if (state.timerId) window.clearTimeout(state.timerId);
+        state.loads = 0;
+        state.errors = 0;
+        state.timerId = window.setTimeout(function () {
+            assessTileHealth(kind);
+        }, TILE_HEALTH_SETTLE_MILLIS);
+    }
+
+    function noteTileHealth(kind, success) {
+        const state = tileHealth[kind];
+        if (!state) return;
+        if (success) state.loads++;
+        else state.errors++;
+    }
+
+    function assessTileHealth(kind) {
+        const state = tileHealth[kind];
+        if (!state) return;
+        if (state.timerId) window.clearTimeout(state.timerId);
+        state.timerId = 0;
+
+        const total = state.loads + state.errors;
+        if (total >= TILE_HEALTH_MIN_SAMPLES) {
+            const ratio = state.errors / total;
+            const degraded = state.errors >= TILE_HEALTH_MIN_ERRORS
+                && ratio >= TILE_HEALTH_ERROR_RATIO;
+
+            if (degraded) {
+                state.degraded = true;
+            } else if (state.loads >= TILE_HEALTH_RECOVERY_SUCCESSES) {
+                state.degraded = false;
+            }
+        }
+
+        renderTileHealth();
+    }
+
+    function bindTileHealth(layer, kind) {
+        if (!layer || layer.__liveWeatherHealthBound) return;
+        layer.__liveWeatherHealthBound = true;
+        layer.on('loading', function () { resetTileHealthWindow(kind); });
+        layer.on('tileload', function () { noteTileHealth(kind, true); });
+        layer.on('tileerror', function () { noteTileHealth(kind, false); });
+        layer.on('load', function () { assessTileHealth(kind); });
     }
 
     function ensureLeafletCss(forceRetry) {
@@ -125,8 +245,6 @@
             return Promise.resolve(true);
         }
 
-        // Never overlap engine-load attempts. A Refresh/Recenter during an active
-        // attempt simply joins it; explicit retry starts after that attempt ends.
         if (leafletLoadPromise) return leafletLoadPromise;
 
         if (forceRetry) removeLeafletScript();
@@ -211,7 +329,9 @@
             keepBuffer:1,
             updateWhenIdle:true,
             attribution:'&copy; <a href="https://www.openstreetmap.org/">OpenStreetMap</a> contributors'
-        }).addTo(map);
+        });
+        bindTileHealth(baseLayer, 'base');
+        baseLayer.addTo(map);
 
         map.attributionControl.addAttribution('<a href="https://open-meteo.com/">Open-Meteo</a> model overlays');
         windGroup = L.layerGroup();
@@ -253,6 +373,7 @@
                 updateWhenIdle:true,
                 attribution:'Radar: <a href="https://www.rainviewer.com/">RainViewer</a>'
             });
+            bindTileHealth(radarLayer, 'radar');
             radarLayerUrl = url;
         } else if (radarLayerUrl !== url) {
             radarLayer.setUrl(url);
@@ -459,6 +580,7 @@
         } else if (activeLayer === 'temp') {
             if (tempGroup && !map.hasLayer(tempGroup)) tempGroup.addTo(map);
         }
+        renderTileHealth();
     }
 
     function applyPayloadToMap() {
@@ -484,6 +606,7 @@
             activeLayer = layer || 'rain';
             if (map) applyLayer();
             else loadLeaflet(false);
+            renderTileHealth();
         },
         setFrame:function (index) {
             const numeric = Number(index);
@@ -524,6 +647,12 @@
         },
         isReady:function () {
             return !!map;
+        },
+        getTileHealth:function () {
+            return {
+                baseDegraded:!!tileHealth.base.degraded,
+                radarDegraded:!!tileHealth.radar.degraded
+            };
         }
     };
 
