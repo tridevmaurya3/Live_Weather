@@ -188,14 +188,29 @@ Acceptance checkpoint: Gradle Sync/debug build, normal/narrow phones, 600dp+ tab
 
 ## Phase 23 — Offline, Cache & Data Reliability 2.0
 
-- Cache age visibility
-- Stale-data rules
-- Active-city/cache identity audit
-- Widget/app/wallpaper cache consistency
-- Network-off behavior
-- Retry/backoff review
-- Location fallback behavior
-- Data diagnostics page/section for troubleshooting provider/time/location mismatches
+Status: SOURCE IMPLEMENTATION COMPLETE — build/device/offline verification pending.
+
+Implemented source checkpoints:
+- Shared `DataReliabilityPolicy` for weather/AQI cache age, stale state and location matching
+- Weather saved-data age bands: recent through 45 min, aging through 3 h, stale through 12 h, very stale beyond 12 h
+- Selected saved city is resolved before startup cache publication so another city's active cache cannot flash on screen
+- Refresh failures can retain only exact-request-location saved weather/AQI
+- `WeatherCache.saveIfStillActive(...)` protects the active app/wallpaper pointer from old background responses
+- Wallpaper background weather/AQI refresh cannot revert a location changed while its request was in flight
+- Follow-active widget refresh cannot revert the active app/wallpaper location; fixed-city widgets remain isolated snapshots
+- `AirQualityCache.saveSnapshot(...)` prevents stale-location AQI work from moving the generic AQI pointer
+- Explicit WorkManager exponential 30-second backoff plus bounded retry budget for wallpaper and manual widget refresh work
+- Persistent `RadarPersistentCache` for validated RainViewer metadata and per-location Open-Meteo model fields after process restart
+- Persistent Radar metadata fallback bounded to 6 h and model-field fallback bounded to 3 h
+- RainViewer host/frame safety is revalidated before persisted radar metadata can be reused
+- Radar image tiles remain provider/network backed and are explicitly not represented as persistent offline tiles
+- Added More-page `Data Reliability` diagnostics for cache ages, active coordinates, selected-city alignment, AQI/Radar cache state and cross-surface identity
+- Diagnostics refresh reads local state only and does not start network work
+- Corrupt per-location weather/AQI/Radar cache entries are discarded rather than used as valid state
+- App + Live Wallpaper continue to share the active weather cache; fixed-city widgets retain separate snapshots
+- See `PHASE_23_OFFLINE_CACHE_RELIABILITY.md` for the complete source contract and acceptance checklist
+
+Acceptance checkpoint: Gradle Sync/debug build, online-to-offline restart, selected-city identity, in-flight city-switch race, saved weather/AQI age labels, app/widget/wallpaper alignment, fixed-widget isolation, bounded retry behavior, Radar restart fallback and More-page Data Reliability diagnostics.
 
 ## Phase 24 — Live Wallpaper Quality Backlog
 
