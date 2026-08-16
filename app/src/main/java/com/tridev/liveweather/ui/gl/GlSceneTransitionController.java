@@ -62,7 +62,10 @@ final class GlSceneTransitionController {
             return false;
         }
 
-        float dt = Math.min(MAX_FRAME_SECONDS, Math.max(0f, (now - lastFrameNanos) / 1_000_000_000f));
+        float dt = Math.min(
+                MAX_FRAME_SECONDS,
+                Math.max(0f, (now - lastFrameNanos) / 1_000_000_000f)
+        );
         lastFrameNanos = now;
         if (dt <= 0f) return false;
 
@@ -87,7 +90,12 @@ final class GlSceneTransitionController {
         from.moonY = approach(from.moonY, to.moonY, dt, 1.4f, 1.4f);
         from.moonVisibility = approach(from.moonVisibility, to.moonVisibility, dt, 1.9f, 2.5f);
         from.moonIllumination = approach(from.moonIllumination, to.moonIllumination, dt, 4.5f, 4.5f);
-        from.moonPhaseAngleRadians = approachAngle(from.moonPhaseAngleRadians, to.moonPhaseAngleRadians, dt, 4.5f);
+        from.moonPhaseAngleRadians = approachAngle(
+                from.moonPhaseAngleRadians,
+                to.moonPhaseAngleRadians,
+                dt,
+                4.5f
+        );
         from.moonAltitude = approach(from.moonAltitude, to.moonAltitude, dt, 1.5f, 1.5f);
         from.starVisibility = approach(from.starVisibility, to.starVisibility, dt, 2.2f, 2.0f);
 
@@ -109,7 +117,12 @@ final class GlSceneTransitionController {
         from.airHazeIntensity = approach(from.airHazeIntensity, to.airHazeIntensity, dt, 3.0f, 4.8f);
 
         from.windStrength = approach(from.windStrength, to.windStrength, dt, 1.25f, 2.2f);
-        from.windDirectionRadians = approachAngle(from.windDirectionRadians, to.windDirectionRadians, dt, 1.8f);
+        from.windDirectionRadians = approachAngle(
+                from.windDirectionRadians,
+                to.windDirectionRadians,
+                dt,
+                1.8f
+        );
         from.sceneLight = approach(from.sceneLight, to.sceneLight, dt, 2.2f, 2.6f);
         from.visibilityFactor = approach(from.visibilityFactor, to.visibilityFactor, dt, 2.0f, 3.2f);
 
@@ -161,7 +174,13 @@ final class GlSceneTransitionController {
                 && unitCycleDistance(a.sunX, b.sunX) < 0.002f
                 && near(a.sunY, b.sunY, 0.002f)
                 && near(a.sunVisibility, b.sunVisibility, 0.002f)
+                && near(a.sunAltitude, b.sunAltitude, 0.05f)
+                && unitCycleDistance(a.moonX, b.moonX) < 0.002f
+                && near(a.moonY, b.moonY, 0.002f)
                 && near(a.moonVisibility, b.moonVisibility, 0.002f)
+                && near(a.moonIllumination, b.moonIllumination, 0.002f)
+                && Math.abs(wrapRadians(a.moonPhaseAngleRadians - b.moonPhaseAngleRadians)) < 0.008f
+                && near(a.moonAltitude, b.moonAltitude, 0.05f)
                 && near(a.starVisibility, b.starVisibility, 0.002f)
                 && near(a.cloudCover, b.cloudCover, 0.002f)
                 && near(a.cloudDensity, b.cloudDensity, 0.002f)
