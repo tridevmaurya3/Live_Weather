@@ -13,6 +13,7 @@ import com.tridev.liveweather.data.local.AlertPreferences;
 import com.tridev.liveweather.domain.WeatherUiState;
 import com.tridev.liveweather.domain.alert.AlertLocation;
 import com.tridev.liveweather.domain.alert.AlertMerger;
+import com.tridev.liveweather.domain.alert.AlertTruthPolicy;
 import com.tridev.liveweather.domain.alert.AlertUiState;
 import com.tridev.liveweather.domain.alert.SmartAlertEngine;
 import com.tridev.liveweather.domain.alert.WeatherAlert;
@@ -25,8 +26,6 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 public final class AlertViewModel extends AndroidViewModel {
-
-    private static final long OFFICIAL_REUSE_MILLIS = 10 * 60 * 1000L;
 
     private final MutableLiveData<AlertUiState> state = new MutableLiveData<>();
     private final AlertLocationResolver locationResolver;
@@ -50,7 +49,8 @@ public final class AlertViewModel extends AndroidViewModel {
                 null,
                 "Waiting for active weather location.",
                 0L,
-                false
+                0L,
+                AlertTruthPolicy.OfficialDelivery.UNAVAILABLE
         ));
     }
 
@@ -72,14 +72,20 @@ public final class AlertViewModel extends AndroidViewModel {
         final List<WeatherAlert> smart = SmartAlertEngine.build(weatherState.getWeather());
         final AlertCache.CachedAlerts cached = cache.loadOfficial(latitude, longitude);
         final long now = System.currentTimeMillis();
+        final AlertTruthPolicy.OfficialDelivery cachedDelivery = cached.getSavedAt() > 0L
+                ? AlertTruthPolicy.OfficialDelivery.CACHE
+                : AlertTruthPolicy.OfficialDelivery.UNAVAILABLE;
 
         state.setValue(new AlertUiState(
                 true,
                 AlertMerger.merge(cached.getAlerts(), smart, now),
                 preferences.loadLocation(),
-                cached.getAlerts().isEmpty() ? "Checking official weather alerts…" : "Refreshing official alerts…",
-                Math.max(cached.getSavedAt(), now),
-                !cached.getAlerts().isEmpty()
+                cached.getSavedAt() > 0L
+                        ? "Refreshing official warning source while saved data remains visible."
+                        : "Checking official weather warnings…",
+                now,
+                cached.getSavedAt(),
+                cachedDelivery
         ));
 
         locationResolver.resolve(latitude, longitude, location -> {
@@ -87,43 +93,48 @@ public final class AlertViewModel extends AndroidViewModel {
             preferences.saveLocation(location);
 
             if (!location.isIndia()) {
+                long resolvedAt = System.currentTimeMillis();
                 List<WeatherAlert> merged = AlertMerger.merge(
                         new ArrayList<>(),
                         smart,
-                        System.currentTimeMillis()
+                        resolvedAt
                 );
                 AlertUiState resolved = new AlertUiState(
                         false,
                         merged,
                         location,
-                        "Official IMD CAP warnings apply to India locations; Smart Risk remains active here.",
-                        System.currentTimeMillis(),
-                        false
+                        "Official IMD warning scope applies to India locations; Smart Risk remains separate and active here.",
+                        resolvedAt,
+                        0L,
+                        AlertTruthPolicy.OfficialDelivery.NOT_APPLICABLE
                 );
-                // Geocoder callbacks are allowed to arrive on a Binder/background thread.
-                // MutableLiveData.setValue() is main-thread only, so all resolver callback
-                // branches use postValue() to remain thread-safe.
                 state.postValue(resolved);
-                notificationManager.notifyNewAlerts(merged);
+                notifyTruthfulCandidates(resolved, resolvedAt);
                 return;
             }
 
-            boolean cacheFresh = cached.getSavedAt() > 0L
-                    && System.currentTimeMillis() - cached.getSavedAt() <= OFFICIAL_REUSE_MILLIS;
+            long resolvedAt = System.currentTimeMillis();
+            boolean cacheFresh = AlertTruthPolicy.isOfficialCacheFresh(
+                    cached.getSavedAt(),
+                    resolvedAt
+            );
             if (!force && cacheFresh) {
                 List<WeatherAlert> merged = AlertMerger.merge(
-                        cached.getAlerts(), smart, System.currentTimeMillis()
+                        cached.getAlerts(),
+                        smart,
+                        resolvedAt
                 );
                 AlertUiState resolved = new AlertUiState(
                         false,
                         merged,
                         location,
-                        "Official IMD CAP cache is fresh.",
+                        "Recent saved official warning check is still within the reuse window.",
+                        resolvedAt,
                         cached.getSavedAt(),
-                        true
+                        AlertTruthPolicy.OfficialDelivery.CACHE
                 );
                 state.postValue(resolved);
-                notificationManager.notifyNewAlerts(merged);
+                notifyTruthfulCandidates(resolved, resolvedAt);
                 return;
             }
 
@@ -149,11 +160,22 @@ public final class AlertViewModel extends AndroidViewModel {
             );
             if (requestGeneration != generation) return;
 
+            long now = System.currentTimeMillis();
             List<WeatherAlert> official;
             String etag = result.getEtag() == null ? cached.getEtag() : result.getEtag();
-            long now = System.currentTimeMillis();
+
             if (result.isNotModified()) {
                 official = cached.getAlerts();
+                // A 304 confirms that the provider's current representation has
+                // not changed. Refresh the validation timestamp without changing
+                // alert content so the UI does not falsely display an old age.
+                cache.saveOfficial(
+                        location.getLatitude(),
+                        location.getLongitude(),
+                        official,
+                        etag,
+                        now
+                );
             } else {
                 official = result.getAlerts();
                 cache.saveOfficial(
@@ -166,37 +188,61 @@ public final class AlertViewModel extends AndroidViewModel {
             }
 
             List<WeatherAlert> merged = AlertMerger.merge(official, smart, now);
-            boolean officialAvailable = result.isNotModified()
-                    ? !cached.getAlerts().isEmpty()
-                    : true;
+            AlertTruthPolicy.OfficialDelivery delivery = official.isEmpty()
+                    ? AlertTruthPolicy.OfficialDelivery.NETWORK_EMPTY
+                    : AlertTruthPolicy.OfficialDelivery.NETWORK;
             AlertUiState resolved = new AlertUiState(
                     false,
                     merged,
                     location,
                     result.isNotModified()
-                            ? "IMD CAP feed unchanged · cached official alerts retained."
-                            : "Official IMD CAP feed synchronized.",
-                    result.isNotModified() ? cached.getSavedAt() : now,
-                    officialAvailable
+                            ? "Official warning source checked · alert content unchanged."
+                            : "Official warning source synchronized.",
+                    now,
+                    now,
+                    delivery
             );
             state.postValue(resolved);
-            notificationManager.notifyNewAlerts(merged);
+            notifyTruthfulCandidates(resolved, now);
         } catch (Exception exception) {
             if (requestGeneration != generation) return;
             long now = System.currentTimeMillis();
             List<WeatherAlert> merged = AlertMerger.merge(cached.getAlerts(), smart, now);
-            state.postValue(new AlertUiState(
+            AlertTruthPolicy.OfficialDelivery delivery = cached.getSavedAt() > 0L
+                    ? AlertTruthPolicy.OfficialDelivery.CACHE
+                    : AlertTruthPolicy.OfficialDelivery.UNAVAILABLE;
+            boolean stale = AlertTruthPolicy.isOfficialSourceStale(
+                    delivery,
+                    cached.getSavedAt(),
+                    now
+            );
+            AlertUiState resolved = new AlertUiState(
                     false,
                     merged,
                     location,
-                    cached.getAlerts().isEmpty()
-                            ? "Official CAP feed unavailable · showing Smart Risk only."
-                            : "Official CAP refresh unavailable · showing saved official alerts + Smart Risk.",
+                    cached.getSavedAt() <= 0L
+                            ? "Official warning source unavailable · Smart Risk only. This is not an official all-clear."
+                            : stale
+                            ? "Official refresh unavailable · saved official warnings are stale and shown only as fallback."
+                            : "Official refresh unavailable · recent saved official warnings remain visible.",
+                    now,
                     cached.getSavedAt(),
-                    !cached.getAlerts().isEmpty()
-            ));
-            notificationManager.notifyNewAlerts(merged);
+                    delivery
+            );
+            state.postValue(resolved);
+            notifyTruthfulCandidates(resolved, now);
         }
+    }
+
+    private void notifyTruthfulCandidates(@NonNull AlertUiState resolved, long nowMillis) {
+        notificationManager.notifyNewAlerts(
+                AlertTruthPolicy.notificationCandidates(
+                        resolved.getAlerts(),
+                        resolved.getOfficialDelivery(),
+                        resolved.getOfficialSavedAt(),
+                        nowMillis
+                )
+        );
     }
 
     @Override
