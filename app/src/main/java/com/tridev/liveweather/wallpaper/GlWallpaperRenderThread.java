@@ -14,6 +14,7 @@ import android.view.Surface;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
+import com.tridev.liveweather.core.performance.AdaptiveFrameTimeGuard;
 import com.tridev.liveweather.data.local.WallpaperPreferences;
 import com.tridev.liveweather.data.remote.dto.AirQualityResponse;
 import com.tridev.liveweather.data.remote.dto.WeatherResponse;
@@ -25,8 +26,8 @@ import com.tridev.liveweather.ui.gl.HeroGlPipeline;
  * Dedicated EGL14 render thread for Android system Live Wallpaper.
  *
  * Renderer faults are isolated inside HeroGlPipeline. Transient EGL/context
- * failures use a bounded recovery path only when a real failure occurs; normal
- * frames carry no recovery polling cost.
+ * failures use bounded recovery, while the frame-time guard adapts only
+ * secondary detail after sustained GPU pressure. Weather truth is untouched.
  */
 public final class GlWallpaperRenderThread {
 
@@ -39,6 +40,7 @@ public final class GlWallpaperRenderThread {
     private final HandlerThread thread;
     private final Handler handler;
     private final HeroGlPipeline pipeline = new HeroGlPipeline();
+    private final AdaptiveFrameTimeGuard frameTimeGuard = new AdaptiveFrameTimeGuard();
 
     private EGLDisplay display = EGL14.EGL_NO_DISPLAY;
     private EGLContext context = EGL14.EGL_NO_CONTEXT;
@@ -73,8 +75,12 @@ public final class GlWallpaperRenderThread {
         @Override
         public void run() {
             if (released || !visible || eglSurface == EGL14.EGL_NO_SURFACE) return;
+
+            long loopStartNanos = System.nanoTime();
             try {
                 refreshRealityIfNeeded();
+
+                long renderStartNanos = System.nanoTime();
                 pipeline.drawFrame();
                 if (!EGL14.eglSwapBuffers(display, eglSurface)) {
                     int eglError = EGL14.eglGetError();
@@ -84,6 +90,14 @@ public final class GlWallpaperRenderThread {
                     );
                     return;
                 }
+
+                float adaptedDetail = frameTimeGuard.observeFrameNanos(
+                        System.nanoTime() - renderStartNanos
+                );
+                if (!Float.isNaN(adaptedDetail)) {
+                    performanceDetailScale = adaptedDetail;
+                    pipeline.setPerformanceDetailScale(adaptedDetail);
+                }
                 eglRecoveryAttempts = 0;
             } catch (RuntimeException error) {
                 scheduleEglRecovery("wallpaper-render-runtime", error);
@@ -91,7 +105,9 @@ public final class GlWallpaperRenderThread {
             }
 
             if (!released && visible && eglSurface != EGL14.EGL_NO_SURFACE) {
-                handler.postDelayed(this, frameIntervalMillis);
+                long loopElapsedMillis = nanosToCeilMillis(System.nanoTime() - loopStartNanos);
+                long delayMillis = Math.max(0L, frameIntervalMillis - loopElapsedMillis);
+                handler.postDelayed(this, delayMillis);
             }
         }
     };
@@ -109,6 +125,7 @@ public final class GlWallpaperRenderThread {
             this.width = Math.max(1, width);
             this.height = Math.max(1, height);
             eglRecoveryAttempts = 0;
+            frameTimeGuard.resetMeasurements();
             try {
                 createEglSurface();
                 restartLoop();
@@ -122,6 +139,7 @@ public final class GlWallpaperRenderThread {
         handler.post(() -> {
             windowSurface = null;
             eglRecoveryAttempts = 0;
+            frameTimeGuard.resetMeasurements();
             handler.removeCallbacks(renderRunnable);
             detachEglSurface();
         });
@@ -141,8 +159,13 @@ public final class GlWallpaperRenderThread {
     public void setPerformanceProfile(long frameMillis, float detailScale) {
         handler.post(() -> {
             frameIntervalMillis = Math.max(16L, frameMillis);
-            performanceDetailScale = clamp(detailScale, 0.5f, 1f);
-            if (pipelineCreated) pipeline.setPerformanceDetailScale(performanceDetailScale);
+            performanceDetailScale = frameTimeGuard.setBaseProfile(
+                    frameIntervalMillis,
+                    clamp(detailScale, 0.5f, 1f)
+            );
+            if (pipelineCreated) {
+                pipeline.setPerformanceDetailScale(performanceDetailScale);
+            }
         });
     }
 
@@ -214,6 +237,7 @@ public final class GlWallpaperRenderThread {
         eglRecoveryAttempts++;
         Log.e(TAG, "wallpaper-egl-recovery attempt=" + eglRecoveryAttempts
                 + " reason=" + reason, error);
+        frameTimeGuard.resetMeasurements();
         destroyEglContext();
 
         long delay = EGL_RECOVERY_DELAY_MILLIS * eglRecoveryAttempts;
@@ -297,9 +321,11 @@ public final class GlWallpaperRenderThread {
             pipeline.onSurfaceCreated();
             pipelineCreated = true;
         }
+        performanceDetailScale = frameTimeGuard.getEffectiveDetailScale();
         pipeline.setPerformanceDetailScale(performanceDetailScale);
         pipeline.onSurfaceChanged(width, height);
         pipeline.setOptions(options);
+        frameTimeGuard.resetMeasurements();
         lastRealityRefresh = 0L;
         lastParallaxCompose = 0L;
         parallaxDirty = true;
@@ -372,7 +398,14 @@ public final class GlWallpaperRenderThread {
         handler.removeCallbacks(renderRunnable);
         if (!released && visible && eglSurface != EGL14.EGL_NO_SURFACE) {
             handler.post(renderRunnable);
+        } else {
+            frameTimeGuard.resetMeasurements();
         }
+    }
+
+    private static long nanosToCeilMillis(long nanos) {
+        if (nanos <= 0L) return 0L;
+        return (nanos + 999_999L) / 1_000_000L;
     }
 
     private static float clamp(float value, float min, float max) {
