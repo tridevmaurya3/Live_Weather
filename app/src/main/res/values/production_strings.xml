@@ -4,5 +4,8 @@
     <string name="more_about_release">Live weather, forecasts, AQI, alerts, radar, widgets and Live Wallpaper share one location-aware weather experience.</string>
     <string name="more_version_release">Version 1.0.0</string>
     <string name="status_phase_fifteen">LIVE WEATHER · WEATHER, RADAR, ALERTS, WIDGETS &amp; WALLPAPER</string>
+    <string name="product_status_home">LIVE CONDITIONS · FORECAST · RADAR · ALERTS</string>
+    <string name="product_status_forecast">LIVE FORECAST · HOURLY · 10-DAY · SKY</string>
+    <string name="product_status_wallpaper">APP + LIVE WALLPAPER · SHARED WEATHER REALITY</string>
     <string name="widget_refresh_accessibility">Refresh weather widget</string>
 </resources>
