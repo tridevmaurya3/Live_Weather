@@ -3,6 +3,8 @@ name: Phase 26 Release Gate
 on:
   push:
     branches: [ main ]
+    paths-ignore:
+      - 'docs/**'
   workflow_dispatch:
 
 permissions:
