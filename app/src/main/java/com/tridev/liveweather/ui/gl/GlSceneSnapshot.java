@@ -51,6 +51,14 @@ public final class GlSceneSnapshot {
     public float windStrength;
     public float windDirectionRadians;
     public float sceneLight;
+
+    /**
+     * Current apparent-temperature signal in the range -1..1.
+     * Negative means genuinely cold-feeling air, positive means genuinely hot-feeling air.
+     * This is presentation context only; it never changes the resolved weather condition.
+     */
+    public float thermalBias;
+
     public float visibilityFactor;
     public float parallax;
 
@@ -91,6 +99,7 @@ public final class GlSceneSnapshot {
             float windStrength,
             float windDirectionRadians,
             float sceneLight,
+            float thermalBias,
             float visibilityFactor,
             float parallax
     ) {
@@ -130,6 +139,7 @@ public final class GlSceneSnapshot {
         this.windStrength = windStrength;
         this.windDirectionRadians = windDirectionRadians;
         this.sceneLight = sceneLight;
+        this.thermalBias = thermalBias;
         this.visibilityFactor = visibilityFactor;
         this.parallax = parallax;
     }
@@ -161,6 +171,7 @@ public final class GlSceneSnapshot {
                 source.windStrength,
                 source.windDirectionRadians,
                 source.sceneLight,
+                source.thermalBias,
                 source.visibilityFactor,
                 source.parallax
         );
@@ -203,6 +214,7 @@ public final class GlSceneSnapshot {
         windStrength = source.windStrength;
         windDirectionRadians = source.windDirectionRadians;
         sceneLight = source.sceneLight;
+        thermalBias = source.thermalBias;
         visibilityFactor = source.visibilityFactor;
         parallax = source.parallax;
     }
