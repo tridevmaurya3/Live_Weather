@@ -3,10 +3,44 @@
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <style>
-        html, body, #map { width:100%; height:100%; margin:0; padding:0; background:#0b1f36; }
+        html, body, #map { width:100%; height:100%; margin:0; padding:0; }
+        html, body { background:#0b1f36; }
         body { overflow:hidden; font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif; }
+        #map {
+            background-color:#0b1f36;
+            background-image:
+                linear-gradient(rgba(126,176,211,.07) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(126,176,211,.07) 1px, transparent 1px);
+            background-size:36px 36px;
+        }
+        #mapShell {
+            position:absolute;
+            inset:0;
+            z-index:1600;
+            display:flex;
+            align-items:center;
+            justify-content:center;
+            padding:22px;
+            pointer-events:none;
+            background:linear-gradient(180deg, rgba(8,25,42,.24), rgba(8,25,42,.68));
+            box-sizing:border-box;
+        }
+        #mapShell.hidden { display:none; }
+        .shell-card {
+            max-width:340px;
+            border:1px solid rgba(124,232,225,.28);
+            border-radius:18px;
+            padding:14px 16px;
+            background:rgba(9,29,48,.92);
+            box-shadow:0 12px 32px rgba(0,0,0,.28);
+            color:#f6faff;
+            text-align:center;
+        }
+        .shell-card.warning { border-color:rgba(255,210,122,.42); }
+        .shell-title { color:#7ce8e1; font-size:13px; font-weight:800; letter-spacing:.05em; }
+        .shell-card.warning .shell-title { color:#ffd27a; }
+        .shell-body { margin-top:6px; color:#b8c7d9; font-size:11px; line-height:1.45; }
         .leaflet-control-attribution { background:rgba(6,16,29,.78)!important; color:#dbe9f4!important; font-size:9px!important; }
         .leaflet-control-attribution a { color:#8ed9ff!important; }
         .leaflet-base-pane img { filter:saturate(.72) brightness(.78) contrast(1.06); }
@@ -19,55 +53,178 @@
 </head>
 <body>
 <div id="map"></div>
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<div id="mapShell" role="status" aria-live="polite">
+    <div id="mapShellCard" class="shell-card">
+        <div id="mapShellTitle" class="shell-title">PREPARING RADAR MAP</div>
+        <div id="mapShellBody" class="shell-body">Loading the interactive map engine…</div>
+    </div>
+</div>
 <script>
 (function () {
+    'use strict';
+
+    const LEAFLET_VERSION = '1.9.4';
+    const LEAFLET_JS_URL = 'https://unpkg.com/leaflet@' + LEAFLET_VERSION + '/dist/leaflet.js';
+    const LEAFLET_CSS_URL = 'https://unpkg.com/leaflet@' + LEAFLET_VERSION + '/dist/leaflet.css';
+    const LEAFLET_LOAD_TIMEOUT_MILLIS = 9000;
     const CLOUD_SURFACE_SIZE = 144;
 
-    const map = L.map('map', {
-        minZoom:3,
-        maxZoom:7,
-        zoomControl:true,
-        preferCanvas:true
-    }).setView([22.6, 79.0], 5);
+    const shell = document.getElementById('mapShell');
+    const shellCard = document.getElementById('mapShellCard');
+    const shellTitle = document.getElementById('mapShellTitle');
+    const shellBody = document.getElementById('mapShellBody');
 
-    map.createPane('basePane');
-    map.getPane('basePane').classList.add('leaflet-base-pane');
-    map.getPane('basePane').style.zIndex = 200;
-
-    map.createPane('cloudPane');
-    map.getPane('cloudPane').style.zIndex = 410;
-    map.getPane('cloudPane').style.pointerEvents = 'none';
-
-    map.createPane('radarPane');
-    map.getPane('radarPane').style.zIndex = 430;
-
-    L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        pane:'basePane',
-        maxZoom:7,
-        attribution:'&copy; <a href="https://www.openstreetmap.org/">OpenStreetMap</a> contributors'
-    }).addTo(map);
-    map.attributionControl.addAttribution('<a href="https://open-meteo.com/">Open-Meteo</a> model overlays');
-
+    let map = null;
+    let baseLayer = null;
+    let leafletLoadPromise = null;
+    let leafletScript = null;
     let payload = null;
     let activeLayer = 'rain';
     let frameIndex = 0;
     let radarLayer = null;
     let radarLayerUrl = null;
     let cloudSurfaceLayer = null;
-    let windGroup = L.layerGroup();
-    let tempGroup = L.layerGroup();
+    let windGroup = null;
+    let tempGroup = null;
     let locationMarker = null;
+    let suspended = false;
+
+    function showShell(title, body, warning) {
+        shellTitle.textContent = title;
+        shellBody.textContent = body;
+        shellCard.classList.toggle('warning', !!warning);
+        shell.classList.remove('hidden');
+    }
+
+    function hideShell() {
+        shell.classList.add('hidden');
+    }
+
+    function ensureLeafletCss() {
+        if (document.getElementById('leaflet-css')) return;
+        const link = document.createElement('link');
+        link.id = 'leaflet-css';
+        link.rel = 'stylesheet';
+        link.href = LEAFLET_CSS_URL;
+        document.head.appendChild(link);
+    }
+
+    function removeLeafletScript() {
+        if (leafletScript && leafletScript.parentNode) {
+            leafletScript.parentNode.removeChild(leafletScript);
+        }
+        leafletScript = null;
+    }
+
+    function loadLeaflet(forceRetry) {
+        if (window.L) {
+            initializeMap();
+            return Promise.resolve(true);
+        }
+        if (leafletLoadPromise && !forceRetry) return leafletLoadPromise;
+
+        if (forceRetry) {
+            removeLeafletScript();
+            leafletLoadPromise = null;
+        }
+
+        ensureLeafletCss();
+        showShell(
+            'PREPARING RADAR MAP',
+            payload ? 'Weather data is ready. Loading the interactive map engine…' : 'Loading the interactive map engine…',
+            false
+        );
+
+        leafletLoadPromise = new Promise(function (resolve) {
+            let finished = false;
+            const finish = function (success) {
+                if (finished) return;
+                finished = true;
+                window.clearTimeout(timeoutId);
+                leafletLoadPromise = null;
+
+                if (success && window.L) {
+                    try {
+                        initializeMap();
+                        resolve(true);
+                        return;
+                    } catch (error) {
+                        console.warn('Radar map initialization failed', error);
+                    }
+                }
+
+                showShell(
+                    'INTERACTIVE MAP UNAVAILABLE',
+                    payload
+                        ? 'Radar/model data is retained in the app. Reconnect and reopen, Refresh, or Recenter to retry the map engine.'
+                        : 'The local Radar page is available, but the interactive map engine could not load. Reconnect and retry.',
+                    true
+                );
+                resolve(false);
+            };
+
+            leafletScript = document.createElement('script');
+            leafletScript.id = 'leaflet-js';
+            leafletScript.src = LEAFLET_JS_URL;
+            leafletScript.async = true;
+            leafletScript.onload = function () { finish(true); };
+            leafletScript.onerror = function () { finish(false); };
+            document.head.appendChild(leafletScript);
+
+            const timeoutId = window.setTimeout(function () {
+                finish(false);
+            }, LEAFLET_LOAD_TIMEOUT_MILLIS);
+        });
+
+        return leafletLoadPromise;
+    }
+
+    function initializeMap() {
+        if (map || !window.L) return;
+
+        map = L.map('map', {
+            minZoom:3,
+            maxZoom:7,
+            zoomControl:true,
+            preferCanvas:true,
+            zoomAnimation:true,
+            fadeAnimation:true
+        }).setView([22.6, 79.0], 5);
+
+        map.createPane('basePane');
+        map.getPane('basePane').classList.add('leaflet-base-pane');
+        map.getPane('basePane').style.zIndex = 200;
+
+        map.createPane('cloudPane');
+        map.getPane('cloudPane').style.zIndex = 410;
+        map.getPane('cloudPane').style.pointerEvents = 'none';
+
+        map.createPane('radarPane');
+        map.getPane('radarPane').style.zIndex = 430;
+
+        baseLayer = L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            pane:'basePane',
+            maxZoom:7,
+            keepBuffer:1,
+            updateWhenIdle:true,
+            attribution:'&copy; <a href="https://www.openstreetmap.org/">OpenStreetMap</a> contributors'
+        }).addTo(map);
+
+        map.attributionControl.addAttribution('<a href="https://open-meteo.com/">Open-Meteo</a> model overlays');
+        windGroup = L.layerGroup();
+        tempGroup = L.layerGroup();
+
+        if (payload) applyPayloadToMap();
+        if (suspended) map.stop();
+        hideShell();
+    }
 
     function clearWeatherLayers() {
-        if (radarLayer && map.hasLayer(radarLayer)) {
-            map.removeLayer(radarLayer);
-        }
-        if (cloudSurfaceLayer && map.hasLayer(cloudSurfaceLayer)) {
-            map.removeLayer(cloudSurfaceLayer);
-        }
-        map.removeLayer(windGroup);
-        map.removeLayer(tempGroup);
+        if (!map) return;
+        if (radarLayer && map.hasLayer(radarLayer)) map.removeLayer(radarLayer);
+        if (cloudSurfaceLayer && map.hasLayer(cloudSurfaceLayer)) map.removeLayer(cloudSurfaceLayer);
+        if (windGroup && map.hasLayer(windGroup)) map.removeLayer(windGroup);
+        if (tempGroup && map.hasLayer(tempGroup)) map.removeLayer(tempGroup);
     }
 
     function radarUrl(index) {
@@ -79,6 +236,7 @@
     }
 
     function ensureRadarLayer(index) {
+        if (!map || !window.L) return null;
         const url = radarUrl(index);
         if (!url) return null;
 
@@ -128,14 +286,14 @@
     }
 
     function invalidateCloudSurface() {
-        if (cloudSurfaceLayer && map.hasLayer(cloudSurfaceLayer)) {
+        if (map && cloudSurfaceLayer && map.hasLayer(cloudSurfaceLayer)) {
             map.removeLayer(cloudSurfaceLayer);
         }
         cloudSurfaceLayer = null;
     }
 
     function buildContinuousCloudSurface(points) {
-        if (!points || points.length < 4) return null;
+        if (!map || !window.L || !points || points.length < 4) return null;
 
         const centerLon = payload && Number.isFinite(Number(payload.longitude))
             ? Number(payload.longitude)
@@ -241,6 +399,7 @@
     }
 
     function rebuildFieldLayers() {
+        if (!map || !window.L) return;
         invalidateCloudSurface();
         windGroup = L.layerGroup();
         tempGroup = L.layerGroup();
@@ -268,7 +427,7 @@
     }
 
     function updateLocationMarker() {
-        if (!payload) return;
+        if (!map || !window.L || !payload) return;
         if (locationMarker) map.removeLayer(locationMarker);
         locationMarker = L.marker([payload.latitude,payload.longitude], {
             zIndexOffset:1200,
@@ -282,6 +441,7 @@
     }
 
     function applyLayer() {
+        if (!map || suspended) return;
         clearWeatherLayers();
         if (!payload) return;
 
@@ -290,27 +450,37 @@
             if (layer && !map.hasLayer(layer)) layer.addTo(map);
         } else if (activeLayer === 'clouds') {
             ensureCloudSurface();
-            if (cloudSurfaceLayer) cloudSurfaceLayer.addTo(map);
+            if (cloudSurfaceLayer && !map.hasLayer(cloudSurfaceLayer)) cloudSurfaceLayer.addTo(map);
         } else if (activeLayer === 'wind') {
-            windGroup.addTo(map);
+            if (windGroup && !map.hasLayer(windGroup)) windGroup.addTo(map);
         } else if (activeLayer === 'temp') {
-            tempGroup.addTo(map);
+            if (tempGroup && !map.hasLayer(tempGroup)) tempGroup.addTo(map);
         }
+    }
+
+    function applyPayloadToMap() {
+        if (!map || !payload) return;
+        frameIndex = payload.frames && payload.frames.length ? payload.frames.length - 1 : 0;
+        rebuildFieldLayers();
+        updateLocationMarker();
+        map.setView([payload.latitude,payload.longitude], payload.zoom || 6, {animate:false});
+        applyLayer();
     }
 
     window.RadarApp = {
         setData:function (data) {
             payload = (typeof data === 'string') ? JSON.parse(data) : data;
             if (!payload) return;
-            frameIndex = payload.frames && payload.frames.length ? payload.frames.length - 1 : 0;
-            rebuildFieldLayers();
-            updateLocationMarker();
-            map.setView([payload.latitude,payload.longitude], payload.zoom || 6, {animate:false});
-            applyLayer();
+            if (map) {
+                applyPayloadToMap();
+            } else {
+                loadLeaflet(false);
+            }
         },
         setLayer:function (layer) {
             activeLayer = layer || 'rain';
-            applyLayer();
+            if (map) applyLayer();
+            else loadLeaflet(false);
         },
         setFrame:function (index) {
             const numeric = Number(index);
@@ -318,17 +488,43 @@
             if (payload && payload.frames && payload.frames.length) {
                 frameIndex = Math.min(frameIndex, payload.frames.length - 1);
             }
-            if (activeLayer === 'rain') {
+            if (map && activeLayer === 'rain' && !suspended) {
                 const layer = ensureRadarLayer(frameIndex);
                 if (layer && !map.hasLayer(layer)) layer.addTo(map);
             }
         },
         recenter:function () {
-            if (payload) {
+            if (map && payload) {
                 map.setView([payload.latitude,payload.longitude], payload.zoom || 6, {animate:true});
+            } else {
+                loadLeaflet(true);
             }
+        },
+        suspend:function () {
+            suspended = true;
+            if (map) map.stop();
+        },
+        resume:function () {
+            suspended = false;
+            if (map) {
+                window.setTimeout(function () {
+                    if (!map) return;
+                    map.invalidateSize({animate:false, pan:false});
+                    applyLayer();
+                }, 0);
+            } else {
+                loadLeaflet(false);
+            }
+        },
+        retryEngine:function () {
+            if (!map) loadLeaflet(true);
+        },
+        isReady:function () {
+            return !!map;
         }
     };
+
+    loadLeaflet(false);
 })();
 </script>
 </body>
