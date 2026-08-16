@@ -36,6 +36,10 @@ import com.tridev.liveweather.ui.gl.HeroGlPipeline;
  * Live Wallpaper. Hidden views draw zero frames. Renderer faults are isolated,
  * transient EGL failures recover in a bounded path, and sustained frame pressure
  * trims only secondary detail while the actual weather state remains untouched.
+ *
+ * Visual-option updates are versioned separately from weather/AQI/location truth,
+ * so toggling clouds/rain/lightning/snow/fog/stars never forces astronomy/weather
+ * recomposition or looks like a scene refresh.
  */
 public final class LiveSkyView extends FrameLayout implements TextureView.SurfaceTextureListener {
 
@@ -52,6 +56,7 @@ public final class LiveSkyView extends FrameLayout implements TextureView.Surfac
     private static double sharedLatitude = Double.NaN;
     private static double sharedLongitude = Double.NaN;
     private static long sharedVersion = 1L;
+    private static long sharedOptionsVersion = 1L;
 
     private final Context appContext;
     private final TextureView textureView;
@@ -77,6 +82,7 @@ public final class LiveSkyView extends FrameLayout implements TextureView.Surfac
     private long lastPerformanceRefresh;
     private long frameIntervalMillis = 33L;
     private long seenSharedVersion = -1L;
+    private long seenSharedOptionsVersion = -1L;
 
     @Nullable private volatile SkyRealityState lastSkyState;
 
@@ -132,7 +138,10 @@ public final class LiveSkyView extends FrameLayout implements TextureView.Surfac
         performancePreferences = new PerformancePreferences(appContext);
 
         synchronized (SHARED_LOCK) {
-            if (sharedOptions == null) sharedOptions = new WallpaperPreferences(context).load();
+            if (sharedOptions == null) {
+                sharedOptions = new WallpaperPreferences(context).load();
+                sharedOptionsVersion++;
+            }
         }
 
         WallpaperPreferences.Options initialOptions;
@@ -205,9 +214,9 @@ public final class LiveSkyView extends FrameLayout implements TextureView.Surfac
     public void setRenderOptions(@NonNull WallpaperPreferences.Options options) {
         synchronized (SHARED_LOCK) {
             sharedOptions = options;
-            sharedVersion++;
+            sharedOptionsVersion++;
         }
-        requestRealityRefresh();
+        requestVisualOptionsRefresh();
     }
 
     @Nullable
@@ -255,6 +264,7 @@ public final class LiveSkyView extends FrameLayout implements TextureView.Surfac
                 frameTimeGuard.resetMeasurements();
                 createEglSurface(surface, surfaceWidth, surfaceHeight);
                 seenSharedVersion = -1L;
+                seenSharedOptionsVersion = -1L;
                 lastPerformanceRefresh = 0L;
                 restartLoopOnRenderThread();
             } catch (RuntimeException error) {
@@ -312,6 +322,16 @@ public final class LiveSkyView extends FrameLayout implements TextureView.Surfac
         });
     }
 
+    /** Visual toggles wake the renderer without invalidating weather/astronomy truth. */
+    private void requestVisualOptionsRefresh() {
+        if (released) return;
+        renderHandler.post(() -> {
+            seenSharedOptionsVersion = -1L;
+            lastPerformanceRefresh = 0L;
+            restartLoopOnRenderThread();
+        });
+    }
+
     private void restartLoopOnRenderThread() {
         renderHandler.removeCallbacks(renderRunnable);
         if (!released && visible && eglSurface != EGL14.EGL_NO_SURFACE) {
@@ -346,6 +366,7 @@ public final class LiveSkyView extends FrameLayout implements TextureView.Surfac
                 createEglSurface(surface, surfaceWidth, surfaceHeight);
                 if (eglSurface != EGL14.EGL_NO_SURFACE) {
                     seenSharedVersion = -1L;
+                    seenSharedOptionsVersion = -1L;
                     lastRealityRefresh = 0L;
                     restartLoopOnRenderThread();
                 } else {
@@ -421,6 +442,7 @@ public final class LiveSkyView extends FrameLayout implements TextureView.Surfac
         pipeline.setPerformanceDetailScale(frameTimeGuard.getEffectiveDetailScale());
         pipeline.onSurfaceChanged(width, height);
         seenSharedVersion = -1L;
+        seenSharedOptionsVersion = -1L;
         lastRealityRefresh = 0L;
         lastPerformanceRefresh = 0L;
     }
@@ -495,6 +517,7 @@ public final class LiveSkyView extends FrameLayout implements TextureView.Surfac
         double latitude;
         double longitude;
         long version;
+        long optionsVersion;
         synchronized (SHARED_LOCK) {
             weather = sharedWeather;
             airQuality = sharedAirQuality;
@@ -502,7 +525,15 @@ public final class LiveSkyView extends FrameLayout implements TextureView.Surfac
             latitude = sharedLatitude;
             longitude = sharedLongitude;
             version = sharedVersion;
+            optionsVersion = sharedOptionsVersion;
         }
+
+        // Visual options are cheap state updates and never invalidate reality composition.
+        if (optionsVersion != seenSharedOptionsVersion) {
+            if (options != null) pipeline.setOptions(options);
+            seenSharedOptionsVersion = optionsVersion;
+        }
+
         if (version == seenSharedVersion
                 && lastRealityRefresh > 0L
                 && now - lastRealityRefresh < REALITY_REFRESH_MILLIS) {
@@ -510,7 +541,7 @@ public final class LiveSkyView extends FrameLayout implements TextureView.Surfac
         }
         seenSharedVersion = version;
         lastRealityRefresh = now;
-        if (options != null) pipeline.setOptions(options);
+
         if (weather == null || Double.isNaN(latitude) || Double.isNaN(longitude)) {
             pipeline.setSnapshot(null);
             lastSkyState = null;
