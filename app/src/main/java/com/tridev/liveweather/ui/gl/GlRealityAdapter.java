@@ -48,17 +48,6 @@ public final class GlRealityAdapter {
         float moonX = celestialX(sky.getMoonAzimuth(), parallax);
         float moonY = celestialY(sky.getMoonAltitude());
 
-        /*
-         * SkyRealityEngine already accounts for darkness, cloud transparency,
-         * visibility, precipitation and lunar glare. Do not multiply the legacy
-         * SceneState weather transparency again. Apply only AQI haze correction.
-         *
-         * The GPU star dots are intentionally tiny. A gamma-like 0.38 exponent
-         * keeps a resolved zero exactly zero but makes real low night visibility
-         * survive launcher dimming and screenshot compression. Cloud layers are
-         * rendered after stars in the base shader, so real clouds still occlude
-         * the boosted points locally.
-         */
         double resolvedStarVisibility = clamp(
                 (sky.getStarVisibilityPercent() / 100d)
                         * (1d - state.getAirHazeIntensity() * 0.45d),
@@ -68,6 +57,8 @@ public final class GlRealityAdapter {
         float gpuStarVisibility = resolvedStarVisibility <= 0d
                 ? 0f
                 : clamp01((float) Math.pow(resolvedStarVisibility, 0.38d));
+
+        float thermalBias = resolveThermalBias(weather.getCurrent());
 
         return new GlSceneSnapshot(
                 skyProfile.topR,
@@ -106,9 +97,22 @@ public final class GlRealityAdapter {
                 clamp01((float) state.getWindStrength()),
                 (float) Math.toRadians(state.getWindDirectionDegrees()),
                 clamp01((float) state.getSceneLight()),
+                thermalBias,
                 clamp01((float) state.getVisibilityFactor()),
                 parallax
         );
+    }
+
+    private static float resolveThermalBias(@Nullable WeatherResponse.CurrentWeather current) {
+        if (current == null) return 0f;
+        Double apparent = current.getApparentTemperature();
+        Double measured = current.getTemperature2m();
+        if (apparent == null && measured == null) return 0f;
+        double celsius = apparent != null ? apparent : measured;
+
+        double warm = clamp((celsius - 27d) / 18d, 0d, 1d);
+        double cold = clamp((16d - celsius) / 18d, 0d, 1d);
+        return (float) clamp(warm - cold, -1d, 1d);
     }
 
     private static float celestialX(double azimuth, float parallaxOffset) {
