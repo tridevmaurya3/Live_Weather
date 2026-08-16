@@ -195,6 +195,7 @@ public final class UiQualityPolicy {
             if (!(raw instanceof LinearLayout.LayoutParams)) continue;
             LinearLayout.LayoutParams params = (LinearLayout.LayoutParams) raw;
             params.width = ViewGroup.LayoutParams.MATCH_PARENT;
+            params.height = ViewGroup.LayoutParams.WRAP_CONTENT;
             params.weight = 0f;
             params.setMarginStart(0);
             params.setMarginEnd(0);
