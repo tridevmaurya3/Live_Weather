@@ -13,10 +13,9 @@ import java.util.Locale;
 /**
  * Read-only diagnostics for the shared OpenGL Hero/Live Wallpaper pipeline.
  *
- * This class never changes weather truth or renderer behavior. Diagnostics are
- * intentionally kept off the frame hot path: a snapshot report is formatted
- * only on explicit capture or when the resolved current-weather evidence class
- * actually changes.
+ * Diagnostics remain off the frame hot path. Renderer faults are recorded only
+ * when a real exception occurs, so graceful recovery does not add per-frame
+ * logging or GPU synchronization work.
  */
 public final class HeroGlDiagnostics {
 
@@ -31,12 +30,10 @@ public final class HeroGlDiagnostics {
             true, true, true, true, true, true, true
     );
 
-    @NonNull
-    private volatile String glVendor = "unknown";
-    @NonNull
-    private volatile String glRenderer = "unknown";
-    @NonNull
-    private volatile String glVersion = "unknown";
+    @NonNull private volatile String glVendor = "unknown";
+    @NonNull private volatile String glRenderer = "unknown";
+    @NonNull private volatile String glVersion = "unknown";
+    @NonNull private volatile String rendererFaults = "none";
 
     @Nullable
     private String lastLoggedEvidence;
@@ -69,6 +66,30 @@ public final class HeroGlDiagnostics {
         options = value;
     }
 
+    public synchronized void resetRendererFaults() {
+        rendererFaults = "none";
+    }
+
+    public synchronized void recordRendererFault(
+            @NonNull String renderer,
+            @NonNull String stage,
+            @NonNull Throwable error
+    ) {
+        String key = renderer + "@" + stage;
+        if ("none".equals(rendererFaults)) {
+            rendererFaults = key;
+        } else if (!rendererFaults.contains(key)) {
+            rendererFaults = rendererFaults + "," + key;
+        }
+        Log.e(TAG, "renderer-isolated " + key + " " + error.getClass().getSimpleName()
+                + ": " + safeMessage(error), error);
+    }
+
+    @NonNull
+    public String getRendererFaultSummary() {
+        return rendererFaults;
+    }
+
     @NonNull
     public Snapshot capture() {
         GlSceneSnapshot state = snapshot;
@@ -84,29 +105,10 @@ public final class HeroGlDiagnostics {
                     glVersion,
                     surfaceWidth,
                     surfaceHeight,
-                    0f,
-                    0f,
-                    0f,
-                    0f,
-                    0f,
-                    0f,
-                    0f,
-                    0f,
-                    0f,
-                    0f,
-                    0f,
-                    0f,
-                    0f,
-                    0f,
-                    0f,
-                    0f,
-                    false,
-                    false,
-                    false,
-                    false,
-                    false,
-                    false,
-                    false
+                    0f, 0f, 0f, 0f, 0f,
+                    0f, 0f, 0f, 0f, 0f, 0f,
+                    0f, 0f, 0f, 0f, 0f,
+                    false, false, false, false, false, false, false
             );
         }
 
@@ -147,7 +149,7 @@ public final class HeroGlDiagnostics {
 
     @NonNull
     public String buildReport() {
-        return capture().toMultilineString();
+        return capture().toMultilineString() + "\nrendererFaults=" + rendererFaults;
     }
 
     private void logCurrent(@NonNull String reason) {
@@ -157,33 +159,15 @@ public final class HeroGlDiagnostics {
 
     @NonNull
     private static String resolveEvidence(@NonNull GlSceneSnapshot state) {
-        if (state.stormIntensity > 0.02f) {
-            return "STORM_CURRENT";
-        }
-        if (state.snowIntensity > 0.004f) {
-            return "SNOW_CURRENT";
-        }
-        if (state.rainIntensity > 0.004f) {
-            return "RAIN_CURRENT";
-        }
-        if (state.drizzleIntensity > 0.004f) {
-            return "DRIZZLE_CURRENT";
-        }
-        if (state.fogIntensity > 0.10f) {
-            return "FOG_OR_LOW_VISIBILITY_CURRENT";
-        }
-        if (state.cloudCover >= 0.78f) {
-            return "OVERCAST_CURRENT";
-        }
-        if (state.cloudCover >= 0.52f) {
-            return "BROKEN_CLOUD_CURRENT";
-        }
-        if (state.cloudCover >= 0.25f) {
-            return "SCATTERED_CLOUD_CURRENT";
-        }
-        if (state.cloudCover >= 0.06f) {
-            return "LIGHT_CLOUD_CURRENT";
-        }
+        if (state.stormIntensity > 0.02f) return "STORM_CURRENT";
+        if (state.snowIntensity > 0.004f) return "SNOW_CURRENT";
+        if (state.rainIntensity > 0.004f) return "RAIN_CURRENT";
+        if (state.drizzleIntensity > 0.004f) return "DRIZZLE_CURRENT";
+        if (state.fogIntensity > 0.10f) return "FOG_OR_LOW_VISIBILITY_CURRENT";
+        if (state.cloudCover >= 0.78f) return "OVERCAST_CURRENT";
+        if (state.cloudCover >= 0.52f) return "BROKEN_CLOUD_CURRENT";
+        if (state.cloudCover >= 0.25f) return "SCATTERED_CLOUD_CURRENT";
+        if (state.cloudCover >= 0.06f) return "LIGHT_CLOUD_CURRENT";
         return "CLEAR_CURRENT";
     }
 
@@ -193,24 +177,16 @@ public final class HeroGlDiagnostics {
             @NonNull WallpaperPreferences.Options options
     ) {
         StringBuilder value = new StringBuilder("sky");
-        if (options.isStars() && state.starVisibility > 0.002f) {
-            value.append(",stars");
-        }
-        if (options.isClouds() && state.cloudCover > 0.015f) {
-            value.append(",clouds");
-        }
+        if (options.isStars() && state.starVisibility > 0.002f) value.append(",stars");
+        if (options.isClouds() && state.cloudCover > 0.015f) value.append(",clouds");
         if (options.isFog() && (state.fogIntensity > 0.01f || state.airHazeIntensity > 0.01f)) {
             value.append(",atmosphere");
         }
-        if (options.isLightning() && state.stormIntensity > 0.02f) {
-            value.append(",lightning");
-        }
+        if (options.isLightning() && state.stormIntensity > 0.02f) value.append(",lightning");
         if (options.isRain() && (state.rainIntensity > 0.003f || state.drizzleIntensity > 0.003f)) {
             value.append(",rain");
         }
-        if (options.isSnow() && state.snowIntensity > 0.003f) {
-            value.append(",snow");
-        }
+        if (options.isSnow() && state.snowIntensity > 0.003f) value.append(",snow");
         return value.toString();
     }
 
@@ -218,6 +194,12 @@ public final class HeroGlDiagnostics {
     private static String safeGlString(int name) {
         String value = GLES20.glGetString(name);
         return value == null || value.trim().isEmpty() ? "unknown" : value.trim();
+    }
+
+    @NonNull
+    private static String safeMessage(@NonNull Throwable error) {
+        String message = error.getMessage();
+        return message == null || message.trim().isEmpty() ? "no-message" : message.trim();
     }
 
     /** Immutable diagnostic snapshot safe to read outside the render loop. */
