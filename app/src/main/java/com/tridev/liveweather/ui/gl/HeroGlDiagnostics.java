@@ -13,10 +13,10 @@ import java.util.Locale;
 /**
  * Read-only diagnostics for the shared OpenGL Hero/Live Wallpaper pipeline.
  *
- * This class never changes weather truth or renderer behavior. It only records
- * the already-resolved GlSceneSnapshot, current visual options, GL environment
- * and surface size so device-only visual mismatches can be diagnosed without
- * guessing whether the problem came from weather evidence or rendering.
+ * This class never changes weather truth or renderer behavior. Diagnostics are
+ * intentionally kept off the frame hot path: a snapshot report is formatted
+ * only on explicit capture or when the resolved current-weather evidence class
+ * actually changes.
  */
 public final class HeroGlDiagnostics {
 
@@ -38,6 +38,9 @@ public final class HeroGlDiagnostics {
     @NonNull
     private volatile String glVersion = "unknown";
 
+    @Nullable
+    private String lastLoggedEvidence;
+
     private volatile int surfaceWidth = 1;
     private volatile int surfaceHeight = 1;
 
@@ -55,7 +58,11 @@ public final class HeroGlDiagnostics {
 
     public void setSnapshot(@Nullable GlSceneSnapshot value) {
         snapshot = value;
-        logCurrent("weather-snapshot");
+        String evidence = value == null ? "NO_WEATHER_SNAPSHOT" : resolveEvidence(value);
+        if (!evidence.equals(lastLoggedEvidence)) {
+            lastLoggedEvidence = evidence;
+            logCurrent("weather-evidence-changed");
+        }
     }
 
     public void setOptions(@NonNull WallpaperPreferences.Options value) {
@@ -144,6 +151,7 @@ public final class HeroGlDiagnostics {
     }
 
     private void logCurrent(@NonNull String reason) {
+        if (!Log.isLoggable(TAG, Log.INFO)) return;
         Log.i(TAG, reason + "\n" + buildReport());
     }
 
