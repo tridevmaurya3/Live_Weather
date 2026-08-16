@@ -134,37 +134,30 @@ Acceptance checkpoint: debug build, real-phone Radar layers, replay/timeline, re
 
 ## Phase 21 — Alerts Pro
 
-Status: IMPLEMENTATION STARTED — Steps 21.1–21.2 source implementation complete; build/device verification pending.
+Status: SOURCE IMPLEMENTATION COMPLETE — build/device acceptance pending.
 
-Step 21.1 implemented:
-- Central `AlertTruthPolicy` for official warning source delivery/freshness state
-- Official network, network-empty, saved cache, unavailable and not-applicable states
+Implemented source checkpoints:
+- Central `AlertTruthPolicy` for official-warning delivery/freshness truth
+- Official network, network-empty, saved-cache, unavailable and not-applicable states
 - Separate current check time from official warning-data timestamp
-- Stale saved official data cannot be shown as a live all-clear
 - `304 Not Modified` refreshes official validation time
-- Stale official fallback alerts are excluded from new notification candidates
-- Alerts Center empty-state wording is source/freshness aware
-- Saved stale official warnings are visibly marked `SAVED OFFICIAL`
-- Smart Risk remains explicitly app-derived and separate from official warnings
+- Stale saved official data cannot be presented as a live all-clear
+- Stale official fallback cannot generate a new official notification
+- Persistent Official / Smart Risk visibility filters
+- Persistent minimum severity: All / Yellow+ / Orange+ / Red only
+- Persistent per-source notification controls for Official and Smart Risk
+- Master notification control remains separate from per-source delivery
+- Android 13+ notification permission/app-level block handling
+- Official and Smart Risk channel block-state handling
+- Explicit `IMD OFFICIAL` vs `SMART RISK` notification labels
+- Alert-row detail dialog with source/severity/area/validity/issue-time disclosure
+- Android notification settings entry point
+- Background worker exits early when alert notification delivery is disabled/blocked
+- Background Smart Risk cannot be generated from cached weather older than 90 minutes
+- Existing notification tap navigation continues to open the Alerts Center
+- No false implication that an unavailable official source means no danger
 
-Step 21.2 implemented:
-- Persistent Official and Smart Risk source filters with safe enabled defaults
-- Persistent minimum severity filter: All / Yellow+ / Orange+ / Red only
-- Compact Alerts Center filter controls with immediate no-network re-render
-- Source/severity filters apply to Alerts Center, Home alert card and notification eligibility
-- Filter-hidden alerts are disclosed instead of being described as nonexistent
-- Official push floor remains Yellow+; Smart Risk push floor remains high-confidence Orange/Red
-- User severity preference may make notifications stricter but cannot loosen Smart Risk push confidence
-- Background alert worker now uses the same official freshness/truth notification candidate policy
-- Successful background 200/304 official checks refresh validation time; stale fallback does not create a new official push
-
-Remaining Phase 21 scope:
-- Master notification/Android permission status polish
-- Per-source notification explanation/status
-- Alert detail/navigation polish
-- Source/severity/validity detail presentation
-- Background/cached/stale warning-state final audit
-- Final Alerts Pro integration and device verification
+Acceptance checkpoint: pull/build, permission flow, source/severity persistence, master + per-source notification controls, Android channel blocking, fresh/304/stale official states, alert details, notification navigation and stale-background guards on a real device.
 
 ## Phase 22 — App UX, Responsive & Accessibility Audit
 
