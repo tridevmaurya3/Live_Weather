@@ -137,10 +137,11 @@
 
         leafletLoadPromise = new Promise(function (resolve) {
             let finished = false;
+            let timeoutId = 0;
             const finish = function (success) {
                 if (finished) return;
                 finished = true;
-                window.clearTimeout(timeoutId);
+                if (timeoutId) window.clearTimeout(timeoutId);
                 leafletLoadPromise = null;
 
                 if (success && window.L) {
@@ -171,7 +172,7 @@
             leafletScript.onerror = function () { finish(false); };
             document.head.appendChild(leafletScript);
 
-            const timeoutId = window.setTimeout(function () {
+            timeoutId = window.setTimeout(function () {
                 finish(false);
             }, LEAFLET_LOAD_TIMEOUT_MILLIS);
         });
