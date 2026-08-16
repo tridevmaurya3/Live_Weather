@@ -97,14 +97,23 @@ Acceptance checkpoint: test hourly chip/chart/timeline synchronization, daily ex
 
 ## Phase 20A — Accurate Live Weather Reality Foundation
 
-Status: IMPLEMENTATION STARTED — real-device visual verification pending.
+Status: SOURCE IMPLEMENTATION COMPLETE — real-device visual verification pending.
 
+Implemented:
 - Accurate current-condition truth remains the authority for every visual layer
-- Organic multi-scale cloud renderer shared by app and Live Wallpaper
-- Real wind direction plus bounded gust response for atmospheric motion
-- Cloud/rain/storm/Sun/Moon/stars/fog/snow/haze acceptance on real devices
-- No square/grid cloud artifacts and no future probability presented as current weather
+- Photoreal weather-selected cloud atlas shared by app and Live Wallpaper
+- Far/mid/near cloud depth, overcast coverage and real wind-driven motion
+- Bounded verified-gust response without inventing storm state
+- Depth-aware drizzle/rain with restrained wet-screen response
+- Storm darkness, cloud-local lightning exposure and branched bolts
+- Astronomy-preserving Sun/Moon/stars with smoother twilight transitions
+- Layered fog/haze atmosphere and dedicated depth-aware snow
+- Shared `HeroGlDiagnostics` with resolved evidence, active effects, GL/GPU identity,
+  surface size and renderer quality label for real-device troubleshooting
+- No square/grid cloud artifacts by design and no future probability presented as current weather
 - See PHASE_20A_ACCURATE_LIVE_REALITY.md for checkpoint and acceptance details
+
+Acceptance checkpoint: real-phone comparison of Home Hero vs applied Live Wallpaper across clear, partly cloudy, overcast, rain, storm, night, fog/haze, snow where available and high-gust scenes. Confirm `LiveWeatherGL` diagnostics agree with the displayed current weather.
 
 ## Phase 20B — Radar Pro
 
