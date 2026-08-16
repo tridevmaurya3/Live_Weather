@@ -20,7 +20,7 @@
     <dimen name="radius_large">24dp</dimen>
     <dimen name="stroke_thin">1dp</dimen>
 
-    <dimen name="text_nav">10sp</dimen>
+    <dimen name="text_nav">11sp</dimen>
     <dimen name="text_caption">12sp</dimen>
     <dimen name="text_body">14sp</dimen>
     <dimen name="text_body_large">16sp</dimen>
@@ -29,8 +29,9 @@
     <dimen name="text_display">34sp</dimen>
     <dimen name="text_temperature">64sp</dimen>
 
-    <dimen name="nav_bar_min_height">56dp</dimen>
-    <dimen name="nav_icon_size">20dp</dimen>
+    <dimen name="touch_target_min">48dp</dimen>
+    <dimen name="nav_bar_min_height">58dp</dimen>
+    <dimen name="nav_icon_size">22dp</dimen>
     <dimen name="compact_card_min_height">76dp</dimen>
     <dimen name="metric_card_min_height">82dp</dimen>
 </resources>
