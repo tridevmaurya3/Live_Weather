@@ -16,11 +16,11 @@ import java.nio.ByteOrder;
 import java.nio.FloatBuffer;
 
 /**
- * Photoreal cloud sprite renderer shared by app Hero and Live Wallpaper.
+ * Photoreal cloud-atlas renderer shared by the app Hero and Live Wallpaper.
  *
- * Weather data always controls cloud truth. Performance detail only changes the
- * number of secondary sprite samples; cloud type, cover, darkness and motion are
- * never replaced by a cheaper fake weather state.
+ * Phase 24 keeps weather truth authoritative while improving apparent volume,
+ * seamless horizontal travel and overcast continuity. Performance detail only
+ * controls secondary samples; cloud type/cover/density/darkness remain intact.
  */
 public final class HeroGlTextureCloudRenderer {
 
@@ -50,64 +50,56 @@ public final class HeroGlTextureCloudRenderer {
             "uniform float uWindDir;",
             "uniform float uParallax;",
             "uniform float uDetail;",
-            "",
             "vec4 atlasSample(vec2 uv,float index){",
-            "  float col=mod(index,4.0);",
-            "  float row=floor(index/4.0);",
+            "  float col=mod(index,4.0);float row=floor(index/4.0);",
             "  vec2 atlasUv=(vec2(col,1.0-row)+vec2(uv.x,1.0-uv.y))/vec2(4.0,2.0);",
-            "  vec4 tex=texture2D(uAtlas,atlasUv);",
-            "  vec3 rgb=tex.rgb;",
-            "  float hi=max(rgb.r,max(rgb.g,rgb.b));",
-            "  float alpha=tex.a*smoothstep(0.035,0.18,hi);",
-            "  rgb=max(vec3(0.0),(rgb-vec3(0.025))/0.975);",
+            "  vec4 tex=texture2D(uAtlas,atlasUv);vec3 rgb=tex.rgb;float hi=max(rgb.r,max(rgb.g,rgb.b));",
+            "  float alpha=tex.a*smoothstep(0.028,0.18,hi);rgb=max(vec3(0.0),(rgb-vec3(0.020))/0.980);",
             "  return vec4(rgb,alpha);",
             "}",
-            "vec4 sprite(vec2 p,vec2 center,vec2 size,float cell,float opacity){",
-            "  vec2 q=(p-center)/size+0.5;",
+            "vec4 spriteWrapped(vec2 p,vec2 center,vec2 size,float cell,float opacity){",
+            "  float dx=p.x-center.x;dx-=floor(dx+0.5);",
+            "  vec2 q=vec2(dx/size.x+0.5,(p.y-center.y)/size.y+0.5);",
             "  float inside=step(0.0,q.x)*step(q.x,1.0)*step(0.0,q.y)*step(q.y,1.0);",
             "  vec4 s=atlasSample(clamp(q,0.0,1.0),cell);",
-            "  s.a*=inside*opacity;",
-            "  return s;",
+            "  float feather=smoothstep(0.0,0.075,q.x)*smoothstep(0.0,0.075,1.0-q.x);",
+            "  s.a*=inside*opacity*feather;return s;",
             "}",
             "void over(inout vec3 color,inout float alpha,vec4 s,vec3 tint){",
-            "  float a=clamp(s.a,0.0,0.94);",
-            "  color=mix(color,s.rgb*tint,a);",
-            "  alpha=1.0-(1.0-alpha)*(1.0-a);",
+            "  float a=clamp(s.a,0.0,0.94);color=mix(color,s.rgb*tint,a);alpha=1.0-(1.0-alpha)*(1.0-a);",
             "}",
             "void main(){",
             "  if(uCloud<0.015){gl_FragColor=vec4(0.0);return;}",
-            "  vec2 p=vec2(vUv.x,1.0-vUv.y);",
-            "  float aspect=uResolution.x/max(1.0,uResolution.y);",
-            "  p.x=(p.x-0.5)*aspect+0.5;",
-            "  float detail=clamp(uDetail,0.5,1.0);",
-            "  float gust=smoothstep(0.56,0.94,uWind);",
-            "  float gustPulse=0.5+0.5*sin(uTime*(0.72+uWind*0.82)+uWindDir*1.7);",
-            "  float gustMod=1.0+gust*(0.10+0.12*gustPulse);",
-            "  float speed=0.010*(0.50+uWind*1.65)*gustMod;",
-            "  float projectedWind=sin(uWindDir)+cos(uWindDir)*0.38;",
-            "  float direction=projectedWind<0.0?-1.0:1.0;",
-            "  float cross=sin(uTime*(0.43+uWind*0.31)+uWindDir*2.1)*0.012*gust;",
-            "  float lift=cos(uTime*(0.37+uWind*0.26)+uWindDir)*0.008*gust;",
+            "  vec2 p=vec2(vUv.x,1.0-vUv.y);float aspect=uResolution.x/max(1.0,uResolution.y);p.x=(p.x-0.5)*aspect+0.5;",
+            "  float detail=clamp(uDetail,0.5,1.0);float cover=clamp(uCloud,0.0,1.0);float density=clamp(uDensity,0.0,1.0);",
+            "  float mass=clamp(cover*0.70+density*0.42,0.0,1.0);float gust=smoothstep(0.56,0.94,uWind);",
+            "  float gustPulse=0.5+0.5*sin(uTime*(0.72+uWind*0.82)+uWindDir*1.7);float gustMod=1.0+gust*(0.08+0.11*gustPulse);",
+            "  float speed=0.0095*(0.50+uWind*1.65)*gustMod;float projectedWind=sin(uWindDir)+cos(uWindDir)*0.38;",
+            "  float direction=projectedWind<0.0?-1.0:1.0;float cross=sin(uTime*(0.43+uWind*0.31)+uWindDir*2.1)*0.010*gust;",
+            "  float lift=cos(uTime*(0.37+uWind*0.26)+uWindDir)*0.007*gust;",
             "  float drift=direction*uTime*speed*(0.72+0.28*abs(projectedWind))+(uParallax-0.5)*0.055+cross;",
-            "  float cell=uStorm>0.08?2.0:(uRain>0.06?1.0:(uCloud>0.78?0.0:(uCloud>0.52?7.0:(uCloud>0.25?6.0:5.0))));",
-            "  float farCell=uCloud>0.68?0.0:(uCloud>0.32?7.0:4.0);",
-            "  float shade=mix(1.0,0.48,clamp(uStorm*0.82+uRain*0.25+(1.0-uBrightness)*0.20,0.0,1.0));",
-            "  vec3 tint=vec3(shade*0.96,shade*0.99,shade*1.03);",
+            "  float cell=uStorm>0.08?2.0:(uRain>0.06?1.0:(cover>0.78?0.0:(cover>0.52?7.0:(cover>0.25?6.0:5.0))));",
+            "  float farCell=cover>0.68?0.0:(cover>0.32?7.0:4.0);",
+            "  float weatherShade=clamp(uStorm*0.84+uRain*0.25+(1.0-uBrightness)*0.22+density*0.08,0.0,1.0);",
+            "  float shade=mix(1.0,0.46,weatherShade);vec3 tint=vec3(shade*0.96,shade*0.99,shade*1.035);",
             "  vec3 color=vec3(0.0);float alpha=0.0;",
-            "  float cover=clamp(uCloud,0.0,1.0);",
-            "  over(color,alpha,sprite(p,vec2(fract(0.18+drift*0.46),0.22+lift*0.22),vec2(0.72,0.25),farCell,(0.18+cover*0.26)*smoothstep(0.05,0.30,cover)),tint*1.08);",
-            "  if(detail>0.72){",
-            "    over(color,alpha,sprite(p,vec2(fract(0.72+drift*0.52),0.29-lift*0.18),vec2(0.67,0.24),farCell,(0.16+cover*0.24)*smoothstep(0.12,0.36,cover)),tint*1.04);",
-            "  }",
-            "  over(color,alpha,sprite(p,vec2(fract(0.33+drift*0.82),0.37+lift*0.44),vec2(0.94,0.40),cell,(0.30+cover*0.48)*smoothstep(0.18,0.52,cover)),tint);",
-            "  if(detail>0.64){",
-            "    over(color,alpha,sprite(p,vec2(fract(0.86+drift*0.88),0.43-lift*0.38),vec2(0.88,0.38),cell,(0.28+cover*0.46)*smoothstep(0.30,0.62,cover)),tint*0.94);",
-            "  }",
-            "  over(color,alpha,sprite(p,vec2(fract(0.55+drift*1.18),0.51+lift*0.64),vec2(1.02,0.46),cell,(0.26+cover*0.54)*smoothstep(0.45,0.76,cover)),tint*0.88);",
-            "  float overcast=smoothstep(0.76,0.94,cover);",
-            "  float sheet=(0.22+0.12*sin(p.x*10.0+uTime*0.026*(1.0+gust*0.34))+0.06*sin(p.x*23.0-uTime*0.017*(1.0+gust*0.46)))*overcast;",
-            "  color=mix(color,vec3(0.43,0.48,0.54)*shade,clamp(sheet,0.0,0.34));",
-            "  alpha=1.0-(1.0-alpha)*(1.0-clamp(sheet,0.0,0.34));",
+            "  float farOpacity=(0.15+mass*0.30)*smoothstep(0.04,0.28,cover);",
+            "  float midOpacity=(0.25+mass*0.52)*smoothstep(0.16,0.50,cover);",
+            "  float nearOpacity=(0.22+mass*0.58)*smoothstep(0.40,0.74,cover);",
+            "  over(color,alpha,spriteWrapped(p,vec2(fract(0.18+drift*0.43),0.215+lift*0.20),vec2(0.72,0.25),farCell,farOpacity),tint*1.09);",
+            "  if(detail>0.70){over(color,alpha,spriteWrapped(p,vec2(fract(0.70+drift*0.51),0.285-lift*0.17),vec2(0.66,0.235),farCell,farOpacity*0.86),tint*1.05);}",
+            "  over(color,alpha,spriteWrapped(p,vec2(fract(0.32+drift*0.79),0.365+lift*0.42),vec2(0.94,0.39),cell,midOpacity),tint);",
+            "  if(detail>0.62){over(color,alpha,spriteWrapped(p,vec2(fract(0.84+drift*0.87),0.425-lift*0.36),vec2(0.87,0.37),cell,midOpacity*0.86),tint*0.95);}",
+            "  over(color,alpha,spriteWrapped(p,vec2(fract(0.54+drift*1.15),0.505+lift*0.60),vec2(1.02,0.455),cell,nearOpacity),tint*0.88);",
+            "  if(detail>0.86&&mass>0.52){over(color,alpha,spriteWrapped(p,vec2(fract(0.04+drift*1.05),0.455-lift*0.28),vec2(0.78,0.33),cell,nearOpacity*0.48),tint*0.91);}",
+            "  float overcast=smoothstep(0.70,0.94,mass);float xWave=0.5+0.5*sin(p.x*8.4+uTime*0.020*(1.0+gust*0.30));",
+            "  float xWave2=0.5+0.5*sin(p.x*18.0-uTime*0.014*(1.0+gust*0.42)+1.8);",
+            "  float ceiling=1.0-smoothstep(0.50+0.08*(1.0-mass),0.82,p.y);",
+            "  float sheet=(0.17+0.085*xWave+0.055*xWave2)*overcast*ceiling;",
+            "  vec3 sheetTint=mix(vec3(0.51,0.55,0.60),vec3(0.34,0.39,0.46),clamp(uStorm*0.78+uRain*0.20,0.0,1.0))*shade;",
+            "  color=mix(color,sheetTint,clamp(sheet,0.0,0.31));alpha=1.0-(1.0-alpha)*(1.0-clamp(sheet,0.0,0.31));",
+            "  float underside=smoothstep(0.42,0.72,p.y)*(1.0-smoothstep(0.78,0.96,p.y))*overcast*(0.020+weatherShade*0.050);",
+            "  color=mix(color,vec3(0.19,0.23,0.29),underside);alpha=1.0-(1.0-alpha)*(1.0-underside*0.55);",
             "  gl_FragColor=vec4(clamp(color,0.0,1.0),clamp(alpha,0.0,0.94));",
             "}");
 
@@ -127,21 +119,17 @@ public final class HeroGlTextureCloudRenderer {
     public void setDetailScale(float value){detailScale=clamp(value,0.5f,1f);}
 
     public void onSurfaceCreated(){
-        program=createProgram(VS,FS);
-        texture=loadTexture();
-        aPosition=GLES20.glGetAttribLocation(program,"aPosition");
+        program=createProgram(VS,FS);texture=loadTexture();aPosition=GLES20.glGetAttribLocation(program,"aPosition");
         uAtlas=u("uAtlas");uResolution=u("uResolution");uTime=u("uTime");uCloud=u("uCloud");uDensity=u("uDensity");
         uRain=u("uRain");uStorm=u("uStorm");uBrightness=u("uBrightness");uWind=u("uWind");uWindDir=u("uWindDir");
-        uParallax=u("uParallax");uDetail=u("uDetail");
-        startNanos=System.nanoTime();
+        uParallax=u("uParallax");uDetail=u("uDetail");startNanos=System.nanoTime();
         GLES20.glDisable(GLES20.GL_DEPTH_TEST);GLES20.glDisable(GLES20.GL_CULL_FACE);
     }
 
     public void onSurfaceChanged(int w,int h){width=Math.max(1,w);height=Math.max(1,h);GLES20.glViewport(0,0,width,height);}
 
     public void drawFrame(){
-        GlSceneSnapshot s=snapshot;
-        if(program==0||texture==0||s==null||s.cloudCover<0.015f)return;
+        GlSceneSnapshot s=snapshot;if(program==0||texture==0||s==null||s.cloudCover<0.015f)return;
         GLES20.glEnable(GLES20.GL_BLEND);GLES20.glBlendFunc(GLES20.GL_SRC_ALPHA,GLES20.GL_ONE_MINUS_SRC_ALPHA);
         GLES20.glUseProgram(program);GLES20.glActiveTexture(GLES20.GL_TEXTURE0);GLES20.glBindTexture(GLES20.GL_TEXTURE_2D,texture);
         GLES20.glUniform1i(uAtlas,0);GLES20.glUniform2f(uResolution,width,height);
