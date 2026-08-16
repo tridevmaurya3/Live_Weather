@@ -13,6 +13,9 @@ val generatedRadarLeafletAssets = layout.buildDirectory.dir("generated/radarLeaf
 val prepareRadarLeafletRuntime by tasks.registering(Copy::class) {
     val webJarPrefix = "META-INF/resources/webjars/leaflet/1.9.4/dist/"
 
+    inputs.files(radarLeafletRuntime)
+    outputs.dir(generatedRadarLeafletAssets)
+
     from({ radarLeafletRuntime.files.map { zipTree(it) } }) {
         include("${webJarPrefix}**")
         eachFile {
@@ -106,7 +109,7 @@ dependencies {
     // Radar Pro 20B.8: resolved only at build time. The task above extracts
     // Leaflet's distributable JS/CSS/images into generated APK assets, so the
     // Radar map engine itself has no runtime CDN dependency.
-    radarLeafletRuntime("org.webjars.npm:leaflet:1.9.4")
+    add(radarLeafletRuntime.name, "org.webjars.npm:leaflet:1.9.4")
 
     testImplementation(libs.junit)
     androidTestImplementation(libs.espresso.core)
