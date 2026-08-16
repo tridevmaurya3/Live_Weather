@@ -19,8 +19,9 @@ import java.nio.FloatBuffer;
  * Phase 20A photoreal cloud sprite renderer.
  *
  * Weather data chooses the atlas cell and controls coverage, depth, darkness,
- * wind direction and speed. Three continuously wrapping layers give parallax
- * without regenerating cloud geometry on the GPU.
+ * wind direction and speed. Three continuously wrapping layers give parallax.
+ * Verified high-gust wind adds bounded speed pulses and small cross-flow motion
+ * without changing cloud type or inventing storm conditions.
  */
 public final class HeroGlTextureCloudRenderer {
 
@@ -77,11 +78,15 @@ public final class HeroGlTextureCloudRenderer {
             "  vec2 p=vec2(vUv.x,1.0-vUv.y);",
             "  float aspect=uResolution.x/max(1.0,uResolution.y);",
             "  p.x=(p.x-0.5)*aspect+0.5;",
-            "  vec2 wind=vec2(sin(uWindDir),-cos(uWindDir));",
-            "  float speed=0.010*(0.50+uWind*1.65);",
+            "  float gust=smoothstep(0.56,0.94,uWind);",
+            "  float gustPulse=0.5+0.5*sin(uTime*(0.72+uWind*0.82)+uWindDir*1.7);",
+            "  float gustMod=1.0+gust*(0.10+0.12*gustPulse);",
+            "  float speed=0.010*(0.50+uWind*1.65)*gustMod;",
             "  float projectedWind=sin(uWindDir)+cos(uWindDir)*0.38;",
             "  float direction=projectedWind<0.0?-1.0:1.0;",
-            "  float drift=direction*uTime*speed*(0.72+0.28*abs(projectedWind))+(uParallax-0.5)*0.055;",
+            "  float cross=sin(uTime*(0.43+uWind*0.31)+uWindDir*2.1)*0.012*gust;",
+            "  float lift=cos(uTime*(0.37+uWind*0.26)+uWindDir)*0.008*gust;",
+            "  float drift=direction*uTime*speed*(0.72+0.28*abs(projectedWind))+(uParallax-0.5)*0.055+cross;",
             "  // Android bitmap upload flips the generated atlas rows in GL space.",
             "  // Indices below deliberately map visual bottom row to logical weather types.",
             "  float cell=uStorm>0.08?2.0:(uRain>0.06?1.0:(uCloud>0.78?0.0:(uCloud>0.52?7.0:(uCloud>0.25?6.0:5.0))));",
@@ -90,13 +95,13 @@ public final class HeroGlTextureCloudRenderer {
             "  vec3 tint=vec3(shade*0.96,shade*0.99,shade*1.03);",
             "  vec3 color=vec3(0.0);float alpha=0.0;",
             "  float cover=clamp(uCloud,0.0,1.0);",
-            "  over(color,alpha,sprite(p,vec2(fract(0.18+drift*0.46),0.22),vec2(0.72,0.25),farCell,(0.18+cover*0.26)*smoothstep(0.05,0.30,cover)),tint*1.08);",
-            "  over(color,alpha,sprite(p,vec2(fract(0.72+drift*0.52),0.29),vec2(0.67,0.24),farCell,(0.16+cover*0.24)*smoothstep(0.12,0.36,cover)),tint*1.04);",
-            "  over(color,alpha,sprite(p,vec2(fract(0.33+drift*0.82),0.37),vec2(0.94,0.40),cell,(0.30+cover*0.48)*smoothstep(0.18,0.52,cover)),tint);",
-            "  over(color,alpha,sprite(p,vec2(fract(0.86+drift*0.88),0.43),vec2(0.88,0.38),cell,(0.28+cover*0.46)*smoothstep(0.30,0.62,cover)),tint*0.94);",
-            "  over(color,alpha,sprite(p,vec2(fract(0.55+drift*1.18),0.51),vec2(1.02,0.46),cell,(0.26+cover*0.54)*smoothstep(0.45,0.76,cover)),tint*0.88);",
+            "  over(color,alpha,sprite(p,vec2(fract(0.18+drift*0.46),0.22+lift*0.22),vec2(0.72,0.25),farCell,(0.18+cover*0.26)*smoothstep(0.05,0.30,cover)),tint*1.08);",
+            "  over(color,alpha,sprite(p,vec2(fract(0.72+drift*0.52),0.29-lift*0.18),vec2(0.67,0.24),farCell,(0.16+cover*0.24)*smoothstep(0.12,0.36,cover)),tint*1.04);",
+            "  over(color,alpha,sprite(p,vec2(fract(0.33+drift*0.82),0.37+lift*0.44),vec2(0.94,0.40),cell,(0.30+cover*0.48)*smoothstep(0.18,0.52,cover)),tint);",
+            "  over(color,alpha,sprite(p,vec2(fract(0.86+drift*0.88),0.43-lift*0.38),vec2(0.88,0.38),cell,(0.28+cover*0.46)*smoothstep(0.30,0.62,cover)),tint*0.94);",
+            "  over(color,alpha,sprite(p,vec2(fract(0.55+drift*1.18),0.51+lift*0.64),vec2(1.02,0.46),cell,(0.26+cover*0.54)*smoothstep(0.45,0.76,cover)),tint*0.88);",
             "  float overcast=smoothstep(0.76,0.94,cover);",
-            "  float sheet=(0.22+0.12*sin(p.x*10.0+uTime*0.026)+0.06*sin(p.x*23.0-uTime*0.017))*overcast;",
+            "  float sheet=(0.22+0.12*sin(p.x*10.0+uTime*0.026*(1.0+gust*0.34))+0.06*sin(p.x*23.0-uTime*0.017*(1.0+gust*0.46)))*overcast;",
             "  color=mix(color,vec3(0.43,0.48,0.54)*shade,clamp(sheet,0.0,0.34));",
             "  alpha=1.0-(1.0-alpha)*(1.0-clamp(sheet,0.0,0.34));",
             "  gl_FragColor=vec4(clamp(color,0.0,1.0),clamp(alpha,0.0,0.94));",
