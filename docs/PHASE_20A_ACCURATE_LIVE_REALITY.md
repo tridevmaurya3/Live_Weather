@@ -1,6 +1,6 @@
 # Phase 20A — Accurate Live Weather Reality Foundation
 
-Status: IMPLEMENTATION STARTED — real-device visual verification required.
+Status: SOURCE IMPLEMENTATION COMPLETE — real-device visual verification required.
 
 ## Product priority
 
@@ -31,23 +31,6 @@ Live Wallpaper. The project is not Final or Production Ready.
 - Softened field thresholds and corrected edge-light calculation to remove the
   polygon/stone-like islands visible in the first device screenshot.
 
-## Acceptance required
-
-Test on a real phone in clear, partly cloudy, overcast, rain, storm and night
-conditions. Compare Home preview and applied Live Wallpaper at the same time and
-city. Confirm clouds have soft natural masses, no rectangular tiles, continuous
-motion and no abrupt celestial disappearance. Source implementation alone is
-not visual acceptance.
-
-## Remaining Phase 20A work
-
-- Tune rain depth, droplets and wet-screen response from real-device recordings.
-- Tune storm darkness, lightning exposure and bolt scale.
-- Verify Moon/Sun/stars across cloud cover and twilight boundaries.
-- Verify dust/haze/fog/snow and high-gust scenes.
-- Add device diagnostics for active weather evidence and renderer quality mode.
-
-
 ## Checkpoint 20A.3 — real animated cloud asset engine
 
 - Retired the analytic cloud-shape renderer from the active pipeline.
@@ -60,7 +43,6 @@ not visual acceptance.
 - Day/night brightness and storm intensity tint the same physical cloud assets.
 - Atlas background is removed in the shader before alpha blending.
 
-
 ## Checkpoint 20A.4 — recording-driven atlas correction
 
 - Corrected the vertically inverted Android/OpenGL atlas row mapping.
@@ -70,3 +52,82 @@ not visual acceptance.
 - Added minimum direction-preserving lateral drift so north/south winds do not
   appear completely static in the 2D scene.
 - Increased visible motion while retaining wind/gust control.
+
+## Checkpoint 20A.5 — rain depth and wet-screen response
+
+- Replaced the active flat rain pass with a depth-aware shared rain renderer.
+- Added separate far, middle and near rain bands with independent apparent size,
+  fall speed and wind lean.
+- Kept drizzle visually finer than confirmed rain.
+- Added bounded heavy-rain mist and wet-lens detail only when current rain
+  evidence is strong enough.
+
+## Checkpoint 20A.6 — storm and lightning realism
+
+- Increased storm darkness according to current storm/cloud/rain evidence.
+- Restricted lightning exposure mainly to the active storm cloud field instead
+  of flashing the whole screen uniformly.
+- Lengthened the main bolt, added deterministic optional forks and tuned glow.
+- Kept electrical effects controlled by the existing Lightning option.
+
+## Checkpoint 20A.7 — celestial and twilight visibility
+
+- Removed duplicate whole-screen weather attenuation from the fixed-star pass.
+- Shared sky-reality visibility remains authoritative; cloud textures rendered
+  afterwards perform actual local star occlusion.
+- Smoothed Sun and Moon twilight visibility and halo behavior without changing
+  astronomical positions or lunar phase geometry.
+
+## Checkpoint 20A.8 — fog, haze and snow
+
+- Separated fog and haze atmosphere behavior instead of using one flat grey veil.
+- Added low rolling fog bands and broader horizon haze behavior.
+- Added a dedicated depth-aware snow renderer with far/mid/near flakes, wind
+  drift and restrained heavy-snow depth mist.
+- Snow remains tied only to resolved current snow evidence and the Snow option.
+
+## Checkpoint 20A.9 — high-gust response
+
+- Preserved sustained wind as the base motion source.
+- Increased bounded motion response to verified current gust excess/ratio.
+- High-gust cloud motion now gains subtle speed modulation, cross-flow and lift.
+- Rain and snow inherit the same shared normalized wind-strength response.
+- Gust evidence cannot invent rain or storm state.
+
+## Checkpoint 20A.10 — renderer diagnostics
+
+- Added a shared read-only HeroGlDiagnostics surface used by the same pipeline as
+  the in-app Hero and Android Live Wallpaper.
+- Diagnostics expose current resolved weather evidence, active visual effects,
+  cloud/rain/drizzle/snow/fog/storm/haze intensities, wind strength/direction,
+  visibility, scene light and star visibility.
+- Captures OpenGL vendor, renderer, version and active surface resolution to help
+  explain emulator/Adreno/Mali device-only differences.
+- Exposes the active renderer quality label (`FULL_SHARED_GL`) and visual option
+  states without changing weather truth or rendering behavior.
+- Writes a concise `LiveWeatherGL` Logcat report when the GL surface or resolved
+  weather snapshot changes.
+- Forecast probability is not converted into current precipitation evidence by
+  this diagnostic layer.
+
+## Acceptance required
+
+Source implementation is complete, but Phase 20A is not accepted until it is
+verified on a real phone.
+
+Test clear, partly cloudy, overcast, rain, storm, night, fog/haze, snow where
+available and a high-gust scene. Compare Home preview and applied Live Wallpaper
+at the same time and city.
+
+Confirm:
+- clouds have soft natural masses and no rectangular tiles;
+- cloud motion is continuous and wind-responsive;
+- drizzle/rain/snow have believable depth;
+- heavy rain wet-screen behavior is restrained and continuous;
+- storm darkness and lightning are natural rather than full-screen white flashes;
+- Sun, Moon and stars transition smoothly and are locally occluded by clouds;
+- fog/haze do not look like a flat opaque rectangle;
+- Home Hero and applied Live Wallpaper remain visually consistent;
+- `LiveWeatherGL` diagnostics match the weather actually being displayed.
+
+Source implementation alone is not visual acceptance.
