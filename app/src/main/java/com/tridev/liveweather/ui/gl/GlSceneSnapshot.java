@@ -1,52 +1,58 @@
 package com.tridev.liveweather.ui.gl;
 
+import androidx.annotation.NonNull;
+
 /**
- * Immutable GPU-facing snapshot. All values are normalized before they cross
- * into the OpenGL renderer so the render loop never needs network/location work.
+ * GPU-facing normalized scene values.
+ *
+ * Snapshots produced by GlRealityAdapter are treated as immutable weather truth.
+ * The shared GL pipeline may also create private reusable copies whose primitive
+ * fields are updated in-place for temporal smoothing. This avoids allocating a
+ * new Java snapshot on every animation frame.
  */
 public final class GlSceneSnapshot {
 
-    public final float topR;
-    public final float topG;
-    public final float topB;
-    public final float midR;
-    public final float midG;
-    public final float midB;
-    public final float horizonR;
-    public final float horizonG;
-    public final float horizonB;
+    public float topR;
+    public float topG;
+    public float topB;
+    public float midR;
+    public float midG;
+    public float midB;
+    public float horizonR;
+    public float horizonG;
+    public float horizonB;
 
-    public final float sunX;
-    public final float sunY;
-    public final float sunVisibility;
-    public final float sunAltitude;
+    public float sunX;
+    public float sunY;
+    public float sunVisibility;
+    public float sunAltitude;
 
-    public final float moonX;
-    public final float moonY;
-    public final float moonVisibility;
-    public final float moonIllumination;
-    public final float moonPhaseAngleRadians;
-    public final float moonAltitude;
+    public float moonX;
+    public float moonY;
+    public float moonVisibility;
+    public float moonIllumination;
+    public float moonPhaseAngleRadians;
+    public float moonAltitude;
 
-    public final float starVisibility;
-    public final float cloudCover;
-    public final float cloudDensity;
-    public final float cloudFarLayer;
-    public final float cloudMidLayer;
-    public final float cloudNearLayer;
-    public final float cloudStormCeiling;
-    public final float cloudBrightness;
-    public final float rainIntensity;
-    public final float drizzleIntensity;
-    public final float snowIntensity;
-    public final float fogIntensity;
-    public final float stormIntensity;
-    public final float airHazeIntensity;
-    public final float windStrength;
-    public final float windDirectionRadians;
-    public final float sceneLight;
-    public final float visibilityFactor;
-    public final float parallax;
+    public float starVisibility;
+    public float cloudCover;
+    public float cloudDensity;
+    public float cloudFarLayer;
+    public float cloudMidLayer;
+    public float cloudNearLayer;
+    public float cloudStormCeiling;
+    public float cloudBrightness;
+    public float rainIntensity;
+    public float drizzleIntensity;
+    public float snowIntensity;
+    public float fogIntensity;
+    public float stormIntensity;
+    public float airHazeIntensity;
+    public float windStrength;
+    public float windDirectionRadians;
+    public float sceneLight;
+    public float visibilityFactor;
+    public float parallax;
 
     public GlSceneSnapshot(
             float topR,
@@ -128,6 +134,124 @@ public final class GlSceneSnapshot {
         this.parallax = parallax;
     }
 
+    /** Creates one reusable internal copy; never call this from the per-frame hot path. */
+    @NonNull
+    static GlSceneSnapshot reusableCopyOf(@NonNull GlSceneSnapshot source) {
+        return new GlSceneSnapshot(
+                source.topR, source.topG, source.topB,
+                source.midR, source.midG, source.midB,
+                source.horizonR, source.horizonG, source.horizonB,
+                source.sunX, source.sunY, source.sunVisibility, source.sunAltitude,
+                source.moonX, source.moonY, source.moonVisibility, source.moonIllumination,
+                source.moonPhaseAngleRadians, source.moonAltitude,
+                source.starVisibility,
+                source.cloudCover,
+                source.cloudDensity,
+                source.cloudFarLayer,
+                source.cloudMidLayer,
+                source.cloudNearLayer,
+                source.cloudStormCeiling,
+                source.cloudBrightness,
+                source.rainIntensity,
+                source.drizzleIntensity,
+                source.snowIntensity,
+                source.fogIntensity,
+                source.stormIntensity,
+                source.airHazeIntensity,
+                source.windStrength,
+                source.windDirectionRadians,
+                source.sceneLight,
+                source.visibilityFactor,
+                source.parallax
+        );
+    }
+
+    void copyFrom(@NonNull GlSceneSnapshot source) {
+        topR = source.topR;
+        topG = source.topG;
+        topB = source.topB;
+        midR = source.midR;
+        midG = source.midG;
+        midB = source.midB;
+        horizonR = source.horizonR;
+        horizonG = source.horizonG;
+        horizonB = source.horizonB;
+        sunX = source.sunX;
+        sunY = source.sunY;
+        sunVisibility = source.sunVisibility;
+        sunAltitude = source.sunAltitude;
+        moonX = source.moonX;
+        moonY = source.moonY;
+        moonVisibility = source.moonVisibility;
+        moonIllumination = source.moonIllumination;
+        moonPhaseAngleRadians = source.moonPhaseAngleRadians;
+        moonAltitude = source.moonAltitude;
+        starVisibility = source.starVisibility;
+        cloudCover = source.cloudCover;
+        cloudDensity = source.cloudDensity;
+        cloudFarLayer = source.cloudFarLayer;
+        cloudMidLayer = source.cloudMidLayer;
+        cloudNearLayer = source.cloudNearLayer;
+        cloudStormCeiling = source.cloudStormCeiling;
+        cloudBrightness = source.cloudBrightness;
+        rainIntensity = source.rainIntensity;
+        drizzleIntensity = source.drizzleIntensity;
+        snowIntensity = source.snowIntensity;
+        fogIntensity = source.fogIntensity;
+        stormIntensity = source.stormIntensity;
+        airHazeIntensity = source.airHazeIntensity;
+        windStrength = source.windStrength;
+        windDirectionRadians = source.windDirectionRadians;
+        sceneLight = source.sceneLight;
+        visibilityFactor = source.visibilityFactor;
+        parallax = source.parallax;
+    }
+
+    /**
+     * Reuses this object as a renderer-specific view of the shared smoothed scene.
+     * The behavior matches withVisualOptions(), but without allocating a new object.
+     */
+    void copyVisualOptionsFrom(
+            @NonNull GlSceneSnapshot source,
+            boolean clouds,
+            boolean rain,
+            boolean lightning,
+            boolean snow,
+            boolean fog,
+            boolean stars
+    ) {
+        copyFrom(source);
+
+        if (!clouds) {
+            cloudCover = 0f;
+            cloudDensity = 0f;
+            cloudFarLayer = 0f;
+            cloudMidLayer = 0f;
+            cloudNearLayer = 0f;
+            cloudStormCeiling = 0f;
+        }
+        if (!rain) {
+            rainIntensity = 0f;
+            drizzleIntensity = 0f;
+        }
+        if (!lightning) {
+            stormIntensity = 0f;
+        }
+        if (!snow) {
+            snowIntensity = 0f;
+        }
+        if (!fog) {
+            fogIntensity = 0f;
+        }
+        if (!stars) {
+            starVisibility = 0f;
+        }
+    }
+
+    /**
+     * Compatibility helper for non-hot-path callers. The active shared pipeline
+     * uses reusable copies instead so animation does not allocate every frame.
+     */
     public GlSceneSnapshot withVisualOptions(
             boolean clouds,
             boolean rain,
@@ -136,39 +260,8 @@ public final class GlSceneSnapshot {
             boolean fog,
             boolean stars
     ) {
-        float cloudAmount = clouds ? cloudCover : 0f;
-        float cloudLayerDensity = clouds ? cloudDensity : 0f;
-        float far = clouds ? cloudFarLayer : 0f;
-        float mid = clouds ? cloudMidLayer : 0f;
-        float near = clouds ? cloudNearLayer : 0f;
-        float ceiling = clouds ? cloudStormCeiling : 0f;
-
-        return new GlSceneSnapshot(
-                topR, topG, topB,
-                midR, midG, midB,
-                horizonR, horizonG, horizonB,
-                sunX, sunY, sunVisibility, sunAltitude,
-                moonX, moonY, moonVisibility, moonIllumination,
-                moonPhaseAngleRadians, moonAltitude,
-                stars ? starVisibility : 0f,
-                cloudAmount,
-                cloudLayerDensity,
-                far,
-                mid,
-                near,
-                ceiling,
-                cloudBrightness,
-                rain ? rainIntensity : 0f,
-                rain ? drizzleIntensity : 0f,
-                snow ? snowIntensity : 0f,
-                fog ? fogIntensity : 0f,
-                lightning ? stormIntensity : 0f,
-                airHazeIntensity,
-                windStrength,
-                windDirectionRadians,
-                sceneLight,
-                visibilityFactor,
-                parallax
-        );
+        GlSceneSnapshot copy = reusableCopyOf(this);
+        copy.copyVisualOptionsFrom(this, clouds, rain, lightning, snow, fog, stars);
+        return copy;
     }
 }
