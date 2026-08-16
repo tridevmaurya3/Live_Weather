@@ -19,7 +19,7 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_marginTop="@dimen/space_4"
-        android:text="Observed precipitation radar + current cloud, wind and temperature field" />
+        android:text="Observed precipitation radar + current model cloud, wind and temperature field" />
 
     <LinearLayout
         android:layout_width="match_parent"
@@ -102,6 +102,41 @@
             android:textColor="@color/weather_text_primary"
             android:textSize="@dimen/text_body"
             android:textStyle="bold" />
+
+        <LinearLayout
+            android:id="@+id/radarLegendCard"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="bottom|start"
+            android:layout_margin="@dimen/space_10"
+            android:background="@drawable/bg_weather_glass_panel"
+            android:maxWidth="320dp"
+            android:orientation="vertical"
+            android:paddingStart="@dimen/space_10"
+            android:paddingTop="@dimen/space_8"
+            android:paddingEnd="@dimen/space_10"
+            android:paddingBottom="@dimen/space_8">
+
+            <TextView
+                android:id="@+id/radarLegendTitle"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:letterSpacing="0.08"
+                android:text="OBSERVED RAIN RADAR"
+                android:textColor="@color/weather_aqua"
+                android:textSize="@dimen/text_caption"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/radarLegendBody"
+                style="@style/TextAppearance.LiveWeather.Caption"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="2dp"
+                android:maxLines="2"
+                android:text="Light → Moderate → Heavy → Intense echoes"
+                android:textColor="@color/weather_text_primary" />
+        </LinearLayout>
     </FrameLayout>
 
     <HorizontalScrollView
@@ -122,10 +157,10 @@
                 android:layout_height="40dp"
                 android:background="@drawable/bg_weather_chip"
                 android:gravity="center"
-                android:minWidth="86dp"
+                android:minWidth="94dp"
                 android:paddingStart="@dimen/space_12"
                 android:paddingEnd="@dimen/space_12"
-                android:text="Radar Rain"
+                android:text="Rain Radar"
                 android:textColor="@color/weather_text_primary"
                 android:textSize="@dimen/text_body"
                 android:textStyle="bold" />
@@ -137,10 +172,10 @@
                 android:layout_marginStart="@dimen/space_8"
                 android:background="@drawable/bg_weather_chip"
                 android:gravity="center"
-                android:minWidth="76dp"
+                android:minWidth="108dp"
                 android:paddingStart="@dimen/space_12"
                 android:paddingEnd="@dimen/space_12"
-                android:text="Clouds"
+                android:text="Model Clouds"
                 android:textColor="@color/weather_text_primary"
                 android:textSize="@dimen/text_body" />
 
@@ -237,7 +272,7 @@
         android:background="@drawable/bg_weather_card_compact"
         android:gravity="center_horizontal"
         android:padding="@dimen/space_8"
-        android:text="RainViewer radar • Open-Meteo model overlays • OpenStreetMap base"
+        android:text="RainViewer observed radar • Open-Meteo model overlays • OpenStreetMap base"
         android:textAlignment="center"
         android:textColor="@color/weather_text_primary" />
 
