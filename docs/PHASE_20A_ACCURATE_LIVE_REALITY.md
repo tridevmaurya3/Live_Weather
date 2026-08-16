@@ -229,6 +229,28 @@ real-device GPU validation are still required before Phase 20A visual acceptance
 - No Activity/Fragment refresh, network request, cache reload or reality recomposition
   was added to drive the transition animation.
 
+## Checkpoint 20A.15 — adaptive frame-time stability guard
+
+- Added allocation-free `AdaptiveFrameTimeGuard` instances separately to the App Hero
+  and Android Live Wallpaper render threads.
+- The guard samples only successful GL draw + `eglSwapBuffers` cost, not weather/network
+  refresh work, so occasional reality recomposition does not cause unnecessary downgrade.
+- A 12-frame EWMA window and hysteresis require sustained pressure before detail steps
+  down; one or two slow driver frames do not immediately reduce visual quality.
+- Secondary detail reduces in small bounded steps and never below the existing mobile
+  safety floor; current cloud/rain/snow/storm truth and primary visual layers stay intact.
+- Detail restoration is deliberately slower than reduction, preventing quality from
+  oscillating rapidly when a device sits near its frame budget.
+- Performance-profile changes reset only the timing baseline; repeated unchanged profile
+  checks preserve the adaptive history.
+- Surface recreation, visibility stops and EGL recovery clear stale frame measurements
+  without changing the selected AUTO / SMOOTH / BATTERY profile.
+- Frame scheduling now subtracts actual loop work from the target frame interval instead
+  of always waiting a full interval after rendering. This removes the old render-time-plus-
+  delay penalty and makes the configured cadence materially more accurate and fluid.
+- Adaptation changes only primitive performance detail state in the existing pipeline;
+  it does not rebuild shaders/textures, refresh Activities/Fragments or trigger network I/O.
+
 ## Acceptance required
 
 Source implementation is complete, but Phase 20A is not accepted until it is
@@ -257,6 +279,9 @@ Confirm:
 - a live weather update changes clouds/precipitation/light/wind continuously without
   an obvious whole-scene jump or page-refresh appearance;
 - precipitation onset remains responsive enough to confirmed current rain/storm/snow
-  while cloud/fog/haze transitions stay atmospheric and smooth.
+  while cloud/fog/haze transitions stay atmospheric and smooth;
+- sustained GPU pressure reduces only secondary detail and recovers gradually without
+  visible quality flicker or changes to the actual weather being shown;
+- configured frame cadence no longer includes an unnecessary full post-render delay.
 
 Source implementation alone is not visual acceptance.
