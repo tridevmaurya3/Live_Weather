@@ -60,10 +60,7 @@ public final class AlertPreferences {
     }
 
     public void setSmartRiskEnabled(boolean enabled) {
-        preferences.edit().putBoolean(KEY_SMART_RISK_ENABLED, true).apply();
-        if (!enabled) {
-            preferences.edit().putBoolean(KEY_SMART_RISK_ENABLED, false).apply();
-        }
+        preferences.edit().putBoolean(KEY_SMART_RISK_ENABLED, enabled).apply();
     }
 
     /** Per-source notification toggles are additional gates, not replacements for the master switch. */
