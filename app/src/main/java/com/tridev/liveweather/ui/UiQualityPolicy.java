@@ -90,11 +90,17 @@ public final class UiQualityPolicy {
         else if (widthDp >= 600) horizontalPaddingDp = 32;
         else horizontalPaddingDp = 16;
 
-        applyPageHorizontalPadding(activity.findViewById(R.id.pageHome), horizontalPaddingDp);
-        applyPageHorizontalPadding(activity.findViewById(R.id.pageForecast), horizontalPaddingDp);
-        applyPageHorizontalPadding(activity.findViewById(R.id.pageWallpaper), horizontalPaddingDp);
-        applyPageHorizontalPadding(activity.findViewById(R.id.pageMore), horizontalPaddingDp);
-        applyPageHorizontalPadding(activity.findViewById(R.id.pageRadar), horizontalPaddingDp);
+        View homePage = activity.findViewById(R.id.pageHome);
+        View forecastPage = activity.findViewById(R.id.pageForecast);
+        View radarPage = activity.findViewById(R.id.pageRadar);
+        View wallpaperPage = activity.findViewById(R.id.pageWallpaper);
+        View morePage = activity.findViewById(R.id.pageMore);
+
+        applyPageHorizontalPadding(homePage, horizontalPaddingDp);
+        applyPageHorizontalPadding(forecastPage, horizontalPaddingDp);
+        applyPageHorizontalPadding(wallpaperPage, horizontalPaddingDp);
+        applyPageHorizontalPadding(morePage, horizontalPaddingDp);
+        applyPageHorizontalPadding(radarPage, horizontalPaddingDp);
 
         View radarMap = activity.findViewById(R.id.radarMapHost);
         if (radarMap != null) {
@@ -117,8 +123,10 @@ public final class UiQualityPolicy {
         }
 
         if (compactLargeText) {
+            stackWeightedRows(homePage);
+            stackWeightedRows(forecastPage);
+            stackWeightedRows(morePage);
             stackParent(activity.findViewById(R.id.homeFeelsLike));
-            stackParent(activity.findViewById(R.id.homeRadarAction));
             stackParent(activity.findViewById(R.id.citySearchInput));
             stackGrandparent(activity.findViewById(R.id.radarLocationValue));
         }
@@ -138,6 +146,31 @@ public final class UiQualityPolicy {
                 horizontal,
                 target.getPaddingBottom()
         );
+    }
+
+    private static void stackWeightedRows(View root) {
+        if (!(root instanceof ViewGroup)) return;
+        ViewGroup group = (ViewGroup) root;
+        for (int index = 0; index < group.getChildCount(); index++) {
+            View child = group.getChildAt(index);
+            if (child instanceof LinearLayout) {
+                LinearLayout row = (LinearLayout) child;
+                if (row.getOrientation() == LinearLayout.HORIZONTAL && allChildrenWeighted(row)) {
+                    stackLinearLayout(row);
+                }
+            }
+            stackWeightedRows(child);
+        }
+    }
+
+    private static boolean allChildrenWeighted(@NonNull LinearLayout row) {
+        if (row.getChildCount() < 2) return false;
+        for (int index = 0; index < row.getChildCount(); index++) {
+            ViewGroup.LayoutParams raw = row.getChildAt(index).getLayoutParams();
+            if (!(raw instanceof LinearLayout.LayoutParams)) return false;
+            if (((LinearLayout.LayoutParams) raw).weight <= 0f) return false;
+        }
+        return true;
     }
 
     private static void stackParent(View child) {
@@ -269,6 +302,7 @@ public final class UiQualityPolicy {
             color = R.color.weather_text_secondary;
         }
         view.setTextColor(ContextCompat.getColor(activity, color));
+        ViewCompat.setAccessibilityLiveRegion(view, ViewCompat.ACCESSIBILITY_LIVE_REGION_POLITE);
 
         StringBuilder description = new StringBuilder(prefix);
         if (!TextUtils.isEmpty(text)) description.append(' ').append(text);
@@ -313,6 +347,47 @@ public final class UiQualityPolicy {
             CharSequence label = textView.getText();
             if (TextUtils.isEmpty(label)) label = textView.getHint();
             if (!TextUtils.isEmpty(label)) view.setContentDescription(label);
+            return;
+        }
+        if (view instanceof ViewGroup) {
+            String summary = collectText((ViewGroup) view, 3, 180);
+            if (!TextUtils.isEmpty(summary)) view.setContentDescription(summary);
+        }
+    }
+
+    @NonNull
+    private static String collectText(@NonNull ViewGroup group, int maxParts, int maxCharacters) {
+        StringBuilder builder = new StringBuilder();
+        appendText(group, builder, maxParts, maxCharacters, new int[]{0});
+        return builder.toString().trim();
+    }
+
+    private static void appendText(
+            @NonNull View view,
+            @NonNull StringBuilder builder,
+            int maxParts,
+            int maxCharacters,
+            @NonNull int[] parts
+    ) {
+        if (parts[0] >= maxParts || builder.length() >= maxCharacters) return;
+        if (view instanceof TextView) {
+            CharSequence text = ((TextView) view).getText();
+            if (!TextUtils.isEmpty(text)) {
+                if (builder.length() > 0) builder.append(". ");
+                String value = text.toString().replace('\n', ' ').trim();
+                int remaining = maxCharacters - builder.length();
+                if (value.length() > remaining) value = value.substring(0, Math.max(0, remaining));
+                builder.append(value);
+                parts[0]++;
+            }
+            return;
+        }
+        if (view instanceof ViewGroup) {
+            ViewGroup nested = (ViewGroup) view;
+            for (int index = 0; index < nested.getChildCount(); index++) {
+                appendText(nested.getChildAt(index), builder, maxParts, maxCharacters, parts);
+                if (parts[0] >= maxParts || builder.length() >= maxCharacters) return;
+            }
         }
     }
 
