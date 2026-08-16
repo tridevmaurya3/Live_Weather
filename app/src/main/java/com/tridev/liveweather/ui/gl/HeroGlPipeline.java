@@ -10,10 +10,10 @@ import com.tridev.liveweather.data.local.WallpaperPreferences;
 /**
  * Shared GPU composition pipeline for the app Hero and Android Live Wallpaper.
  *
- * Phase 20A.13 isolates renderer failures per GL surface. A broken secondary
- * effect is quarantined instead of repeatedly crashing the whole composition.
- * If the core sky renderer fails, a stable fallback clear keeps the surface
- * alive so healthy cloud/world/weather layers can continue rendering.
+ * Phase 20A.14 keeps resolved weather truth immediate while renderer-facing
+ * values move through an allocation-free temporal transition controller. New
+ * weather therefore changes the sky naturally instead of looking like a page or
+ * scene refresh.
  */
 public final class HeroGlPipeline {
 
@@ -26,9 +26,21 @@ public final class HeroGlPipeline {
     private final HeroGlDepthRainRenderer rainRenderer = new HeroGlDepthRainRenderer();
     private final HeroGlSnowRenderer snowRenderer = new HeroGlSnowRenderer();
     private final HeroGlDiagnostics diagnostics = new HeroGlDiagnostics();
+    private final GlSceneTransitionController transitionController = new GlSceneTransitionController();
 
+    /** Latest resolved current-weather truth. Diagnostics use this immediately. */
     @Nullable
     private GlSceneSnapshot fullSnapshot;
+
+    /** Reusable renderer-specific views; allocated once, then mutated in place. */
+    @Nullable private GlSceneSnapshot sceneView;
+    @Nullable private GlSceneSnapshot starView;
+    @Nullable private GlSceneSnapshot cloudView;
+    @Nullable private GlSceneSnapshot worldView;
+    @Nullable private GlSceneSnapshot atmosphereView;
+    @Nullable private GlSceneSnapshot stormView;
+    @Nullable private GlSceneSnapshot rainView;
+    @Nullable private GlSceneSnapshot snowView;
 
     private volatile float performanceDetailScale = 1f;
 
@@ -101,7 +113,12 @@ public final class HeroGlPipeline {
         }
 
         applyPerformanceDetail();
-        applySnapshot();
+        GlSceneSnapshot visual = transitionController.current();
+        if (visual != null) {
+            applyVisualSnapshot(visual);
+        } else {
+            clearRendererSnapshots();
+        }
     }
 
     public void onSurfaceChanged(int width, int height) {
@@ -175,14 +192,29 @@ public final class HeroGlPipeline {
 
     public void setSnapshot(@Nullable GlSceneSnapshot snapshot) {
         fullSnapshot = snapshot;
+
+        // Diagnostics reflect current resolved truth immediately, before visual easing.
         diagnostics.setSnapshot(snapshot);
-        applySnapshot();
+        transitionController.setTarget(snapshot);
+
+        GlSceneSnapshot visual = transitionController.current();
+        if (visual == null) {
+            clearRendererSnapshots();
+        } else {
+            applyVisualSnapshot(visual);
+        }
     }
 
     public void setOptions(@NonNull WallpaperPreferences.Options options) {
         this.options = options;
         diagnostics.setOptions(options);
-        applySnapshot();
+
+        GlSceneSnapshot visual = transitionController.current();
+        if (visual == null) {
+            clearRendererSnapshots();
+        } else {
+            applyVisualSnapshot(visual);
+        }
     }
 
     /** Changes only secondary visual sampling cost. Weather state/intensity is untouched. */
@@ -207,6 +239,12 @@ public final class HeroGlPipeline {
     }
 
     public void drawFrame() {
+        // No allocations here: the controller and renderer views are reused.
+        if (transitionController.advance()) {
+            GlSceneSnapshot visual = transitionController.current();
+            if (visual != null) applyVisualSnapshot(visual);
+        }
+
         if (sceneHealthy) {
             try {
                 sceneRenderer.drawFrame();
@@ -296,54 +334,74 @@ public final class HeroGlPipeline {
         snowRenderer.setDetailScale(detail);
     }
 
-    private void applySnapshot() {
-        GlSceneSnapshot state = fullSnapshot;
-        if (state == null) {
-            sceneRenderer.setSnapshot(null);
-            starRenderer.setSnapshot(null);
-            cloudRenderer.setSnapshot(null);
-            worldRenderer.setSnapshot(null);
-            atmosphereRenderer.setSnapshot(null);
-            stormRenderer.setSnapshot(null);
-            rainRenderer.setSnapshot(null);
-            snowRenderer.setSnapshot(null);
-            return;
-        }
+    /**
+     * Copies the smoothed master scene into renderer-specific reusable views.
+     * This replaces the old per-update withVisualOptions object fan-out and keeps
+     * the per-frame transition path allocation-free.
+     */
+    private void applyVisualSnapshot(@NonNull GlSceneSnapshot state) {
+        ensureRendererViews(state);
 
-        GlSceneSnapshot sceneSnapshot = state.withVisualOptions(
-                false, false, true, options.isSnow(), options.isFog(), false
+        sceneView.copyVisualOptionsFrom(
+                state, false, false, true, options.isSnow(), options.isFog(), false
         );
-        GlSceneSnapshot starSnapshot = state.withVisualOptions(
-                options.isClouds(), true, true, true, options.isFog(), options.isStars()
+        starView.copyVisualOptionsFrom(
+                state, options.isClouds(), true, true, true, options.isFog(), options.isStars()
         );
-        GlSceneSnapshot cloudSnapshot = state.withVisualOptions(
-                options.isClouds(), false, true, options.isSnow(), options.isFog(), false
+        cloudView.copyVisualOptionsFrom(
+                state, options.isClouds(), false, true, options.isSnow(), options.isFog(), false
         );
-        GlSceneSnapshot worldSnapshot = state.withVisualOptions(
-                options.isClouds(), options.isRain(), true, options.isSnow(), options.isFog(), options.isStars()
+        worldView.copyVisualOptionsFrom(
+                state, options.isClouds(), options.isRain(), true,
+                options.isSnow(), options.isFog(), options.isStars()
         );
-        GlSceneSnapshot atmosphereSnapshot = state.withVisualOptions(
-                options.isClouds(), true, true, options.isSnow(), options.isFog(), options.isStars()
+        atmosphereView.copyVisualOptionsFrom(
+                state, options.isClouds(), true, true,
+                options.isSnow(), options.isFog(), options.isStars()
         );
-        GlSceneSnapshot stormSnapshot = state.withVisualOptions(
-                options.isClouds(), false, true, options.isSnow(), options.isFog(), options.isStars()
+        stormView.copyVisualOptionsFrom(
+                state, options.isClouds(), false, true,
+                options.isSnow(), options.isFog(), options.isStars()
         );
-        GlSceneSnapshot rainSnapshot = state.withVisualOptions(
-                true, options.isRain(), options.isLightning(), true, true, true
+        rainView.copyVisualOptionsFrom(
+                state, true, options.isRain(), options.isLightning(), true, true, true
         );
-        GlSceneSnapshot snowSnapshot = state.withVisualOptions(
-                true, false, true, options.isSnow(), true, true
+        snowView.copyVisualOptionsFrom(
+                state, true, false, true, options.isSnow(), true, true
         );
 
-        sceneRenderer.setSnapshot(sceneSnapshot);
-        starRenderer.setSnapshot(starSnapshot);
-        cloudRenderer.setSnapshot(cloudSnapshot);
-        worldRenderer.setSnapshot(worldSnapshot);
-        atmosphereRenderer.setSnapshot(atmosphereSnapshot);
-        stormRenderer.setSnapshot(stormSnapshot);
+        // Rebinding is only reference assignment; renderer views themselves are reused.
+        sceneRenderer.setSnapshot(sceneView);
+        starRenderer.setSnapshot(starView);
+        cloudRenderer.setSnapshot(cloudView);
+        worldRenderer.setSnapshot(worldView);
+        atmosphereRenderer.setSnapshot(atmosphereView);
+        stormRenderer.setSnapshot(stormView);
         stormRenderer.setElectricalEnabled(options.isLightning());
-        rainRenderer.setSnapshot(rainSnapshot);
-        snowRenderer.setSnapshot(snowSnapshot);
+        rainRenderer.setSnapshot(rainView);
+        snowRenderer.setSnapshot(snowView);
+    }
+
+    private void ensureRendererViews(@NonNull GlSceneSnapshot state) {
+        if (sceneView == null) sceneView = GlSceneSnapshot.reusableCopyOf(state);
+        if (starView == null) starView = GlSceneSnapshot.reusableCopyOf(state);
+        if (cloudView == null) cloudView = GlSceneSnapshot.reusableCopyOf(state);
+        if (worldView == null) worldView = GlSceneSnapshot.reusableCopyOf(state);
+        if (atmosphereView == null) atmosphereView = GlSceneSnapshot.reusableCopyOf(state);
+        if (stormView == null) stormView = GlSceneSnapshot.reusableCopyOf(state);
+        if (rainView == null) rainView = GlSceneSnapshot.reusableCopyOf(state);
+        if (snowView == null) snowView = GlSceneSnapshot.reusableCopyOf(state);
+    }
+
+    private void clearRendererSnapshots() {
+        sceneRenderer.setSnapshot(null);
+        starRenderer.setSnapshot(null);
+        cloudRenderer.setSnapshot(null);
+        worldRenderer.setSnapshot(null);
+        atmosphereRenderer.setSnapshot(null);
+        stormRenderer.setSnapshot(null);
+        rainRenderer.setSnapshot(null);
+        snowRenderer.setSnapshot(null);
     }
 
     private void resetRendererHealth() {
@@ -358,7 +416,8 @@ public final class HeroGlPipeline {
     }
 
     private void drawFallbackSky() {
-        GlSceneSnapshot state = fullSnapshot;
+        GlSceneSnapshot state = transitionController.current();
+        if (state == null) state = fullSnapshot;
         float light = state == null ? 0.45f : Math.max(0f, Math.min(1f, state.sceneLight));
         float red = 0.025f + light * 0.075f;
         float green = 0.045f + light * 0.115f;
