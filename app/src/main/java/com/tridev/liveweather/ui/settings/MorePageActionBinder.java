@@ -13,11 +13,12 @@ import androidx.core.widget.NestedScrollView;
 import com.tridev.liveweather.R;
 
 /**
- * Phase 25 product-completeness binder for More-page summary cards.
+ * Phase 25 product-completeness binder for summary actions and legacy status polish.
  *
  * Alerts and Air quality already have full dynamic sections on the More page.
- * This binder turns their compact summary cards into real navigation actions
- * instead of leaving them as static/placeholder-looking tiles.
+ * Their compact cards now navigate to those sections instead of looking static.
+ * Old internal phase/status labels are also replaced at runtime with product-facing
+ * language without altering live weather status text once the renderer owns it.
  */
 public final class MorePageActionBinder {
 
@@ -29,6 +30,7 @@ public final class MorePageActionBinder {
         if (!(root instanceof ViewGroup)) return;
 
         ViewGroup content = (ViewGroup) root;
+        applyProductStatusText(activity, content);
         bindScrollCard(
                 activity,
                 content,
@@ -43,6 +45,33 @@ public final class MorePageActionBinder {
                 "Air Quality Intelligence",
                 "Open air quality details"
         );
+    }
+
+    private static void applyProductStatusText(
+            @NonNull Activity activity,
+            @NonNull ViewGroup root
+    ) {
+        TextView homeStatus = activity.findViewById(R.id.homePhaseStatus);
+        if (homeStatus != null) {
+            homeStatus.setText(R.string.product_status_home);
+        }
+
+        TextView forecastStatus = activity.findViewById(R.id.forecastStatus);
+        if (forecastStatus != null) {
+            CharSequence current = forecastStatus.getText();
+            String legacy = activity.getString(R.string.status_phase_six);
+            if (current != null && legacy.contentEquals(current)) {
+                forecastStatus.setText(R.string.product_status_forecast);
+            }
+        }
+
+        TextView wallpaperStatus = findTextView(
+                root,
+                activity.getString(R.string.status_real_nature_engine)
+        );
+        if (wallpaperStatus != null) {
+            wallpaperStatus.setText(R.string.product_status_wallpaper);
+        }
     }
 
     private static void bindScrollCard(
