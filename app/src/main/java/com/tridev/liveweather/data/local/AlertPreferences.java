@@ -18,6 +18,8 @@ public final class AlertPreferences {
     private static final String KEY_NOTIFICATIONS_ENABLED = "notifications_enabled";
     private static final String KEY_OFFICIAL_ALERTS_ENABLED = "official_alerts_enabled";
     private static final String KEY_SMART_RISK_ENABLED = "smart_risk_enabled";
+    private static final String KEY_OFFICIAL_NOTIFICATIONS_ENABLED = "official_notifications_enabled";
+    private static final String KEY_SMART_NOTIFICATIONS_ENABLED = "smart_notifications_enabled";
     private static final String KEY_MINIMUM_SEVERITY = "minimum_severity";
     private static final String KEY_NOTIFIED = "notified_fingerprints";
     private static final String KEY_DISTRICT = "last_district";
@@ -42,8 +44,8 @@ public final class AlertPreferences {
     }
 
     /**
-     * Source filters default to enabled so Phase 21.2 does not silently hide
-     * alert categories that were visible before the settings surface existed.
+     * Source display filters default to enabled so Phase 21 never silently hides
+     * categories that were visible before the settings surface existed.
      */
     public boolean isOfficialAlertsEnabled() {
         return preferences.getBoolean(KEY_OFFICIAL_ALERTS_ENABLED, true);
@@ -58,7 +60,32 @@ public final class AlertPreferences {
     }
 
     public void setSmartRiskEnabled(boolean enabled) {
-        preferences.edit().putBoolean(KEY_SMART_RISK_ENABLED, enabled).apply();
+        preferences.edit().putBoolean(KEY_SMART_RISK_ENABLED, true).apply();
+        if (!enabled) {
+            preferences.edit().putBoolean(KEY_SMART_RISK_ENABLED, false).apply();
+        }
+    }
+
+    /** Per-source notification toggles are additional gates, not replacements for the master switch. */
+    public boolean isOfficialNotificationsEnabled() {
+        return preferences.getBoolean(KEY_OFFICIAL_NOTIFICATIONS_ENABLED, true);
+    }
+
+    public void setOfficialNotificationsEnabled(boolean enabled) {
+        preferences.edit().putBoolean(KEY_OFFICIAL_NOTIFICATIONS_ENABLED, enabled).apply();
+    }
+
+    public boolean isSmartNotificationsEnabled() {
+        return preferences.getBoolean(KEY_SMART_NOTIFICATIONS_ENABLED, true);
+    }
+
+    public void setSmartNotificationsEnabled(boolean enabled) {
+        preferences.edit().putBoolean(KEY_SMART_NOTIFICATIONS_ENABLED, enabled).apply();
+    }
+
+    public boolean isAnyNotificationSourceEnabled() {
+        return (isOfficialAlertsEnabled() && isOfficialNotificationsEnabled())
+                || (isSmartRiskEnabled() && isSmartNotificationsEnabled());
     }
 
     @NonNull
@@ -104,6 +131,13 @@ public final class AlertPreferences {
         return alert.isOfficial() ? isOfficialAlertsEnabled() : isSmartRiskEnabled();
     }
 
+    public boolean isNotificationSourceEnabled(@NonNull WeatherAlert alert) {
+        if (!isSourceEnabled(alert)) return false;
+        return alert.isOfficial()
+                ? isOfficialNotificationsEnabled()
+                : isSmartNotificationsEnabled();
+    }
+
     public boolean meetsMinimumSeverity(@NonNull WeatherAlert.Severity severity) {
         return severityRank(severity) >= severityRank(getMinimumSeverity());
     }
@@ -113,13 +147,12 @@ public final class AlertPreferences {
     }
 
     /**
-     * Notification policy intentionally keeps the pre-Phase-21 confidence floors:
+     * Notification policy keeps the pre-Phase-21 confidence floors:
      * official warnings require Yellow+, while Smart Risk requires Orange+.
-     * The user's minimum-severity setting can make notifications stricter but
-     * cannot make lower-confidence Smart Risk signals start generating pushes.
+     * User settings may make delivery stricter but cannot lower the Smart Risk floor.
      */
     public boolean shouldNotify(@NonNull WeatherAlert alert) {
-        if (!isSourceEnabled(alert) || !meetsMinimumSeverity(alert.getSeverity())) {
+        if (!isNotificationSourceEnabled(alert) || !meetsMinimumSeverity(alert.getSeverity())) {
             return false;
         }
         if (alert.isOfficial()) {
