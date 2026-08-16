@@ -26,8 +26,10 @@ public final class RadarViewModel extends ViewModel {
     private List<RadarFieldPointResponse> field = Collections.emptyList();
     private String radarError;
     private String fieldError;
-    private boolean radarFromCache;
-    private boolean fieldFromCache;
+    private RadarRepository.DeliverySource radarSource;
+    private RadarRepository.DeliverySource fieldSource;
+    private long radarSavedAtMillis;
+    private long fieldSavedAtMillis;
 
     public LiveData<RadarUiState> getState() {
         return state;
@@ -48,20 +50,30 @@ public final class RadarViewModel extends ViewModel {
         radarError = null;
         fieldError = null;
 
-        if (force || !sameLocation) {
-            radar = null;
+        /*
+         * Manual refresh must not blank a usable map. RainViewer metadata is a
+         * global observed timeline, so it can remain visible even if the active
+         * map location changes. The Open-Meteo 5x5 field is location-specific;
+         * clear it only when the active location really changes.
+         */
+        if (!sameLocation) {
             field = Collections.emptyList();
-            radarFromCache = false;
-            fieldFromCache = false;
+            fieldSource = null;
+            fieldSavedAtMillis = 0L;
         }
         publish();
 
         repository.loadRadar(force, new RadarRepository.ResultCallback<RainViewerResponse>() {
             @Override
-            public void onSuccess(@NonNull RainViewerResponse value, boolean fromCache) {
+            public void onSuccess(
+                    @NonNull RainViewerResponse value,
+                    @NonNull RadarRepository.DeliverySource source,
+                    long savedAtMillis
+            ) {
                 if (generation != requestGeneration) return;
                 radar = value;
-                radarFromCache = fromCache;
+                radarSource = source;
+                radarSavedAtMillis = savedAtMillis;
                 radarError = null;
                 loadingRadar = false;
                 publish();
@@ -81,11 +93,13 @@ public final class RadarViewModel extends ViewModel {
                     @Override
                     public void onSuccess(
                             @NonNull List<RadarFieldPointResponse> value,
-                            boolean fromCache
+                            @NonNull RadarRepository.DeliverySource source,
+                            long savedAtMillis
                     ) {
                         if (generation != requestGeneration) return;
                         field = value;
-                        fieldFromCache = fromCache;
+                        fieldSource = source;
+                        fieldSavedAtMillis = savedAtMillis;
                         fieldError = null;
                         loadingField = false;
                         publish();
@@ -111,8 +125,10 @@ public final class RadarViewModel extends ViewModel {
                 field,
                 radarError,
                 fieldError,
-                radarFromCache,
-                fieldFromCache
+                radarSource,
+                fieldSource,
+                radarSavedAtMillis,
+                fieldSavedAtMillis
         );
         state.postValue(snapshot);
     }
