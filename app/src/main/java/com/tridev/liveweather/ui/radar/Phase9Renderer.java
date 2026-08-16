@@ -24,6 +24,7 @@ import com.google.gson.Gson;
 import com.tridev.liveweather.R;
 import com.tridev.liveweather.data.remote.dto.RadarFieldPointResponse;
 import com.tridev.liveweather.data.remote.dto.RainViewerResponse;
+import com.tridev.liveweather.data.repository.RadarRepository;
 import com.tridev.liveweather.ui.weather.WeatherFormatter;
 
 import java.time.Instant;
@@ -45,10 +46,15 @@ import java.util.Map;
  * Phase 20B.4 makes the observed timeline timestamp-aware, gives latest/history/
  * playback states explicit UI, and keeps replay behavior deterministic without
  * inventing any future radar frame.
+ *
+ * Phase 20B.5 exposes freshness and delivery provenance while preserving usable
+ * cached layers during refresh. Freshness text updates once per minute only while
+ * the Radar page is visible; it performs no network request or map rebuild.
  */
 public final class Phase9Renderer {
 
     private static final long PLAY_INTERVAL_MILLIS = 1_100L;
+    private static final long FRESHNESS_TICK_MILLIS = 60_000L;
     private static final DateTimeFormatter FRAME_TIME_FORMATTER =
             DateTimeFormatter.ofPattern("HH:mm 'UTC'", Locale.US).withZone(ZoneOffset.UTC);
 
@@ -60,6 +66,7 @@ public final class Phase9Renderer {
     private final WebView mapWebView;
     private final TextView locationValue;
     private final TextView statusValue;
+    private final TextView freshnessValue;
     private final TextView frameTimeValue;
     private final TextView timelineSummary;
     private final TextView sourceValue;
@@ -78,6 +85,7 @@ public final class Phase9Renderer {
     private boolean webReady;
     private boolean playing;
     private boolean destroyed;
+    private boolean pageVisible;
     private boolean followLatest = true;
     private int frameIndex = -1;
     @Nullable private Long selectedFrameTime;
@@ -110,11 +118,25 @@ public final class Phase9Renderer {
         }
     };
 
+    private final Runnable freshnessTicker = new Runnable() {
+        @Override
+        public void run() {
+            if (destroyed || !pageVisible) return;
+            if (latestState != null) {
+                renderFreshness(latestState);
+                renderLegend();
+                updatePlaybackPresentation();
+            }
+            handler.postDelayed(this, FRESHNESS_TICK_MILLIS);
+        }
+    };
+
     public Phase9Renderer(@NonNull Activity activity) {
         this.activity = activity;
         mapHost = activity.findViewById(R.id.radarMapHost);
         locationValue = activity.findViewById(R.id.radarLocationValue);
         statusValue = activity.findViewById(R.id.radarStatusValue);
+        freshnessValue = activity.findViewById(R.id.radarFreshnessValue);
         frameTimeValue = activity.findViewById(R.id.radarFrameTimeValue);
         timelineSummary = activity.findViewById(R.id.radarTimelineSummary);
         sourceValue = activity.findViewById(R.id.radarSourceValue);
@@ -161,6 +183,7 @@ public final class Phase9Renderer {
         ));
 
         renderStatus(state);
+        renderFreshness(state);
         renderSource(state);
         renderTimeline(state, locationChanged);
         renderLegend();
@@ -169,12 +192,18 @@ public final class Phase9Renderer {
 
     public void onVisible() {
         if (destroyed) return;
+        pageVisible = true;
         mapWebView.onResume();
         pushStateToMap();
+        if (latestState != null) renderFreshness(latestState);
+        handler.removeCallbacks(freshnessTicker);
+        handler.postDelayed(freshnessTicker, FRESHNESS_TICK_MILLIS);
     }
 
     public void onHidden() {
         if (destroyed) return;
+        pageVisible = false;
+        handler.removeCallbacks(freshnessTicker);
         stopPlayback();
         mapWebView.onPause();
     }
@@ -182,6 +211,8 @@ public final class Phase9Renderer {
     public void onDestroy() {
         if (destroyed) return;
         destroyed = true;
+        pageVisible = false;
+        handler.removeCallbacks(freshnessTicker);
         stopPlayback();
         refreshAction = null;
         webReady = false;
@@ -306,11 +337,41 @@ public final class Phase9Renderer {
         });
     }
 
-    private void renderStatus(RadarUiState state) {
-        if (state.isLoadingRadar() || state.isLoadingField()) {
-            statusValue.setText("Syncing observed radar and atmospheric model field…");
+    private void renderStatus(@NonNull RadarUiState state) {
+        boolean refreshing = state.isLoadingRadar() || state.isLoadingField();
+        boolean hasUsableData = state.hasRadarFrames() || state.hasField();
+
+        refreshButton.setText(refreshing ? "Refreshing" : "Refresh");
+        refreshButton.setEnabled(!refreshing);
+        refreshButton.setAlpha(refreshing ? 0.64f : 1.0f);
+        refreshButton.setContentDescription(refreshing
+                ? "Refreshing radar and model field"
+                : "Refresh radar and model field");
+
+        if (refreshing) {
+            statusValue.setText(hasUsableData
+                    ? "Refreshing… showing existing usable data"
+                    : "Loading observed radar and atmospheric model field…");
             return;
         }
+
+        if ((state.isRadarNetworkFallback() && state.hasRadarFrames())
+                || (state.isFieldNetworkFallback() && state.hasField())) {
+            statusValue.setText("Network unavailable • cached fallback active");
+            return;
+        }
+
+        if ((state.isRadarServerFallback() && state.hasRadarFrames())
+                || (state.isFieldServerFallback() && state.hasField())) {
+            statusValue.setText("Provider refresh unavailable • cached fallback active");
+            return;
+        }
+
+        if ((state.getRadarError() != null || state.getFieldError() != null) && hasUsableData) {
+            statusValue.setText("Refresh issue • continuing with existing usable data");
+            return;
+        }
+
         if (state.hasRadarFrames() && state.hasField()) {
             statusValue.setText("Observed radar + model field ready");
             return;
@@ -337,17 +398,96 @@ public final class Phase9Renderer {
         }
     }
 
-    private void renderSource(RadarUiState state) {
+    private void renderFreshness(@NonNull RadarUiState state) {
+        long now = System.currentTimeMillis();
+        StringBuilder text = new StringBuilder();
+
+        if (state.hasRadarFrames()) {
+            text.append("Radar observation ")
+                    .append(ageLabel(state.getRadarObservationAgeMillis(now)));
+            if (state.isRadarObservationDelayed(now)) text.append(" · delayed");
+            text.append(" · ").append(sourceLabel(state.getRadarSource()));
+        } else if (state.isLoadingRadar()) {
+            text.append("Radar loading");
+        } else {
+            text.append("Radar unavailable");
+        }
+
+        text.append("  •  ");
+
+        if (state.hasField()) {
+            text.append("Model field ")
+                    .append(ageLabel(state.getFieldAgeMillis(now)));
+            if (state.isFieldDelayed(now)) text.append(" · delayed");
+            text.append(" · ").append(sourceLabel(state.getFieldSource()));
+        } else if (state.isLoadingField()) {
+            text.append("Model loading");
+        } else {
+            text.append("Model unavailable");
+        }
+
+        freshnessValue.setText(text.toString());
+        boolean warning = state.isRadarNetworkFallback()
+                || state.isFieldNetworkFallback()
+                || state.isRadarServerFallback()
+                || state.isFieldServerFallback()
+                || state.isRadarObservationDelayed(now)
+                || state.isFieldDelayed(now);
+        boolean unavailable = !state.hasRadarFrames()
+                && !state.hasField()
+                && !state.isLoadingRadar()
+                && !state.isLoadingField();
+        freshnessValue.setTextColor(activity.getColor(
+                unavailable
+                        ? R.color.weather_danger
+                        : warning ? R.color.weather_warning : R.color.weather_text_secondary
+        ));
+        freshnessValue.setContentDescription(text.toString());
+    }
+
+    @NonNull
+    private String ageLabel(long ageMillis) {
+        if (ageMillis < 0L) return "age --";
+        long minutes = ageMillis / 60_000L;
+        if (minutes < 1L) return "<1m ago";
+        if (minutes < 60L) return minutes + "m ago";
+        long hours = minutes / 60L;
+        if (hours < 48L) return hours + "h ago";
+        return (hours / 24L) + "d ago";
+    }
+
+    @NonNull
+    private String sourceLabel(@Nullable RadarRepository.DeliverySource source) {
+        if (source == null) return "source --";
+        switch (source) {
+            case NETWORK:
+                return "network";
+            case MEMORY_CACHE:
+                return "recent cache";
+            case NETWORK_FALLBACK_CACHE:
+                return "network fallback";
+            case SERVER_FALLBACK_CACHE:
+                return "provider fallback";
+            default:
+                return "saved data";
+        }
+    }
+
+    private void renderSource(@NonNull RadarUiState state) {
         StringBuilder text = new StringBuilder(
                 "RainViewer observed radar • Open-Meteo model field (cloud/wind/temp) • OpenStreetMap base"
         );
-        if (state.isRadarFromCache() || state.isFieldFromCache()) {
-            text.append(" • cached fallback");
+        if (state.isRadarNetworkFallback() || state.isFieldNetworkFallback()) {
+            text.append(" • network fallback cache");
+        } else if (state.isRadarServerFallback() || state.isFieldServerFallback()) {
+            text.append(" • provider fallback cache");
+        } else if (state.isRadarFromCache() || state.isFieldFromCache()) {
+            text.append(" • recent memory cache");
         }
-        if (state.hasRadarFrames() && state.isRadarMetadataStale()) {
-            text.append(" • radar metadata delayed");
+        if (state.hasRadarFrames() && state.isRadarObservationDelayed(System.currentTimeMillis())) {
+            text.append(" • radar delayed");
         }
-        text.append("\nCloud/wind/temp points are model context, not radar observations. No future radar nowcast is fabricated.");
+        text.append("\nCloud/wind/temp remain model context, not radar observations. No future radar nowcast is fabricated.");
         sourceValue.setText(text.toString());
     }
 
@@ -482,8 +622,12 @@ public final class Phase9Renderer {
             timelineSummary.setText("Playing observed history · " + position);
         } else if (atLatest) {
             playButton.setText(count > 1 ? "Replay" : "Play");
-            if (state.isRadarMetadataStale()) {
-                timelineSummary.setText("Latest available · delayed metadata · " + position);
+            if (state.isRadarObservationDelayed(System.currentTimeMillis())) {
+                timelineSummary.setText("Latest available · delayed observation · " + position);
+            } else if (state.isRadarNetworkFallback()) {
+                timelineSummary.setText("Latest cached observation · network fallback · " + position);
+            } else if (state.isRadarServerFallback()) {
+                timelineSummary.setText("Latest cached observation · provider fallback · " + position);
             } else if (state.isRadarFromCache()) {
                 timelineSummary.setText("Latest cached observation · " + position);
             } else {
@@ -540,6 +684,8 @@ public final class Phase9Renderer {
                 legendTitle.setText("MODEL CLOUDS · OPEN-METEO");
                 if (state != null && !state.hasField()) {
                     legendBody.setText("Current model cloud field unavailable.");
+                } else if (state != null && state.isFieldDelayed(System.currentTimeMillis())) {
+                    legendBody.setText("Cloud cover 0–100% · delayed saved model field");
                 } else {
                     legendBody.setText("Cloud cover 0–100% · continuous interpolated model field");
                 }
@@ -549,6 +695,8 @@ public final class Phase9Renderer {
                 legendTitle.setText("MODEL WIND · OPEN-METEO");
                 if (state != null && !state.hasField()) {
                     legendBody.setText("Current model wind field unavailable.");
+                } else if (state != null && state.isFieldDelayed(System.currentTimeMillis())) {
+                    legendBody.setText("Saved model field is delayed · arrow = flow direction");
                 } else {
                     legendBody.setText("Arrow = flow direction · label = speed in selected wind unit");
                 }
@@ -558,6 +706,8 @@ public final class Phase9Renderer {
                 legendTitle.setText("MODEL TEMPERATURE · OPEN-METEO");
                 if (state != null && !state.hasField()) {
                     legendBody.setText("Current model temperature field unavailable.");
+                } else if (state != null && state.isFieldDelayed(System.currentTimeMillis())) {
+                    legendBody.setText("Saved model field is delayed · labels use selected unit");
                 } else {
                     legendBody.setText("Color scale: cold → cool → mild → warm → hot · labels use selected unit");
                 }
@@ -568,8 +718,8 @@ public final class Phase9Renderer {
                 legendTitle.setText("OBSERVED RAIN RADAR · RAINVIEWER");
                 if (state != null && !state.hasRadarFrames()) {
                     legendBody.setText("Observed radar frames unavailable for this area/network.");
-                } else if (state != null && state.isRadarMetadataStale()) {
-                    legendBody.setText("Echo intensity: light → moderate → heavy → intense · delayed metadata");
+                } else if (state != null && state.isRadarObservationDelayed(System.currentTimeMillis())) {
+                    legendBody.setText("Echo intensity: light → moderate → heavy → intense · delayed observation");
                 } else {
                     legendBody.setText("Echo intensity: light → moderate → heavy → intense · observed past frames");
                 }
