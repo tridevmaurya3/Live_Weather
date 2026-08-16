@@ -8,6 +8,28 @@ Accurate Live Weather in Real Feeling is the app's Hero Part. Radar and later
 feature work must preserve the same current-condition truth used by Home and
 Live Wallpaper. The project is not Final or Production Ready.
 
+## Cinematic realism + smoothness contract
+
+Real Live Weather should aim for film-quality believability without turning the
+phone into a movie-render workstation. Visual realism is achieved with layered,
+GPU-friendly motion, deterministic textures, bounded atmospheric effects and
+shared scene state rather than repeated UI/network refreshes.
+
+Permanent rules:
+- weather/network access never belongs in the per-frame render loop;
+- no screen/page refresh is used to animate weather;
+- renderer state changes only when real weather/options/location evidence changes;
+- normal frame animation uses lightweight shader uniforms and pre-created GPU resources;
+- expensive astronomy/weather recomposition is rate-limited and never tied directly
+  to every home-screen swipe/parallax callback;
+- hidden app surfaces and invisible Live Wallpaper surfaces render zero frames;
+- inactive rain/snow/storm passes return immediately;
+- performance/battery policy may change frame cadence, but must never change the
+  truth of the weather being shown;
+- future realism upgrades must prefer perceptual tricks (depth, parallax, lighting,
+  occlusion, texture reuse) over large allocations, repeated bitmap creation or
+  per-frame Java object generation.
+
 ## Checkpoint 20A.1
 
 - Replaced repeating fixed ellipse cloud banks with deterministic multi-scale
@@ -105,10 +127,35 @@ Live Wallpaper. The project is not Final or Production Ready.
   explain emulator/Adreno/Mali device-only differences.
 - Exposes the active renderer quality label (`FULL_SHARED_GL`) and visual option
   states without changing weather truth or rendering behavior.
-- Writes a concise `LiveWeatherGL` Logcat report when the GL surface or resolved
-  weather snapshot changes.
+- `LiveWeatherGL` reports are formatted only on explicit capture, GL surface
+  creation or a meaningful resolved weather-evidence class change; diagnostics
+  are not a per-frame logging workload.
 - Forecast probability is not converted into current precipitation evidence by
   this diagnostic layer.
+
+## Checkpoint 20A.11 — source build-safety and smoothness audit
+
+- Rechecked the active shared renderer lifecycle: sky, stars, texture clouds,
+  world, atmosphere, storm, depth rain and depth snow remain wired through one
+  HeroGlPipeline for both app Hero and Live Wallpaper.
+- Preserved early-return behavior for inactive precipitation/storm effects.
+- Confirmed app Hero and Live Wallpaper rendering runs on dedicated display-priority
+  render threads rather than the UI/network thread.
+- Preserved lifecycle stop behavior: hidden app Hero and invisible wallpaper draw
+  no frames.
+- Confirmed wallpaper network refresh remains independent through WorkManager and
+  is not coupled to animation FPS.
+- Added cached-state change detection so the 45-second lightweight wallpaper cache
+  check does not re-send unchanged weather/options through the renderer.
+- Removed unnecessary weather recomposition when only a visual option changes.
+- Added bounded home-screen parallax recomposition so rapid launcher offset events
+  cannot trigger full astronomy/weather composition on every callback.
+- Kept diagnostics report formatting off the frame hot path.
+- No renderer in the active Phase 20A pipeline performs network I/O, bitmap creation
+  or large Java object allocation per frame.
+
+This checkpoint is a source-level safety audit. A local Android Gradle build and
+real-device GPU validation are still required before Phase 20A visual acceptance.
 
 ## Acceptance required
 
@@ -128,6 +175,8 @@ Confirm:
 - Sun, Moon and stars transition smoothly and are locally occluded by clouds;
 - fog/haze do not look like a flat opaque rectangle;
 - Home Hero and applied Live Wallpaper remain visually consistent;
-- `LiveWeatherGL` diagnostics match the weather actually being displayed.
+- `LiveWeatherGL` diagnostics match the weather actually being displayed;
+- launcher swipes/parallax do not cause stutter or visible scene resets;
+- unchanged cached weather does not cause a visible refresh/flicker.
 
 Source implementation alone is not visual acceptance.
