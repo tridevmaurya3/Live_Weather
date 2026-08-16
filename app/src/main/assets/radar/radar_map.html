@@ -53,15 +53,15 @@
     let activeLayer = 'rain';
     let frameIndex = 0;
     let radarLayer = null;
+    let radarLayerUrl = null;
     let cloudSurfaceLayer = null;
     let windGroup = L.layerGroup();
     let tempGroup = L.layerGroup();
     let locationMarker = null;
 
     function clearWeatherLayers() {
-        if (radarLayer) {
+        if (radarLayer && map.hasLayer(radarLayer)) {
             map.removeLayer(radarLayer);
-            radarLayer = null;
         }
         if (cloudSurfaceLayer && map.hasLayer(cloudSurfaceLayer)) {
             map.removeLayer(cloudSurfaceLayer);
@@ -70,19 +70,34 @@
         map.removeLayer(tempGroup);
     }
 
-    function makeRadarLayer(index) {
+    function radarUrl(index) {
         if (!payload || !payload.radarHost || !payload.frames || !payload.frames.length) return null;
         const safeIndex = Math.max(0, Math.min(index, payload.frames.length - 1));
         const frame = payload.frames[safeIndex];
         if (!frame || !frame.path) return null;
-        const url = payload.radarHost + frame.path + '/256/{z}/{x}/{y}/2/1_1.png';
-        return L.tileLayer(url, {
-            pane:'radarPane',
-            opacity:.78,
-            maxZoom:7,
-            tileSize:256,
-            attribution:'Radar: <a href="https://www.rainviewer.com/">RainViewer</a>'
-        });
+        return payload.radarHost + frame.path + '/256/{z}/{x}/{y}/2/1_1.png';
+    }
+
+    function ensureRadarLayer(index) {
+        const url = radarUrl(index);
+        if (!url) return null;
+
+        if (!radarLayer) {
+            radarLayer = L.tileLayer(url, {
+                pane:'radarPane',
+                opacity:.78,
+                maxZoom:7,
+                tileSize:256,
+                keepBuffer:1,
+                updateWhenIdle:true,
+                attribution:'Radar: <a href="https://www.rainviewer.com/">RainViewer</a>'
+            });
+            radarLayerUrl = url;
+        } else if (radarLayerUrl !== url) {
+            radarLayer.setUrl(url);
+            radarLayerUrl = url;
+        }
+        return radarLayer;
     }
 
     function tempColor(t) {
@@ -197,9 +212,6 @@
 
                 const cloud = totalWeight <= 0 ? 0 : clamp(weightedCloud / totalWeight, 0, 100);
                 const density = cloud / 100;
-
-                // Feather the model-field edge so the sampled 5x5 coverage never
-                // reveals itself as a rectangular image boundary on the map.
                 const edgeFeather = smoothstep(0.00, 0.115, u)
                     * smoothstep(0.00, 0.115, 1 - u)
                     * smoothstep(0.00, 0.115, v)
@@ -207,24 +219,19 @@
                 const visibility = smoothstep(0.035, 0.20, density);
                 const alpha = clamp((0.035 + density * 0.40) * visibility * edgeFeather, 0, 0.44);
 
-                const index = (y * CLOUD_SURFACE_SIZE + x) * 4;
-                pixels[index] = Math.round(240 - density * 57);
-                pixels[index + 1] = Math.round(247 - density * 50);
-                pixels[index + 2] = Math.round(251 - density * 43);
-                pixels[index + 3] = Math.round(alpha * 255);
+                const pixel = (y * CLOUD_SURFACE_SIZE + x) * 4;
+                pixels[pixel] = Math.round(240 - density * 57);
+                pixels[pixel + 1] = Math.round(247 - density * 50);
+                pixels[pixel + 2] = Math.round(251 - density * 43);
+                pixels[pixel + 3] = Math.round(alpha * 255);
             }
         }
 
         context.putImageData(image, 0, 0);
-        const dataUrl = canvas.toDataURL('image/png');
         return L.imageOverlay(
-            dataUrl,
+            canvas.toDataURL('image/png'),
             [[south, west], [north, east]],
-            {
-                pane:'cloudPane',
-                opacity:1,
-                interactive:false
-            }
+            { pane:'cloudPane', opacity:1, interactive:false }
         );
     }
 
@@ -247,12 +254,7 @@
             const windHtml = '<div class="wind-arrow"><span class="arrow" style="transform:rotate(' + flowDirection + 'deg)">➜</span><span>' + windText + '</span></div>';
             L.marker([p.lat,p.lon], {
                 interactive:false,
-                icon:L.divIcon({
-                    className:'',
-                    html:windHtml,
-                    iconSize:[80,28],
-                    iconAnchor:[40,14]
-                })
+                icon:L.divIcon({ className:'', html:windHtml, iconSize:[80,28], iconAnchor:[40,14] })
             }).addTo(windGroup);
 
             const temp = p.temperature;
@@ -260,12 +262,7 @@
             const tempHtml = '<div class="temp-dot" style="background:' + tempColor(temp) + '">' + tempText + '</div>';
             L.marker([p.lat,p.lon], {
                 interactive:false,
-                icon:L.divIcon({
-                    className:'',
-                    html:tempHtml,
-                    iconSize:[42,34],
-                    iconAnchor:[21,17]
-                })
+                icon:L.divIcon({ className:'', html:tempHtml, iconSize:[42,34], iconAnchor:[21,17] })
             }).addTo(tempGroup);
         });
     }
@@ -289,8 +286,8 @@
         if (!payload) return;
 
         if (activeLayer === 'rain') {
-            radarLayer = makeRadarLayer(frameIndex);
-            if (radarLayer) radarLayer.addTo(map);
+            const layer = ensureRadarLayer(frameIndex);
+            if (layer && !map.hasLayer(layer)) layer.addTo(map);
         } else if (activeLayer === 'clouds') {
             ensureCloudSurface();
             if (cloudSurfaceLayer) cloudSurfaceLayer.addTo(map);
@@ -316,8 +313,15 @@
             applyLayer();
         },
         setFrame:function (index) {
-            frameIndex = index || 0;
-            if (activeLayer === 'rain') applyLayer();
+            const numeric = Number(index);
+            frameIndex = Number.isFinite(numeric) ? Math.max(0, Math.round(numeric)) : 0;
+            if (payload && payload.frames && payload.frames.length) {
+                frameIndex = Math.min(frameIndex, payload.frames.length - 1);
+            }
+            if (activeLayer === 'rain') {
+                const layer = ensureRadarLayer(frameIndex);
+                if (layer && !map.hasLayer(layer)) layer.addTo(map);
+            }
         },
         recenter:function () {
             if (payload) {
