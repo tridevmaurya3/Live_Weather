@@ -15,7 +15,6 @@
         .wind-arrow .arrow { display:inline-block; font-size:19px; color:#6fe6ff; transform-origin:50% 50%; }
         .temp-dot { min-width:34px; height:34px; border-radius:17px; display:flex; align-items:center; justify-content:center; color:white; font-size:10px; font-weight:800; border:1px solid rgba(255,255,255,.7); box-shadow:0 2px 8px rgba(0,0,0,.32); padding:0 4px; }
         .leaflet-control-zoom a { background:#102d49!important; color:#e7f6ff!important; border-color:#31506b!important; }
-        .cloud-field-blob { filter:blur(11px); opacity:.96; }
     </style>
 </head>
 <body>
@@ -23,6 +22,8 @@
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
 (function () {
+    const CLOUD_SURFACE_SIZE = 144;
+
     const map = L.map('map', {
         minZoom:3,
         maxZoom:7,
@@ -36,6 +37,7 @@
 
     map.createPane('cloudPane');
     map.getPane('cloudPane').style.zIndex = 410;
+    map.getPane('cloudPane').style.pointerEvents = 'none';
 
     map.createPane('radarPane');
     map.getPane('radarPane').style.zIndex = 430;
@@ -47,13 +49,11 @@
     }).addTo(map);
     map.attributionControl.addAttribution('<a href="https://open-meteo.com/">Open-Meteo</a> model overlays');
 
-    const cloudSvgRenderer = L.svg({ padding:0.70, pane:'cloudPane' });
-
     let payload = null;
     let activeLayer = 'rain';
     let frameIndex = 0;
     let radarLayer = null;
-    let cloudGroup = L.layerGroup();
+    let cloudSurfaceLayer = null;
     let windGroup = L.layerGroup();
     let tempGroup = L.layerGroup();
     let locationMarker = null;
@@ -63,7 +63,9 @@
             map.removeLayer(radarLayer);
             radarLayer = null;
         }
-        map.removeLayer(cloudGroup);
+        if (cloudSurfaceLayer && map.hasLayer(cloudSurfaceLayer)) {
+            map.removeLayer(cloudSurfaceLayer);
+        }
         map.removeLayer(windGroup);
         map.removeLayer(tempGroup);
     }
@@ -93,73 +95,156 @@
         return '#d95145';
     }
 
-    function hash(value) {
-        const x = Math.sin(value * 12.9898 + 78.233) * 43758.5453;
-        return x - Math.floor(x);
+    function clamp(value, min, max) {
+        return Math.max(min, Math.min(max, value));
     }
 
-    function cloudColor(cloud) {
-        if (cloud >= 82) return '#b9c3cd';
-        if (cloud >= 58) return '#cdd6de';
-        if (cloud >= 32) return '#dce6ed';
-        return '#eef6fb';
+    function smoothstep(edge0, edge1, value) {
+        if (edge0 === edge1) return value >= edge1 ? 1 : 0;
+        const t = clamp((value - edge0) / (edge1 - edge0), 0, 1);
+        return t * t * (3 - 2 * t);
     }
 
-    function addCloudBlob(point, cloud, index, variant) {
-        if (cloud < 4) return;
+    function wrappedLongitudeNear(longitude, center) {
+        let value = longitude;
+        while (value - center > 180) value -= 360;
+        while (value - center < -180) value += 360;
+        return value;
+    }
 
-        const seed = (point.lat || 0) * 17.0
-            + (point.lon || 0) * 31.0
-            + index * 13.0
-            + variant * 97.0;
-        const angle = hash(seed + 1.7) * Math.PI * 2.0;
-        const offsetDistance = variant === 0 ? 0 : 0.10 + hash(seed + 2.9) * 0.20;
-        const latOffset = Math.sin(angle) * offsetDistance;
-        const lonScale = Math.max(0.28, Math.cos((point.lat || 0) * Math.PI / 180));
-        const lonOffset = Math.cos(angle) * offsetDistance / lonScale;
+    function invalidateCloudSurface() {
+        if (cloudSurfaceLayer && map.hasLayer(cloudSurfaceLayer)) {
+            map.removeLayer(cloudSurfaceLayer);
+        }
+        cloudSurfaceLayer = null;
+    }
 
-        const density = Math.max(0, Math.min(100, cloud)) / 100;
-        const radiusBase = 72000 + density * 72000;
-        const radiusScale = variant === 0 ? 1.0 : 0.58 + hash(seed + 4.1) * 0.30;
-        const opacityBase = 0.055 + density * 0.31;
-        const opacityScale = variant === 0 ? 1.0 : 0.48 + hash(seed + 5.2) * 0.22;
+    function buildContinuousCloudSurface(points) {
+        if (!points || points.length < 4) return null;
 
-        L.circle(
-            [(point.lat || 0) + latOffset, (point.lon || 0) + lonOffset],
-            {
-                renderer:cloudSvgRenderer,
-                pane:'cloudPane',
-                radius:radiusBase * radiusScale,
-                stroke:false,
-                fill:true,
-                fillColor:cloudColor(cloud),
-                fillOpacity:Math.min(0.42, opacityBase * opacityScale),
-                interactive:false,
-                className:'cloud-field-blob'
+        const centerLon = payload && Number.isFinite(Number(payload.longitude))
+            ? Number(payload.longitude)
+            : Number(points[0].lon || 0);
+
+        const samples = [];
+        points.forEach(function (point) {
+            const lat = Number(point.lat);
+            const lon = Number(point.lon);
+            const cloud = Number(point.cloud);
+            if (!Number.isFinite(lat) || !Number.isFinite(lon) || !Number.isFinite(cloud)) return;
+            samples.push({
+                lat:lat,
+                lon:wrappedLongitudeNear(lon, centerLon),
+                cloud:clamp(cloud, 0, 100)
+            });
+        });
+        if (samples.length < 4) return null;
+
+        let minLat = samples[0].lat;
+        let maxLat = samples[0].lat;
+        let minLon = samples[0].lon;
+        let maxLon = samples[0].lon;
+        samples.forEach(function (sample) {
+            minLat = Math.min(minLat, sample.lat);
+            maxLat = Math.max(maxLat, sample.lat);
+            minLon = Math.min(minLon, sample.lon);
+            maxLon = Math.max(maxLon, sample.lon);
+        });
+
+        const sampleLatSpan = Math.max(0.5, maxLat - minLat);
+        const sampleLonSpan = Math.max(0.5, maxLon - minLon);
+        if (sampleLonSpan > 30) return null;
+
+        const latPadding = Math.max(0.30, sampleLatSpan * 0.12);
+        const lonPadding = Math.max(0.30, sampleLonSpan * 0.12);
+        const south = minLat - latPadding;
+        const north = maxLat + latPadding;
+        const west = minLon - lonPadding;
+        const east = maxLon + lonPadding;
+        const renderLatSpan = Math.max(0.001, north - south);
+        const renderLonSpan = Math.max(0.001, east - west);
+
+        const canvas = document.createElement('canvas');
+        canvas.width = CLOUD_SURFACE_SIZE;
+        canvas.height = CLOUD_SURFACE_SIZE;
+        const context = canvas.getContext('2d', {alpha:true});
+        if (!context) return null;
+
+        const image = context.createImageData(CLOUD_SURFACE_SIZE, CLOUD_SURFACE_SIZE);
+        const pixels = image.data;
+        const centerLat = (north + south) * 0.5;
+        const lonMetric = Math.max(0.28, Math.cos(centerLat * Math.PI / 180));
+
+        for (let y = 0; y < CLOUD_SURFACE_SIZE; y++) {
+            const v = y / (CLOUD_SURFACE_SIZE - 1);
+            const lat = north - v * renderLatSpan;
+
+            for (let x = 0; x < CLOUD_SURFACE_SIZE; x++) {
+                const u = x / (CLOUD_SURFACE_SIZE - 1);
+                const lon = west + u * renderLonSpan;
+                let weightedCloud = 0;
+                let totalWeight = 0;
+
+                for (let i = 0; i < samples.length; i++) {
+                    const sample = samples[i];
+                    const dLat = (lat - sample.lat) / sampleLatSpan;
+                    const dLon = ((lon - sample.lon) * lonMetric) / sampleLonSpan;
+                    const distanceSquared = dLat * dLat + dLon * dLon;
+                    const weight = 1 / Math.pow(distanceSquared + 0.0028, 1.28);
+                    weightedCloud += sample.cloud * weight;
+                    totalWeight += weight;
+                }
+
+                const cloud = totalWeight <= 0 ? 0 : clamp(weightedCloud / totalWeight, 0, 100);
+                const density = cloud / 100;
+
+                // Feather the model-field edge so the sampled 5x5 coverage never
+                // reveals itself as a rectangular image boundary on the map.
+                const edgeFeather = smoothstep(0.00, 0.115, u)
+                    * smoothstep(0.00, 0.115, 1 - u)
+                    * smoothstep(0.00, 0.115, v)
+                    * smoothstep(0.00, 0.115, 1 - v);
+                const visibility = smoothstep(0.035, 0.20, density);
+                const alpha = clamp((0.035 + density * 0.40) * visibility * edgeFeather, 0, 0.44);
+
+                const index = (y * CLOUD_SURFACE_SIZE + x) * 4;
+                pixels[index] = Math.round(240 - density * 57);
+                pixels[index + 1] = Math.round(247 - density * 50);
+                pixels[index + 2] = Math.round(251 - density * 43);
+                pixels[index + 3] = Math.round(alpha * 255);
             }
-        ).addTo(cloudGroup);
+        }
+
+        context.putImageData(image, 0, 0);
+        const dataUrl = canvas.toDataURL('image/png');
+        return L.imageOverlay(
+            dataUrl,
+            [[south, west], [north, east]],
+            {
+                pane:'cloudPane',
+                opacity:1,
+                interactive:false
+            }
+        );
+    }
+
+    function ensureCloudSurface() {
+        if (cloudSurfaceLayer || !payload || !payload.field) return;
+        cloudSurfaceLayer = buildContinuousCloudSurface(payload.field);
     }
 
     function rebuildFieldLayers() {
-        cloudGroup = L.layerGroup();
+        invalidateCloudSurface();
         windGroup = L.layerGroup();
         tempGroup = L.layerGroup();
         if (!payload || !payload.field) return;
 
-        payload.field.forEach(function (p, index) {
+        payload.field.forEach(function (p) {
             if (p.lat == null || p.lon == null) return;
-
-            const cloud = Math.max(0, Math.min(100, p.cloud == null ? 0 : p.cloud));
-
-            if (cloud >= 4) {
-                addCloudBlob(p, cloud, index, 0);
-                if (cloud >= 18) addCloudBlob(p, cloud, index, 1);
-                if (cloud >= 42) addCloudBlob(p, cloud, index, 2);
-            }
 
             const flowDirection = ((p.windDirection || 0) + 180) % 360;
             const windText = p.windLabel || '--';
-            const windHtml = '<div class="wind-arrow"><span class="arrow" style="transform:rotate(' + flowDirection + 'deg)">➜</span><span>' + windText + '</span></div>';
+            const windHtml = '<div class="wind-arrow"><span class="arrow" style="transform:rotate(' + flowDirection + 'deg')">➜</span><span>' + windText + '</span></div>';
             L.marker([p.lat,p.lon], {
                 interactive:false,
                 icon:L.divIcon({
@@ -207,7 +292,8 @@
             radarLayer = makeRadarLayer(frameIndex);
             if (radarLayer) radarLayer.addTo(map);
         } else if (activeLayer === 'clouds') {
-            cloudGroup.addTo(map);
+            ensureCloudSurface();
+            if (cloudSurfaceLayer) cloudSurfaceLayer.addTo(map);
         } else if (activeLayer === 'wind') {
             windGroup.addTo(map);
         } else if (activeLayer === 'temp') {
