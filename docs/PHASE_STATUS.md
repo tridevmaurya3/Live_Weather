@@ -1,311 +1,194 @@
-# Live Weather Development Status
+# Live Weather — Current Development Status
 
-## Phase 0 — Foundation
-Status: COMPLETE
+Status: ACTIVE DEVELOPMENT — Phase 25 source implementation complete; Phase 26 release gate not started.
 
-- Android Studio Java + XML project
-- GitHub main branch workflow
-- Modular architecture contract
-- Lifecycle, WorkManager, Retrofit and Gson foundation
-- Atmospheric Material 3 design tokens
-- Responsive five-destination navigation shell
-- Stable edge-to-edge system inset handling
+The project must not be labelled Final, Complete, Production Ready or Release Candidate until Phase 26 is completed and the user explicitly approves finalization.
 
-## Phase 1 — Professional Weather UI System
-Status: COMPLETE
+## Foundation through Phase 15
 
-- Full-width compact bottom navigation
-- Home weather dashboard shell
-- Current-weather hero card
-- Compact humidity, wind and rain cards
-- Hourly forecast strip
-- 10-day, radar and air-quality quick surfaces
-- Forecast, Radar, Wallpaper and More shells
-- Responsive glass surfaces, typography and spacing
+Completed foundations:
+- Phase 0 — Android project foundation and architecture
+- Phase 1 — Professional weather UI system
+- Phase 2 — Real weather data engine
+- Phase 3 — Location and multi-city engine
+- Phase 4 — Dashboard intelligence and interaction
+- Phase 5 — Advanced Forecast and Sky Reality foundation
+- Phase 6 — Weather accuracy and celestial timeline
+- Phase 7 — AQI + Sun/Moon intelligence
+- Phase 8 — Weather Alerts foundation
+- Phase 9 — Radar foundation
+- Phase 10 — Home-screen widget foundation
+- Hero Real Live Nature Engine — animated sky/weather/dynamic reality/Android Live Wallpaper
+- Phase 14 — Performance, battery and renderer reliability foundation
+- Phase 15 — Production-foundation pass
 
-## Phase 2 — Real Weather Data Engine
-Status: COMPLETE
+## Phase 16 — Settings & Units Pro
+Status: IMPLEMENTED — device verification backlog remains in final regression.
 
-- Open-Meteo current, hourly and 10-day forecast integration
-- Foreground device location engine
-- Current weather, hourly and daily UI sync
-- Shared WeatherViewModel state
-- Persistent per-location weather cache
-- Retry/loading/offline fallback
+Implemented:
+- Celsius/Fahrenheit;
+- km/h, mph, m/s, knots;
+- hPa/mbar/inHg;
+- mm/inch;
+- km/miles;
+- Metric, Imperial and custom profiles;
+- Auto / Smooth / Battery performance selector;
+- shared formatter repaint across app/widgets/Radar labels.
 
-## Phase 3 — Location & City Engine
-Status: COMPLETE
+## Phase 17 — Widget Pro
+Status: IMPLEMENTED — launcher/device regression remains in final regression.
 
-- Friendly current-place naming
-- Global city / postal-code search
-- Multiple saved cities
-- Persistent active city
-- Current-location / city switching
-- Per-location weather cache
+Implemented:
+- per-widget configuration;
+- active-weather or fixed-city source;
+- glass/transparent appearance;
+- compact/wide responsive layouts;
+- refresh/status/source isolation;
+- fixed-city refresh that does not move the app/wallpaper active location.
 
-## Phase 4 — Main Weather Dashboard Intelligence & Interaction
-Status: COMPLETE
+## Phase 18 — Weather Intelligence 2.0
+Status: IMPLEMENTED — device verification backlog remains in final regression.
 
-- Rich current conditions
-- Weather interpretation layer
-- Sunrise/sunset/daylight/UV/pressure/cloud/gust/rain details
-- Weather-reactive hero modes
-- Dashboard actions and refresh
+Implemented:
+- shared weather-intelligence report;
+- current precipitation separated from forecast probability;
+- rain-soon/later semantics;
+- feels-like/humidity/dew point/wind/gust/visibility/pressure interpretation;
+- saved/offline model freshness wording;
+- Smart Risk protection against false rain-now claims.
 
-## Phase 5 — Advanced Forecast System & Charts
-Status: COMPLETE
+## Phase 19 — Forecast Pro
+Status: IMPLEMENTED — device verification backlog remains in final regression.
 
-- Smart 24-hour summary
-- Native Canvas temperature chart
-- Native Canvas rain-probability chart
-- Rich hourly strip
-- Expandable 10-day forecast
-- Astronomy Engine 2.1.19
-- Shared SkyRealityState / SkyRealityEngine
-- Sun/Moon positions and Moon phase/illumination
-- Weather-aware star visibility
-- Scene-light state
+Implemented:
+- interactive 24-hour forecast selection;
+- temperature/precipitation charts;
+- rain-risk timeline;
+- expandable 10-day forecast;
+- detailed daily weather, Sun/Moon and astronomical events;
+- truthful live/refreshing/saved/stale/unavailable state handling.
 
-## Phase 6 — Advanced Weather Details, Accuracy & Celestial Timeline
-Status: COMPLETE
+## Phase 20A — Accurate Live Weather Reality Foundation
+Status: SOURCE IMPLEMENTATION COMPLETE — real-device visual acceptance remains in final regression.
 
-- Higher-freshness precise current-location flow
-- 15-minute precipitation cross-check
-- Precipitation-first live condition resolver
-- Two-minute foreground live reuse window
-- Daily Moon phase progression
-- Sun/Moon rise-set timeline
-- Advanced atmospheric/wind/comfort/data-quality details
-- Weather accuracy contract
+Implemented:
+- current-weather truth as renderer authority;
+- photoreal cloud atlas and multi-depth clouds;
+- depth-aware rain/drizzle;
+- storm/lightning realism;
+- Sun/Moon/stars/twilight improvements;
+- fog/haze/snow;
+- gust response;
+- OpenGL diagnostics, renderer isolation, bounded EGL recovery;
+- temporal smoothing and adaptive frame-time guard.
 
-## Hero Real Live Nature Engine
-Status: COMPLETE — FUNCTIONAL PROCEDURAL ENGINE
+## Phase 20B — Radar Pro
+Status: SOURCE IMPLEMENTATION COMPLETE — Gradle Sync/debug integration has passed; full real-device Radar acceptance remains.
 
-### A. Animated Sky Engine
-Status: COMPLETE
+Implemented:
+- RainViewer observed radar truth boundary;
+- Open-Meteo model Clouds/Wind/Temperature layers;
+- professional layers/legends;
+- observed timeline/replay;
+- freshness/provenance/fallback states;
+- WebView lifecycle and tile-health guards;
+- bundled local Leaflet runtime;
+- persistent bounded Radar metadata/model fallback from Phase 23.
 
-- Procedural glowing Sun disc and rays
-- Real Sun altitude/azimuth from active location + clock
-- Procedural Moon disc with phase-dependent shadow
-- Real Moon altitude/azimuth, phase and illumination
-- Below-horizon Sun/Moon are hidden
-- Animated twinkling star field
-- Star visibility reacts to astronomical darkness, clouds, fog, precipitation and Moon glare
-- Daylight/golden-hour/twilight/night gradients
-- App-wide live animated nature background
-- Forecast and Wallpaper preview use the same renderer
+## Phase 21 — Alerts Pro
+Status: SOURCE IMPLEMENTATION COMPLETE — device regression remains.
 
-### B. Animated Weather Engine
-Status: COMPLETE
+Implemented:
+- official-warning truth/freshness policy;
+- saved/stale/unavailable source states;
+- source and severity filters;
+- master/per-source notification controls;
+- Android notification/channel block awareness;
+- IMD Official vs Smart Risk notification labels;
+- detailed alert dialog and notification settings entry;
+- stale-background guards.
 
-- Multi-depth moving cloud layers
-- Cloud density follows cloud cover
-- Cloud speed and direction respond to live wind
-- Animated rain and drizzle
-- Wind-driven precipitation angle
-- Animated snow drift
-- Moving fog/mist bands
-- Irregular thunderstorm flash and procedural lightning
-- Weather animation intensity follows the shared live condition
+## Phase 22 — App UX, Responsive & Accessibility Audit
+Status: SOURCE IMPLEMENTATION COMPLETE — full accessibility/device regression remains.
 
-### C. Dynamic Reality Composer
-Status: COMPLETE
+Implemented:
+- central `UiQualityPolicy`;
+- 48dp touch target baseline;
+- narrow/large-text card reflow;
+- responsive phone/tablet padding;
+- Home temperature autosizing;
+- adaptive Radar height;
+- TalkBack pane/action descriptions;
+- decorative GL/chart focus cleanup;
+- consistent loading/live/stale/error semantic treatment.
 
-- Shared SceneState
-- DynamicRealityComposer
-- Weather + astronomy combined before rendering
-- Cloud/rain/drizzle/snow/fog/storm/wind/visibility intensities
-- Weather obstruction controls Sun/Moon/star visibility
-- Shared scene-light state
+## Phase 23 — Offline, Cache & Data Reliability 2.0
+Status: SOURCE IMPLEMENTATION COMPLETE — offline/device regression remains.
 
-### D. Android Live Wallpaper Engine
-Status: COMPLETE
+Implemented:
+- shared cache-age/location reliability policy;
+- selected-city startup identity protection;
+- background old-city race protection;
+- AQI snapshot isolation;
+- bounded WorkManager retry/backoff;
+- persistent bounded Radar metadata/model cache;
+- More-page Data Reliability diagnostics;
+- corrupt cache rejection;
+- app/widget/wallpaper source-identity rules.
 
-- Real WallpaperService
-- BIND_WALLPAPER manifest registration and metadata
-- Android live-wallpaper preview/confirmation launch
-- Shared NatureSceneRenderer across app and system wallpaper
-- Visible-only render loop
-- Adaptive FPS for Power Saver/low battery
-- Horizontal parallax
-- Network refresh separated from rendering
-- WorkManager weather refresh
-- No background GPS permission
+## Phase 24 — Live Wallpaper Quality Backlog
+Status: SOURCE IMPLEMENTATION COMPLETE — current project debug build passed; real-device OpenGL/visual acceptance remains.
 
-## Phase 7 — AQI + Sun / Moon Intelligence
-Status: COMPLETE
+Verified in active shared renderer source:
+- depth/variation/wind response for rain;
+- restrained wet-glass droplets/film;
+- rain-gated wet-world reflections;
+- richer terrain/forest/world depth;
+- improved branched multi-pulse lightning;
+- cloud-density mass, edge wrapping, layered motion and overcast continuity;
+- app Hero and Android Live Wallpaper share `GlRealityAdapter -> GlSceneSnapshot -> HeroGlPipeline`;
+- performance modes change frame pacing/secondary detail, not weather truth.
 
-### Step 7.1 — Real Air Quality Data Engine
-Status: COMPLETE
+## Phase 25 — Product Completeness Audit
+Status: SOURCE IMPLEMENTATION COMPLETE — current project debug build passed; full real-device product regression remains.
 
-- Open-Meteo Air Quality API client added
-- CAMS-based current and hourly air-quality data
-- United States AQI and European AQI
-- Pollutant-specific U.S. AQI components
-- PM2.5 and PM10
-- Ozone, nitrogen dioxide, sulphur dioxide and carbon monoxide
-- Aerosol optical depth and dust
-- UV index and clear-sky UV index
-- Three-day AQI request window with 24-hour intelligence presentation
+Verified/fixed:
+- all five primary destinations are real: Home, Forecast, Radar, Wallpaper, More;
+- Home Forecast/Radar/Air Quality/Wallpaper actions are wired;
+- More Alerts and Air Quality compact cards are real actions;
+- Widgets, Units, Performance and Data Reliability have active runtime actions;
+- `LiveWeatherApplication` activates Forecast, Settings, Data Reliability, More-action and UX binders;
+- active UI no longer exposes development/roadmap wording;
+- More/About displays product-facing copy and Version 1.0.0;
+- legitimate waiting/saved/stale/no-results states are retained as data truth;
+- stale repository status documents were synchronized to the actual roadmap.
 
-### Step 7.2 — Per-Location AQI State & Cache
-Status: COMPLETE
+See `PHASE_25_PRODUCT_COMPLETENESS_AUDIT.md` for the detailed audit and regression matrix.
 
-- Shared AirQualityViewModel
-- Per-location persistent AQI cache
-- Saved-city/current-location synchronization
-- Cached fallback while refreshing
-- Manual AQI refresh action
-- Background wallpaper worker refreshes weather and AQI independently on connected network
+## Current build checkpoint
 
-### Step 7.3 — Professional AQI Intelligence Surface
-Status: COMPLETE
+The user's latest local Android Studio debug-build checkpoint passed after the Phase 25 source commits were already present in `main`.
 
-- More screen receives a full Air Quality Intelligence card
-- Large current US AQI value and category
-- EU AQI comparison
-- Dominant pollutant derived from pollutant-specific AQI components
-- PM2.5/PM10 and gas pollutant detail
-- Aerosol/dust haze detail
-- Actual UV versus clear-sky UV comparison
-- Next-24-hour AQI range and peak period
-- Horizontal three-hour AQI outlook cards
-- Home Air Quality quick action opens the AQI intelligence surface
-- CAMS/Open-Meteo model-estimate wording is surfaced instead of pretending to be a local sensor
+This confirms Java/XML/resource integration for the current source line, but it does not replace real-device regression or the release/R8 gate.
 
-### Step 7.4 — AQI-Aware Reality Engine
-Status: COMPLETE
+## Phase 26 — Final Release Gate
+Status: NOT STARTED.
 
-- Domain AirQualityReality haze rule added
-- Aerosol optical depth, PM2.5 and dust feed a normalized haze estimate
-- Live app background receives AQI haze
-- Forecast Live Sky receives AQI haze
-- Wallpaper preview receives AQI haze
-- Android system Live Wallpaper receives matching-location AQI haze from cache
-- City switching cannot intentionally mix an unrelated AQI cache with another weather-location cache
-- AQI network refresh remains separate from animation frames
+Phase 26 may begin only when the user wants to enter final release validation.
 
-### Step 7.5 — Advanced Sun & Moon Intelligence
-Status: COMPLETE
-
-- Real current Sun altitude and azimuth
-- Sun above/below-horizon state
-- Real current Moon altitude and azimuth
-- Current Moon phase and illuminated percentage
-- Daylight progress through today's sunrise/sunset window
-- Solar midpoint estimate
-- Current sky-stage/star-visibility/scene-light summary
-- Dedicated Sun & Moon Intelligence surface below the Forecast Live Sky
-
-### Step 7.6 — Upcoming Lunar Events
-Status: COMPLETE
-
-- Astronomy Engine searchMoonQuarter / nextMoonQuarter flow integrated
-- Next New Moon, First Quarter, Full Moon and Third Quarter events are calculated rather than hard-coded
-- Event date/time is converted to the active weather-location timezone
-- Existing daily Moon phase progression and moonrise/moonset timeline remain synchronized
-
-### Step 7.7 — Air Quality Accuracy Contract
-Status: COMPLETE
-
-- docs/AIR_QUALITY_ENGINE.md added
-- AQI is explicitly treated as CAMS model data, not a street-level physical sensor
-- Primary AQI is explicitly United States AQI; it is not mislabeled as India CPCB AQI
-- CAMS/Open-Meteo attribution requirement documented
-- Weather visibility, fog, AQI haze and astronomy remain separate inputs to one coherent visual reality
-
-## Phase 7 Result
-
-Live Weather now synchronizes weather, astronomy and atmospheric-composition intelligence for the active location.
-
-The user can inspect current and near-term AQI/pollutants, aerosol/dust haze, Sun/Moon position, daylight progress and upcoming major lunar events. AQI haze also participates in the animated app and Live Wallpaper atmosphere without creating network calls in the render loop.
-
-## Phase 8 — Weather Alerts
-Status: COMPLETE
-
-### Step 8.1 — Alert Source Contract
-Status: COMPLETE
-
-- WMO-registered India Meteorological Department CAP RSS feed is the active authoritative India warning source
-- Direct IMD JSON warning endpoints are retained only as an optional future whitelisted adapter and are not the mobile production dependency
-- IMD official alerts and app-derived Smart Risk alerts remain separate source types
-- Official/model-derived source badges are preserved in UI and notifications
-
-### Step 8.2 — Location-Aware Official CAP Engine
-Status: COMPLETE
-
-- Active weather coordinates are reverse-geocoded to district/state/country
-- IMD CAP is used only for India locations
-- CAP/RSS XML consumer hardened against external XML entities
-- District/state area matching filters official alerts for the selected location
-- HTTP ETag / If-None-Match support added
-- HTTP 304 retains cached official alerts without reparsing unchanged data
-- Per-location official alert cache stores alerts, ETag and update time
-- Expired official alerts are filtered
-
-### Step 8.3 — Smart Risk Engine
-Status: COMPLETE
-
-- Smart Risk is generated from the shared weather state, never from a separate weather fetch
-- Thunderstorm risk
-- Strong current precipitation
-- Strong wind gusts
-- Very low visibility
-- Heavy-rain potential
-- Strong-gust potential
-- Very-high UV
-- High-heat risk
-- Smart Risk is explicitly labelled as model-derived and never presented as an IMD warning
-
-### Step 8.4 — Dashboard + Weather Alerts Center
-Status: COMPLETE
-
-- Highest-priority active alert appears as a compact Home banner
-- Home banner opens the Weather Alerts Center
-- More screen receives a full Alerts Center
-- Active alert location, source, severity, message and validity are visible
-- Official IMD and Smart Risk cards have distinct source labels
-- No-alert state is explicit instead of displaying a fake placeholder warning
-- Manual alert refresh action added
-
-### Step 8.5 — Contextual Android Notifications
-Status: COMPLETE
-
-- Android 13+ POST_NOTIFICATIONS permission is declared
-- Permission is requested only from the user's Enable alerts action
-- Separate notification channels for official alerts and Smart Risk
-- Official non-info warnings can notify when enabled
-- Smart Risk notifications are limited to ORANGE/RED to reduce noise
-- Persistent alert fingerprints prevent repeated notifications for the same event
-- Notification taps open the Weather Alerts Center
-
-### Step 8.6 — Background Alert Refresh
-Status: COMPLETE
-
-- Network-constrained WorkManager alert refresh scheduled at Android's 15-minute periodic minimum
-- Background worker reuses WeatherCache for Smart Risk and does not duplicate the weather network request
-- Official CAP is refreshed separately using ETag caching
-- Cached official alerts remain available if the CAP refresh fails
-- Background GPS permission is not requested
-- Background alerts use the last foreground-resolved district and active cached weather coordinates
-
-### Step 8.7 — Weather Alert Accuracy Contract
-Status: COMPLETE
-
-- docs/WEATHER_ALERT_ENGINE.md added
-- Official source and Smart Risk are never conflated
-- Cached official state is identified when refresh is unavailable
-- Absence of an in-app alert is not represented as proof that hazardous weather is impossible
-- Source attribution and alert-cache strategy are documented
-
-## Phase 8 Result
-
-Live Weather now has a source-aware, location-aware alert system. India locations can consume the official IMD CAP warning feed while the app separately derives high-confidence Smart Risk signals from the same shared weather state used by the dashboard and live environment.
-
-The alert system includes severity ranking, caching, deduplication, dashboard presentation, a detailed Alerts Center, contextual Android notification permission, notification deep-linking and battery-aware background refresh without background GPS or duplicate weather-network loops.
+Required release gate:
+- latest Debug build pass;
+- Release/R8 build pass;
+- real-device smoke/regression pass;
+- Widgets pass;
+- Live Wallpaper/OpenGL pass;
+- Radar pass;
+- Alerts/notification pass;
+- offline/cache pass;
+- final versionCode/versionName decision;
+- release/Play Store preparation if requested;
+- explicit user approval before the project is called final.
 
 ## Next
 
-Phase 9 — Live Weather Radar
-
-Planned scope: professional map/radar experience with precipitation/cloud/wind layers, animated timeline where provider data supports it, active-location synchronization, source/licensing transparency and integration with the shared weather/alert reality state.
+**Phase 26 — Final Release Gate**, only after explicit user instruction to start it.
