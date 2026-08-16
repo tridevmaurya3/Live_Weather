@@ -117,24 +117,44 @@ Acceptance checkpoint: real-phone comparison of Home Hero vs applied Live Wallpa
 
 ## Phase 20B — Radar Pro
 
-- Layer controls polish
-- Clear legend for Rain / Clouds / Wind / Temperature
-- Timeline/playback UX polish
-- Recenter/current-location action
-- Data timestamp/source visibility
-- Loading/error/offline state
-- WebView lifecycle/memory audit
-- Radar vs model-field distinction remains explicit
+Status: SOURCE IMPLEMENTATION COMPLETE — Gradle Sync passed; debug build and real-device Radar acceptance pending.
+
+Implemented source checkpoints:
+- Observed RainViewer radar truth boundary and sanitized past timeline
+- Continuous Open-Meteo model cloud surface without old circles/boxes
+- Professional Rain / Model Clouds / Wind / Temperature controls and legends
+- Timestamp-aware observed timeline and reusable playback layer
+- Freshness, source provenance and cache/fallback states
+- WebView lifecycle/memory hardening and bounded recovery
+- OSM/RainViewer tile-delivery health guard
+- Bundled Leaflet runtime with no runtime CDN dependency for the map engine
+- Source freeze / pull-readiness pass and subsequent Gradle Sync compatibility fixes
+
+Acceptance checkpoint: debug build, real-phone Radar layers, replay/timeline, refresh/recenter, tab lifecycle, weak/offline network tile warning and local Leaflet startup verification.
 
 ## Phase 21 — Alerts Pro
 
+Status: IMPLEMENTATION STARTED — Step 21.1 source implementation complete; build/device verification pending.
+
+Step 21.1 implemented:
+- Central `AlertTruthPolicy` for official warning source delivery/freshness state
+- Official network, network-empty, saved cache, unavailable and not-applicable states
+- Separate current check time from official warning-data timestamp
+- Stale saved official data cannot be shown as a live all-clear
+- `304 Not Modified` refreshes official validation time
+- Stale official fallback alerts are excluded from new notification candidates
+- Alerts Center empty-state wording is source/freshness aware
+- Saved stale official warnings are visibly marked `SAVED OFFICIAL`
+- Smart Risk remains explicitly app-derived and separate from official warnings
+
+Remaining Phase 21 scope:
 - Alert settings surface
-- Official IMD vs Smart Risk filtering
+- Official warning vs Smart Risk filters
 - Severity preferences
 - Notification preferences and clear source labels
 - Alert detail/navigation polish
-- Cached/stale warning state
-- No false implication that “no alert” means “no danger”
+- Background/cached/stale warning-state hardening
+- Final Alerts Pro integration and device verification
 
 ## Phase 22 — App UX, Responsive & Accessibility Audit
 
