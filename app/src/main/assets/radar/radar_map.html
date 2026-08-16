@@ -83,7 +83,7 @@
 <div id="mapShell" role="status" aria-live="polite">
     <div id="mapShellCard" class="shell-card">
         <div id="mapShellTitle" class="shell-title">PREPARING RADAR MAP</div>
-        <div id="mapShellBody" class="shell-body">Loading the interactive map engine…</div>
+        <div id="mapShellBody" class="shell-body">Loading the bundled interactive map engine…</div>
     </div>
 </div>
 <script>
@@ -91,9 +91,9 @@
     'use strict';
 
     const LEAFLET_VERSION = '1.9.4';
-    const LEAFLET_JS_URL = 'https://unpkg.com/leaflet@' + LEAFLET_VERSION + '/dist/leaflet.js';
-    const LEAFLET_CSS_URL = 'https://unpkg.com/leaflet@' + LEAFLET_VERSION + '/dist/leaflet.css';
-    const LEAFLET_LOAD_TIMEOUT_MILLIS = 9000;
+    const LEAFLET_JS_URL = 'vendor/leaflet/leaflet.js';
+    const LEAFLET_CSS_URL = 'vendor/leaflet/leaflet.css';
+    const LEAFLET_LOAD_TIMEOUT_MILLIS = 3500;
     const CLOUD_SURFACE_SIZE = 144;
     const TILE_HEALTH_SETTLE_MILLIS = 4200;
     const TILE_HEALTH_MIN_SAMPLES = 4;
@@ -251,7 +251,7 @@
         ensureLeafletCss(forceRetry);
         showShell(
             'PREPARING RADAR MAP',
-            payload ? 'Weather data is ready. Loading the interactive map engine…' : 'Loading the interactive map engine…',
+            payload ? 'Weather data is ready. Starting the bundled interactive map engine…' : 'Starting the bundled interactive map engine…',
             false
         );
 
@@ -277,8 +277,8 @@
                 showShell(
                     'INTERACTIVE MAP UNAVAILABLE',
                     payload
-                        ? 'Radar/model data is retained in the app. Reconnect and reopen, Refresh, or Recenter to retry the map engine.'
-                        : 'The local Radar page is available, but the interactive map engine could not load. Reconnect and retry.',
+                        ? 'Radar/model data is retained. The bundled map runtime could not start; Refresh or Recenter can retry it.'
+                        : 'The local Radar page is available, but the bundled map runtime could not start. Reopen Radar, Refresh, or Recenter to retry.',
                     true
                 );
                 resolve(false);
@@ -652,6 +652,12 @@
             return {
                 baseDegraded:!!tileHealth.base.degraded,
                 radarDegraded:!!tileHealth.radar.degraded
+            };
+        },
+        getEngineInfo:function () {
+            return {
+                runtime:'bundled',
+                leafletVersion:LEAFLET_VERSION
             };
         }
     };
