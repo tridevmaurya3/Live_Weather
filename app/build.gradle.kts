@@ -8,7 +8,16 @@ val radarLeafletRuntime by configurations.creating {
     isTransitive = false
 }
 
-val generatedRadarLeafletAssets = layout.buildDirectory.dir("generated/radarLeafletAssets")
+/*
+ * Keep this as a concrete File, not Provider<Directory>.
+ * Newer Android Gradle Plugin versions reject Provider instances passed to the
+ * legacy SourceSet API. preBuild explicitly depends on the generation task, so
+ * the generated directory is prepared before Android packages main assets.
+ */
+val generatedRadarLeafletAssets = layout.buildDirectory
+    .dir("generated/radarLeafletAssets")
+    .get()
+    .asFile
 
 val prepareRadarLeafletRuntime by tasks.registering(Copy::class) {
     val webJarPrefix = "META-INF/resources/webjars/leaflet/1.9.4/dist/"
@@ -27,9 +36,8 @@ val prepareRadarLeafletRuntime by tasks.registering(Copy::class) {
     into(generatedRadarLeafletAssets)
 
     doLast {
-        val outputRoot = generatedRadarLeafletAssets.get().asFile
-        val leafletJs = outputRoot.resolve("radar/vendor/leaflet/leaflet.js")
-        val leafletCss = outputRoot.resolve("radar/vendor/leaflet/leaflet.css")
+        val leafletJs = generatedRadarLeafletAssets.resolve("radar/vendor/leaflet/leaflet.js")
+        val leafletCss = generatedRadarLeafletAssets.resolve("radar/vendor/leaflet/leaflet.css")
         if (!leafletJs.isFile || !leafletCss.isFile) {
             throw GradleException(
                 "Leaflet 1.9.4 WebJar layout changed; Radar local runtime assets were not generated."
