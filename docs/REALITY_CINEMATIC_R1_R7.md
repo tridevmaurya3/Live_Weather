@@ -1,6 +1,6 @@
 # Live Weather — Cinematic Reality R1–R7
 
-Status: **SOURCE IMPLEMENTATION COMPLETE — automated build gate pending at this checkpoint; real-device OpenGL visual acceptance still required.**
+Status: **SOURCE IMPLEMENTATION COMPLETE — automated Debug/tests/Release lint/R8 APK+AAB gate PASSED; real-device OpenGL visual acceptance still required.**
 
 This pass is intentionally not a Play Store/release phase. Its only goal is to make the shared app Hero + Android Live Wallpaper reality engine smoother, more natural and more cinematic without fabricating weather.
 
@@ -97,6 +97,22 @@ Active renderers: `HeroGlSnowRenderer`, `HeroGlAtmosphereOverlayRenderer`, `Hero
 - Hidden app Hero and invisible Wallpaper retain zero/paused rendering behavior from the existing lifecycle/performance system.
 - Weather truth is never reduced to gain FPS.
 
+## Automated gate
+
+Authoritative source checkpoint: `cfe2a4673758a490ee7a64183ad10a66a8a0d85d`.
+
+GitHub Actions run `31968665220` completed successfully with:
+
+- Debug build
+- unit tests
+- Release lint
+- minified/R8 Release APK
+- Release AAB
+- release-output verification
+- verification artifact upload
+
+GLSL shaders still compile on the actual device GPU when the OpenGL surface is created, so this automated pass is necessary but not sufficient for final visual/GPU acceptance.
+
 ## Required real-device acceptance
 
 Test both Home Hero and an applied Live Wallpaper:
@@ -116,5 +132,3 @@ Test both Home Hero and an applied Live Wallpaper:
 13. Switch city/current location and watch all layers ease rather than hard-reset.
 14. Compare Home Hero and applied Wallpaper for the same weather/time/location.
 15. Check Smooth/Auto/Battery modes for identical weather truth and only reduced secondary detail/FPS.
-
-GLSL shaders compile on the actual device GPU when the OpenGL surface is created, so Android/CI build success is necessary but not sufficient for visual/GPU acceptance.
