@@ -9,7 +9,12 @@ import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.nio.FloatBuffer;
 
-/** Depth-aware rain with mobile governor-controlled secondary detail. */
+/**
+ * Shared depth-aware rain + wet-glass pass for app Hero and Live Wallpaper.
+ *
+ * Phase 24 improves perspective, streak variation and gravity-driven glass
+ * droplets while keeping every effect gated by resolved current rain/drizzle.
+ */
 public final class HeroGlDepthRainRenderer {
 
     private static final float[] QUAD={-1f,-1f,1f,-1f,-1f,1f,1f,1f};
@@ -38,44 +43,50 @@ public final class HeroGlDepthRainRenderer {
             "uniform float uSceneLight;",
             "uniform float uDetail;",
             "float rnd(vec2 id,float seed){vec2 uv=fract((id+vec2(seed,seed*1.731)+0.5)/64.0);return texture2D(uNoise,uv).r;}",
-            "float rainBand(vec2 p,vec2 grid,float speed,float width,float length,float lean,float seed,float density){",
-            "  vec2 q=p;q.x+=q.y*lean;q*=grid;vec2 id=floor(q);float a=rnd(id,seed);float b=rnd(id,seed+9.37);float c=rnd(id,seed+21.11);",
-            "  float x=fract(q.x)-0.5+(a-0.5)*0.58;float y=fract(q.y+uTime*speed*(0.72+b*0.58)+c*6.0);",
-            "  float line=1.0-smoothstep(width,width*2.45,abs(x));float head=smoothstep(0.015,0.095,y);float tail=1.0-smoothstep(length,min(0.995,length+0.20),y);",
-            "  return line*head*tail*step(1.0-density,b);",
+            "float rainBand(vec2 p,vec2 grid,float speed,float width,float length,float lean,float seed,float density,float depth){",
+            "  vec2 q=p;float sway=sin(uTime*(0.70+depth*0.32)+p.y*4.0+seed)*0.006*uWind;",
+            "  q.x+=q.y*lean+sway;q*=grid;vec2 id=floor(q);float a=rnd(id,seed);float b=rnd(id,seed+9.37);float c=rnd(id,seed+21.11);",
+            "  float jitter=0.82+b*0.46;float x=fract(q.x)-0.5+(a-0.5)*(0.55-0.12*depth);",
+            "  float y=fract(q.y+uTime*speed*jitter+c*6.0);float w=width*(0.82+0.42*a);float len=length*(0.82+0.34*c);",
+            "  float line=1.0-smoothstep(w,w*2.35,abs(x));float head=smoothstep(0.012,0.085,y);float tail=1.0-smoothstep(len,min(0.995,len+0.19),y);",
+            "  float sparkle=0.78+0.22*smoothstep(0.70,0.98,a);return line*head*tail*sparkle*step(1.0-density,b);",
             "}",
-            "float wetDrop(vec2 p,float seed,float density){",
-            "  vec2 g=p*vec2(6.0,9.0);vec2 id=floor(g);float a=rnd(id,seed);float b=rnd(id,seed+13.4);",
-            "  vec2 f=fract(g)-0.5+vec2((a-0.5)*0.42,(b-0.5)*0.34);f.y*=0.80;float d=length(f);",
-            "  float outer=1.0-smoothstep(0.19,0.28,d);float inner=1.0-smoothstep(0.115,0.18,d);float rim=max(0.0,outer-inner);",
-            "  float highlight=(1.0-smoothstep(0.025,0.085,length(f-vec2(-0.055,0.060))))*0.65;return (rim+highlight*outer)*step(1.0-density,a);",
+            "float glassDrop(vec2 p,float seed,float density,float speed){",
+            "  vec2 g=p*vec2(6.2,8.7);vec2 id=floor(g);float a=rnd(id,seed);float b=rnd(id,seed+13.4);float c=rnd(id,seed+27.2);",
+            "  float fall=fract(uTime*speed*(0.34+0.70*b)+c*5.0);",
+            "  vec2 f=fract(g)-0.5+vec2((a-0.5)*0.38,fall-0.50);f.y*=0.82;float d=length(f);",
+            "  float outer=1.0-smoothstep(0.18,0.275,d);float inner=1.0-smoothstep(0.105,0.175,d);float rim=max(0.0,outer-inner);",
+            "  float highlight=(1.0-smoothstep(0.020,0.080,length(f-vec2(-0.052,0.060))))*0.72*outer;",
+            "  float trailX=1.0-smoothstep(0.025,0.070,abs(f.x));float trailY=smoothstep(0.02,0.20,f.y)*(1.0-smoothstep(0.20,0.48,f.y));",
+            "  float trail=trailX*trailY*(0.20+0.38*b);return (rim+highlight+trail)*step(1.0-density,a);",
             "}",
             "void main(){",
             "  float rain=clamp(uRain,0.0,1.0);float drizzle=clamp(uDrizzle,0.0,1.0);float detail=clamp(uDetail,0.5,1.0);",
             "  float effective=max(rain,drizzle*0.58);if(effective<0.004){gl_FragColor=vec4(0.0);return;}",
             "  vec2 p=vec2(vUv.x,1.0-vUv.y);float aspect=uResolution.x/max(1.0,uResolution.y);vec2 sceneP=vec2((p.x-0.5)*aspect+0.5,p.y);",
-            "  float side=sin(uWindDir);float forward=cos(uWindDir);float lean=side*(0.035+uWind*0.34)+forward*0.018*side;float windSpeed=0.78+uWind*0.82;",
+            "  float side=sin(uWindDir);float forward=cos(uWindDir);float lean=side*(0.034+uWind*0.34)+forward*0.018*side;float windSpeed=0.78+uWind*0.84;",
             "  float drizzleGate=drizzle*(1.0-smoothstep(0.22,0.58,rain));float farGate=clamp(0.18+rain*0.58+drizzleGate*0.35,0.0,0.78);",
             "  float midGate=clamp(0.12+rain*0.66+drizzleGate*0.20,0.0,0.82);float nearGate=clamp(rain*0.70-0.04,0.0,0.72);",
-            "  float drizzleFine=rainBand(sceneP+vec2(0.13,0.04),vec2(106.0,58.0),0.52*windSpeed,0.0065,0.35,lean*0.48,2.3,0.25+drizzleGate*0.34);",
-            "  float farRain=rainBand(sceneP+vec2(0.31,0.09),vec2(82.0,45.0),0.70*windSpeed,0.0085,0.43,lean*0.62,5.9,farGate);",
-            "  float midRain=rainBand(sceneP+vec2(0.47,0.16),vec2(52.0,31.0),0.96*windSpeed,0.0135,0.56,lean*0.84,11.7,midGate);",
-            "  float nearRain=0.0;if(detail>0.62){nearRain=rainBand(sceneP+vec2(0.67,0.25),vec2(29.0,19.0),1.28*windSpeed,0.0220,0.69,lean*1.08,18.1,nearGate);}",
-            "  float lineAlpha=drizzleFine*drizzleGate*0.26+farRain*rain*(0.18+rain*0.12)+midRain*rain*(0.34+rain*0.18)+nearRain*rain*(0.54+rain*0.26);",
-            "  lineAlpha=clamp(lineAlpha,0.0,0.82);",
-            "  float heavy=smoothstep(0.52,0.92,rain);vec2 mistUv=vec2(sceneP.x*0.46+uTime*side*0.006,sceneP.y*0.38-uTime*(0.010+rain*0.014));",
+            "  float drizzleFine=rainBand(sceneP+vec2(0.13,0.04),vec2(108.0,60.0),0.50*windSpeed,0.0062,0.33,lean*0.47,2.3,0.25+drizzleGate*0.34,0.18);",
+            "  float farRain=rainBand(sceneP+vec2(0.31,0.09),vec2(84.0,46.0),0.69*windSpeed,0.0084,0.42,lean*0.61,5.9,farGate,0.34);",
+            "  float midRain=rainBand(sceneP+vec2(0.47,0.16),vec2(53.0,31.0),0.97*windSpeed,0.0132,0.56,lean*0.84,11.7,midGate,0.62);",
+            "  float nearRain=0.0;if(detail>0.62){nearRain=rainBand(sceneP+vec2(0.67,0.25),vec2(29.0,18.0),1.31*windSpeed,0.0215,0.70,lean*1.10,18.1,nearGate,0.92);}",
+            "  float lineAlpha=drizzleFine*drizzleGate*0.25+farRain*rain*(0.18+rain*0.12)+midRain*rain*(0.34+rain*0.18)+nearRain*rain*(0.54+rain*0.25);",
+            "  float perspective=mix(0.80,1.10,smoothstep(0.22,0.95,p.y));lineAlpha=clamp(lineAlpha*perspective,0.0,0.82);",
+            "  float heavy=smoothstep(0.50,0.90,rain);vec2 mistUv=vec2(sceneP.x*0.45+uTime*side*0.006,sceneP.y*0.38-uTime*(0.010+rain*0.014));",
             "  float mistNoise=texture2D(uNoise,mistUv).r;if(detail>0.70){mistNoise=mistNoise*0.64+texture2D(uNoise,mistUv*1.91+vec2(0.17,0.23)).r*0.36;}",
-            "  float lowVisibility=1.0-clamp(uVisibility,0.0,1.0);float rainVeil=(0.020+mistNoise*0.070)*heavy*(0.82+lowVisibility*0.34);",
-            "  float wetGate=smoothstep(0.42,0.86,effective);float wet=0.0;",
-            "  if(detail>0.56){wet=wetDrop(p,4.7,0.055+wetGate*0.14);}",
-            "  if(detail>0.82){wet+=wetDrop(p+vec2(0.16,0.08),12.6,0.035+wetGate*0.10);}",
-            "  wet*=wetGate;float lowerFilm=smoothstep(0.80,1.0,p.y)*(0.010+heavy*0.045);",
-            "  float stormLift=clamp(uStorm,0.0,1.0)*0.14;vec3 rainColor=mix(vec3(0.58,0.70,0.80),vec3(0.84,0.92,0.98),0.38+uSceneLight*0.30+stormLift);",
+            "  float lowVisibility=1.0-clamp(uVisibility,0.0,1.0);float rainVeil=(0.018+mistNoise*0.068)*heavy*(0.82+lowVisibility*0.35);",
+            "  float wetGate=smoothstep(0.38,0.84,effective);float wet=0.0;",
+            "  if(detail>0.56){wet=glassDrop(p,4.7,0.050+wetGate*0.13,0.16+rain*0.18);}",
+            "  if(detail>0.82){wet+=glassDrop(p+vec2(0.16,0.08),12.6,0.032+wetGate*0.095,0.12+rain*0.16);}",
+            "  wet*=wetGate;float lowerFilm=smoothstep(0.79,1.0,p.y)*(0.010+heavy*0.050);",
+            "  float filmRipple=(0.5+0.5*sin(p.x*34.0+uTime*(1.1+rain*1.8)))*(0.004+heavy*0.012)*smoothstep(0.86,1.0,p.y);",
+            "  float stormLift=clamp(uStorm,0.0,1.0)*0.14;vec3 rainColor=mix(vec3(0.57,0.69,0.80),vec3(0.85,0.93,1.0),0.37+uSceneLight*0.30+stormLift);",
             "  vec3 color=rainColor;float alpha=lineAlpha;float veil=clamp(rainVeil,0.0,0.12);",
-            "  color=mix(color,vec3(0.35,0.43,0.50),veil*2.4);alpha=1.0-(1.0-alpha)*(1.0-veil);",
-            "  float wetAlpha=clamp(wet*0.20,0.0,0.18);color=mix(color,vec3(0.86,0.94,1.0),wetAlpha*2.5);alpha=1.0-(1.0-alpha)*(1.0-wetAlpha);",
-            "  float film=clamp(lowerFilm,0.0,0.07);color=mix(color,vec3(0.19,0.27,0.33),film*1.8);alpha=1.0-(1.0-alpha)*(1.0-film);",
-            "  alpha*=0.70+0.30*(0.34+uSceneLight*0.66);gl_FragColor=vec4(clamp(color,0.0,1.0),clamp(alpha,0.0,0.86));",
+            "  color=mix(color,vec3(0.34,0.42,0.50),veil*2.4);alpha=1.0-(1.0-alpha)*(1.0-veil);",
+            "  float wetAlpha=clamp(wet*0.21,0.0,0.19);color=mix(color,vec3(0.87,0.95,1.0),wetAlpha*2.55);alpha=1.0-(1.0-alpha)*(1.0-wetAlpha);",
+            "  float film=clamp(lowerFilm+filmRipple,0.0,0.082);color=mix(color,vec3(0.18,0.27,0.34),film*1.85);alpha=1.0-(1.0-alpha)*(1.0-film);",
+            "  alpha*=0.70+0.30*(0.34+uSceneLight*0.66);gl_FragColor=vec4(clamp(color,0.0,1.0),clamp(alpha,0.0,0.87));",
             "}");
 
     private final FloatBuffer quad;
