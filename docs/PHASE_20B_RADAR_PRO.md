@@ -1,6 +1,6 @@
 # Phase 20B — Radar Pro
 
-Status: IMPLEMENTATION STARTED — Step 20B.1 observed-data foundation complete; visual/device verification pending.
+Status: IMPLEMENTATION STARTED — Steps 20B.1–20B.2 complete; visual/device verification pending.
 
 ## Product contract
 
@@ -31,15 +31,30 @@ Implemented:
 - `Phase9Renderer` sends only the safe host and sanitized observed frames to the map payload.
 - Radar source/status text explicitly distinguishes observed radar from Open-Meteo model context and states that no future radar nowcast is fabricated.
 
-## Existing cloud-layer limitation discovered in the audit
+## Step 20B.2 — continuous model-cloud surface
 
-The current Clouds layer in `radar_map.html` uses blurred Leaflet circles derived from a sparse 5x5 Open-Meteo cloud-cover field. It is a model visualization, not a real cloud raster/satellite layer. This is the main architectural reason the cloud layer can look like separated blobs/tiles instead of a continuous professional weather map.
+Implemented:
+- Removed the old cloud presentation based on multiple blurred Leaflet circles around each model sample.
+- Open-Meteo 5x5 cloud-cover points are now interpolated into one continuous bounded atmospheric field using inverse-distance weighting.
+- The model surface is rendered once into a small 144x144 transparent offscreen canvas and delivered to Leaflet as one georeferenced image overlay.
+- Individual sample circles, SVG cloud blobs and per-point cloud DOM geometry are no longer used.
+- Surface edges use an alpha feather so the finite sampled field does not reveal a hard rectangular boundary.
+- Cloud tone/opacity vary continuously with interpolated cloud-cover density while keeping the base map readable.
+- Longitude samples are unwrapped around the active location before interpolation to avoid a false large span near the antimeridian; pathological spans are rejected.
+- Cloud-surface generation is lazy. The default Rain layer pays no interpolation cost unless the user actually selects Clouds.
+- New field data invalidates the old cloud surface; normal map pan/zoom reuses Leaflet's single image overlay instead of recomputing the field during gestures.
+- RainViewer observed radar rendering and observed-frame timeline are unchanged.
+- The layer remains explicitly an Open-Meteo model visualization, not radar or satellite imagery.
 
-Step 20B.1 intentionally does not redesign that visual layer. The next Radar Pro step should replace the sparse-circle presentation with a continuous, bounded model-field surface (or another properly sourced raster product if adopted) while preserving explicit source semantics.
+## Performance contract for the cloud surface
+
+The cloud field is intentionally a low-frequency contextual layer. Its interpolation runs only when a new model field needs a Cloud-layer image. It is not an animation loop, does not trigger Android page refreshes, does not make additional network calls and does not rebuild while the user pans or zooms the map.
+
+This keeps the Radar page aligned with the Real Live Weather smoothness rule: realistic presentation without trading away responsiveness.
 
 ## Verification boundary
 
 - Source changes are on `main`.
-- No local Android Studio / Gradle build was run in this step.
-- No real-device WebView/radar playback validation was run in this step.
+- No local Android Studio / Gradle build was run in these Radar Pro steps.
+- No real-device WebView/radar playback/cloud-surface validation was run yet.
 - Phase 20B is not complete.
