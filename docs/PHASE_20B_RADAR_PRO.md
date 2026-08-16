@@ -1,6 +1,6 @@
 # Phase 20B — Radar Pro
 
-Status: IMPLEMENTATION STARTED — Steps 20B.1–20B.3 complete; visual/device verification pending.
+Status: IMPLEMENTATION STARTED — Steps 20B.1–20B.4 complete; visual/device verification pending.
 
 ## Product contract
 
@@ -68,6 +68,21 @@ Implemented:
 - Temperature legend identifies `MODEL TEMPERATURE · OPEN-METEO`; the color legend remains qualitative while numeric labels continue using the user's selected temperature unit.
 - If observed radar or model-field data is unavailable, the active legend says so instead of displaying a misleading normal-state explanation.
 - Layer switching still uses the existing `RadarApp.setLayer(...)` JavaScript bridge and does not reload the WebView, refetch network data, or rebuild the Android page.
+
+## Step 20B.4 — observed timeline + playback UX
+
+Implemented:
+- The timeline now presents explicit `Latest observed`, `Historical observed`, `Playing`, `Cached`, and `Delayed metadata` states instead of a generic fixed subtitle.
+- The selected observed timestamp is retained separately from the SeekBar index. When a refreshed provider timeline shifts frame positions, the UI preserves the nearest matching observed time instead of silently jumping to an unrelated frame number.
+- While the user is following the latest frame, refreshed radar metadata continues to follow the newest validated observed frame.
+- The latest frame uses `Replay`; starting from latest restarts at the oldest available observed frame and then plays forward to the newest observation.
+- Pausing or dragging the timeline preserves the selected historical frame rather than forcing an immediate jump back to latest.
+- Playback automatically returns to a `Replay` state when the newest observed frame is reached.
+- SeekBar and Play/Replay controls now expose dynamic accessibility descriptions with current timeline state and frame time.
+- The RainViewer Leaflet tile layer is now reused across playback frames. `setFrame(...)` changes the existing tile layer URL instead of removing the layer object and constructing a new `L.tileLayer` on every playback tick.
+- Switching away from Rain may remove the radar layer from the map, but the layer object is retained for reuse when Rain is selected again.
+- No frame prefetch loop, extra radar request, synthetic interpolation, or future nowcast was added.
+- The playback cadence remains bounded on the Android main handler and is stopped when the Radar page is hidden/destroyed.
 
 ## Verification boundary
 
