@@ -114,7 +114,7 @@ public final class LiveWeatherWallpaperService extends WallpaperService {
         private boolean sameOptions(@NonNull WallpaperPreferences.Options first,@NonNull WallpaperPreferences.Options second){
             return first.isRain()==second.isRain()&&first.isClouds()==second.isClouds()&&first.isLightning()==second.isLightning()
                     &&first.isSnow()==second.isSnow()&&first.isFog()==second.isFog()&&first.isStars()==second.isStars()
-                    &&first.isBatteryAdaptive()==second.isBatteryAdaptive();
+                    &&first.isBatteryAdaptive()==second.isBatteryAdaptive()&&first.getSceneryMode()==second.getSceneryMode();
         }
 
         private boolean sameCoordinate(double first,double second){
