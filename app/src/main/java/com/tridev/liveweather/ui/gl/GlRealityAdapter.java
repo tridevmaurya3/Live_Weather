@@ -15,9 +15,14 @@ import com.tridev.liveweather.domain.scene.SceneState;
  *
  * Sun/Moon positions, lunar phase and astronomical star visibility remain
  * authoritative outputs of the shared reality engines. The GPU adapter only
- * converts them to normalized/perceptual display uniforms.
+ * converts them to normalized/perceptual display uniforms. For the cinematic
+ * reality pass it also supplies observer latitude and local sidereal angle so
+ * the star renderer can rotate the celestial sphere instead of pinning stars to
+ * screen coordinates.
  */
 public final class GlRealityAdapter {
+
+    private static final double TWO_PI = Math.PI * 2d;
 
     private GlRealityAdapter() {
     }
@@ -58,6 +63,8 @@ public final class GlRealityAdapter {
                 ? 0f
                 : clamp01((float) Math.pow(resolvedStarVisibility, 0.38d));
 
+        float observerLatitudeRadians = (float) Math.toRadians(clamp(latitude, -89.9d, 89.9d));
+        float localSiderealRadians = (float) resolveLocalSiderealRadians(epochMillis, longitude);
         float thermalBias = resolveThermalBias(weather.getCurrent());
 
         return new GlSceneSnapshot(
@@ -81,6 +88,8 @@ public final class GlRealityAdapter {
                 (float) Math.toRadians(normalizeDegrees(sky.getMoonPhaseAngleDegrees())),
                 (float) sky.getMoonAltitude(),
                 gpuStarVisibility,
+                observerLatitudeRadians,
+                localSiderealRadians,
                 clamp01((float) clouds.getCloudAmount()),
                 clamp01((float) clouds.getDensity()),
                 clamp01((float) clouds.getFarLayer()),
@@ -101,6 +110,16 @@ public final class GlRealityAdapter {
                 clamp01((float) state.getVisibilityFactor()),
                 parallax
         );
+    }
+
+    /** Greenwich mean sidereal time + observer longitude, normalized to 0..2π. */
+    private static double resolveLocalSiderealRadians(long epochMillis, double longitudeDegrees) {
+        double julianDate = epochMillis / 86_400_000d + 2_440_587.5d;
+        double daysSinceJ2000 = julianDate - 2_451_545.0d;
+        double gmstDegrees = 280.46061837d + 360.98564736629d * daysSinceJ2000;
+        double localDegrees = normalizeDegrees(gmstDegrees + longitudeDegrees);
+        double radians = Math.toRadians(localDegrees) % TWO_PI;
+        return radians < 0d ? radians + TWO_PI : radians;
     }
 
     private static float resolveThermalBias(@Nullable WeatherResponse.CurrentWeather current) {
