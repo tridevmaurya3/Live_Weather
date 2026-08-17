@@ -13,4 +13,8 @@
     <string name="wallpaper_scenery_selected_format">Selected scene · %1$s</string>
     <string name="wallpaper_scenery_select_accessibility">Select %1$s scenery</string>
     <string name="wallpaper_scenery_changed_accessibility">%1$s scenery selected</string>
+    <string name="wallpaper_scenery_variation_format">Variation %1$d of %2$d</string>
+    <string name="wallpaper_scenery_variation_action">Change variation</string>
+    <string name="wallpaper_scenery_variation_accessibility">Change scenery variation. Current variation %1$d of %2$d</string>
+    <string name="wallpaper_scenery_variation_changed_accessibility">Scenery variation %1$d of %2$d selected</string>
 </resources>
