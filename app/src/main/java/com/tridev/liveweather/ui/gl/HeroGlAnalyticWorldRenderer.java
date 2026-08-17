@@ -16,9 +16,10 @@ import java.nio.FloatBuffer;
 /**
  * Deterministic atmospheric world shared by app Hero and Live Wallpaper.
  *
- * Scenery S4 adds four stable visual composition variants per user-facing scene.
- * Variant 1 preserves the S3 baseline; variants 2-4 alter only presentation geometry,
- * spacing and material rhythm. Weather truth still comes exclusively from GlSceneSnapshot.
+ * Scenery S5 adds restrained category-specific natural micro-detail on top of the
+ * S4 variation library. Details are presentation-only, visibility-aware and driven
+ * only by existing current weather inputs. Cloud rendering remains a separate,
+ * frozen layer and weather truth still comes exclusively from GlSceneSnapshot.
  */
 public final class HeroGlAnalyticWorldRenderer {
 
@@ -97,6 +98,7 @@ public final class HeroGlAnalyticWorldRenderer {
             " float light=clamp(0.18+uSceneLight*0.74+lunar*0.18,0.16,0.95);",
             " float rainAir=precip*(0.08+uStorm*0.08);",
             " float haze=max(max(uFog*0.55,uHaze*0.25),rainAir);",
+            " float detailVis=clamp((1.0-haze*0.86)*(0.52+light*0.48)*(1.0-uStorm*0.22),0.0,1.0);",
             " float warm=max(0.0,uThermal);float cold=max(0.0,-uThermal);",
             " vec3 farC=mix(vec3(0.055,0.085,0.120),vec3(0.25,0.32,0.36),light);",
             " vec3 midC=mix(vec3(0.032,0.058,0.086),vec3(0.15,0.22,0.25),light);",
@@ -114,6 +116,9 @@ public final class HeroGlAnalyticWorldRenderer {
             " float midEdge=(1.0-smoothstep(midLine-0.006,midLine+0.010,p.y))*smoothstep(midLine-0.017,midLine-0.003,p.y)*terrainW;",
             " float rimLight=(0.012+light*0.028)*(1.0-haze*0.72)*(1.0-uStorm*0.45);",
             " color+=vec3(0.34,0.39,0.40)*farEdge*rimLight+vec3(0.20,0.27,0.28)*midEdge*rimLight*0.72;",
+            " float ridgeTexture=0.5+0.5*sin(xMid*(46.0+variant*2.1)+sin(xMid*13.0+vPhase)*1.35);",
+            " float ridgeDetail=mNature*midM*(1.0-nearM)*smoothstep(midLine+0.008,midLine+0.060,p.y)*detailVis;",
+            " color=mix(color,mix(vec3(0.075,0.115,0.110),vec3(0.13,0.18,0.16),light),ridgeDetail*ridgeTexture*0.055);",
             " float groundStart=mix(0.925-vNorm*0.004*sin(vPhase),0.975-vNorm*0.005,mOpen);",
             " float ground=smoothstep(groundStart,min(0.998,groundStart+0.033),p.y);",
             " vec3 groundC=mix(vec3(0.008,0.018,0.024),vec3(0.025,0.046,0.052),light);",
@@ -152,10 +157,17 @@ public final class HeroGlAnalyticWorldRenderer {
             " float roadCurve=0.5+0.5*sin(xNear*(4.0+variant*0.34)+0.8+vPhase*0.31);",
             " road*=smoothstep(0.16,0.48,roadCurve)*(1.0-uFog*0.45);",
             " color=mix(color,mix(vec3(0.030,0.030,0.026),vec3(0.115,0.100,0.075),light),road*0.20);alpha=max(alpha,road*0.10);",
+            " float hedgeLine=0.884+0.005*sin(xNear*(17.0+variant*0.8)+vPhase*0.43);",
+            " float hedge=mVillage*smoothstep(hedgeLine-0.005,hedgeLine+0.003,p.y)*(1.0-smoothstep(hedgeLine+0.014,hedgeLine+0.023,p.y))*detailVis;",
+            " vec3 hedgeC=mix(vec3(0.018,0.038,0.024),vec3(0.075,0.115,0.060),light);",
+            " color=mix(color,hedgeC,hedge*0.24);alpha=max(alpha,hedge*0.10);",
             " float windowEnd=0.41+0.14*mUrban+vNorm*0.035;",
             " float windowShape=step(0.80-vNorm*0.04,fract(cityCell*0.618+vPhase*0.07))*step(0.22,cityLocal)*step(cityLocal,windowEnd);",
             " float windowBand=windowShape*buildingShape*night*(1.0-uFog*0.70)*(0.20*mUrban+0.13*mVillage+0.10*mNature);",
             " color+=vec3(0.78,0.58,0.30)*windowBand*0.55;alpha=max(alpha,windowBand*0.14);",
+            " float roofEdge=mUrban*buildingShape*(1.0-smoothstep(cityTop+0.005,cityTop+0.014,p.y))*detailVis;",
+            " float roofRhythm=0.45+0.55*(0.5+0.5*sin(cityCell*3.17+cityLocal*8.0+vPhase));",
+            " color+=mix(vec3(0.055,0.070,0.080),vec3(0.12,0.14,0.15),light)*roofEdge*roofRhythm*0.050;",
             " float sway=sin(uTime*(0.42+uWind*0.72)+xNear*(19.0+variant*1.6)+vPhase)*uWind;",
             " float farmGround=mFarm*smoothstep(0.855-vNorm*0.004,0.950,p.y);",
             " float farmPerspective=max(0.0,p.y-(0.850-vNorm*0.003));",
@@ -169,6 +181,10 @@ public final class HeroGlAnalyticWorldRenderer {
             " vec3 farmC=mix(vec3(0.035,0.060,0.030),vec3(0.18,0.25,0.085),light);",
             " color=mix(color,farmC,rowMask*(0.34+vNorm*0.04));alpha=max(alpha,rowMask*0.25);",
             " color+=vec3(0.10,0.12,0.045)*fineRows*farmGround*(0.026+vNorm*0.006)*(1.0-uFog*0.60);",
+            " float cropHeadNoise=0.5+0.5*sin(xNear*(121.0+variant*6.0)+farmPerspective*88.0+sway*0.22+vPhase);",
+            " float cropHeadBand=farmGround*rowMask*smoothstep(0.858,0.884,p.y)*(1.0-smoothstep(0.925,0.953,p.y))*detailVis;",
+            " float cropHeads=cropHeadBand*smoothstep(0.72,0.94,cropHeadNoise);",
+            " color+=mix(vec3(0.10,0.15,0.050),vec3(0.24,0.22,0.075),light)*cropHeads*0.050;",
             " float riverShift=vNorm*0.006*sin(vPhase*1.3);",
             " float bank=mRiver*smoothstep(0.862+riverShift,0.878+riverShift,p.y)*(1.0-smoothstep(0.892+riverShift,0.906+riverShift,p.y));",
             " vec3 bankC=mix(vec3(0.018,0.038,0.026),vec3(0.080,0.115,0.062),light);",
@@ -184,11 +200,18 @@ public final class HeroGlAnalyticWorldRenderer {
             " color=mix(color,waterC,water*(0.64-haze*0.18));alpha=max(alpha,water*0.55);",
             " float waterGlint=water*(1.0-uFog*0.72)*(0.5+0.5*microWave)*(0.008+uSunVis*0.020+uMoonVis*night*0.008);",
             " color+=mix(vec3(0.17,0.24,0.30),vec3(0.52,0.60,0.63),light)*waterGlint;",
+            " float reedNoise=0.5+0.5*sin(xNear*(83.0+variant*4.5)+sway*0.18+vPhase*0.6);",
+            " float reedBand=mRiver*smoothstep(0.866+riverShift,0.878+riverShift,p.y)*(1.0-smoothstep(0.889+riverShift,0.903+riverShift,p.y))*detailVis;",
+            " float reeds=reedBand*smoothstep(0.74,0.94,reedNoise);",
+            " color=mix(color,mix(vec3(0.020,0.052,0.030),vec3(0.105,0.145,0.065),light),reeds*0.24);alpha=max(alpha,reeds*0.08);",
             " float meadow=mFlowers*smoothstep(0.850-vNorm*0.005,0.935,p.y);",
             " float leafTexture=0.5+0.5*sin(xNear*(67.0+variant*5.0)+sin(xNear*(19.0+variant*1.2)+sway*0.12+vPhase)*2.2);",
             " vec3 meadowC=mix(vec3(0.018,0.048,0.034),vec3(0.080,0.18,0.090),light);",
             " meadowC=mix(meadowC,vec3(0.065,0.17,0.11),vNorm*0.12);",
             " color=mix(color,meadowC,meadow*(0.42+leafTexture*0.16)*(1.0-uFog*0.42));alpha=max(alpha,meadow*0.46);",
+            " float grassFine=0.5+0.5*sin(xNear*(137.0+variant*5.0)+p.y*73.0+sway*0.25+vPhase*0.5);",
+            " float grassDetail=meadow*smoothstep(0.72,0.94,grassFine)*detailVis;",
+            " color+=mix(vec3(0.020,0.060,0.030),vec3(0.075,0.14,0.060),light)*grassDetail*0.038;",
             " float flowerA=step(0.955-vNorm*0.018,0.5+0.5*sin(xNear*(113.0+variant*4.0)+floor(p.y*112.0)*2.31+sway*0.16+vPhase));",
             " float flowerB=step(0.965-vNorm*0.016,0.5+0.5*sin(xNear*(79.0+variant*3.0)-floor(p.y*96.0)*1.73+1.4-sway*0.11-vPhase*0.7));",
             " float flowerDots=meadow*max(flowerA,flowerB)*(1.0-uFog*0.72)*(0.34+light*0.44);",
