@@ -9,6 +9,7 @@ import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
 import com.tridev.liveweather.data.local.UnitPreferences;
+import com.tridev.liveweather.domain.scene.SceneryVariantRuntimeState;
 import com.tridev.liveweather.ui.UiQualityPolicy;
 import com.tridev.liveweather.ui.forecast.ForecastProBinder;
 import com.tridev.liveweather.ui.settings.DataReliabilityBinder;
@@ -37,6 +38,7 @@ public final class LiveWeatherApplication extends Application
     public void onCreate() {
         super.onCreate();
         applicationContext = getApplicationContext();
+        SceneryVariantRuntimeState.initialize(this);
         WeatherFormatter.configure(new UnitPreferences(this).load());
         WidgetRefreshScheduler.schedule(this);
         WeatherWidgetUpdater.updateAll(this);
