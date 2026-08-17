@@ -16,6 +16,39 @@ public final class GroundWetnessControllerTest {
 
         assertTrue(controller.getWetness() > 0.85f);
         assertTrue(controller.getPuddleCoverage() > 0.55f);
+        assertTrue(controller.getSoilSaturation() > 0.85f);
+        assertTrue(controller.getSurfaceWater() > 0.45f);
+    }
+
+    @Test
+    public void longerRainAccumulatesMoreStandingWaterThanShortShower() {
+        GroundWetnessController shortShower = new GroundWetnessController();
+        GroundWetnessController longDownpour = new GroundWetnessController();
+
+        for (int second = 0; second < 20; second++) {
+            shortShower.advance(0.90f, 0f, 0.35f, 0f, 0.20f, 1f);
+        }
+        for (int second = 0; second < 180; second++) {
+            longDownpour.advance(0.90f, 0f, 0.35f, 0f, 0.20f, 1f);
+        }
+
+        assertTrue(longDownpour.getSurfaceWater() > shortShower.getSurfaceWater() + 0.25f);
+        assertTrue(longDownpour.getPuddleCoverage() > shortShower.getPuddleCoverage() + 0.25f);
+    }
+
+    @Test
+    public void drizzleWetsGroundButProducesLessStandingWaterThanRain() {
+        GroundWetnessController drizzle = new GroundWetnessController();
+        GroundWetnessController rain = new GroundWetnessController();
+
+        for (int second = 0; second < 120; second++) {
+            drizzle.advance(0f, 0.90f, 0f, 0f, 0.10f, 1f);
+            rain.advance(0.90f, 0f, 0f, 0f, 0.10f, 1f);
+        }
+
+        assertTrue(drizzle.getWetness() > 0.45f);
+        assertTrue(rain.getSurfaceWater() > drizzle.getSurfaceWater());
+        assertTrue(rain.getPuddleCoverage() > drizzle.getPuddleCoverage());
     }
 
     @Test
@@ -38,6 +71,19 @@ public final class GroundWetnessControllerTest {
     }
 
     @Test
+    public void puddlesDrainBeforeDeepGroundMoisture() {
+        GroundWetnessController controller = new GroundWetnessController();
+        controller.reset(0.95f, 0.75f);
+
+        for (int second = 0; second < 900; second++) {
+            controller.advance(0f, 0f, 0f, 0.45f, 0.55f, 1f);
+        }
+
+        assertTrue(controller.getSoilSaturation() > controller.getSurfaceWater());
+        assertTrue(controller.getWetness() > controller.getPuddleCoverage());
+    }
+
+    @Test
     public void warmWindDriesFasterThanCalmCoolAir() {
         GroundWetnessController coolCalm = new GroundWetnessController();
         GroundWetnessController warmWindy = new GroundWetnessController();
@@ -51,6 +97,7 @@ public final class GroundWetnessControllerTest {
 
         assertTrue(warmWindy.getWetness() < coolCalm.getWetness());
         assertTrue(warmWindy.getPuddleCoverage() < coolCalm.getPuddleCoverage());
+        assertTrue(warmWindy.getSurfaceWater() < coolCalm.getSurfaceWater());
     }
 
     @Test
@@ -64,6 +111,8 @@ public final class GroundWetnessControllerTest {
 
         assertTrue(controller.getWetness() >= 0f && controller.getWetness() <= 1f);
         assertTrue(controller.getPuddleCoverage() >= 0f && controller.getPuddleCoverage() <= 1f);
+        assertTrue(controller.getSoilSaturation() >= 0f && controller.getSoilSaturation() <= 1f);
+        assertTrue(controller.getSurfaceWater() >= 0f && controller.getSurfaceWater() <= 1f);
         assertTrue(controller.getPuddleCoverage() <= controller.getWetness() + 0.0001f);
     }
 }
