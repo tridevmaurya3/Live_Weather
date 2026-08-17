@@ -26,9 +26,9 @@ import java.util.List;
 /**
  * Professional scenery library for the Wallpaper page.
  *
- * S11 replaces text-only scene discovery with lightweight procedural preview cards while
- * preserving S10 Auto Scene intelligence, direct variations, quick presets and favorites.
- * Preview cards represent scenery style only; they never render/infer current weather.
+ * S12 preserves S11 one-tap visual scene selection and adds a non-destructive full-screen
+ * detail preview. Long-pressing a scene card previews that candidate without applying it;
+ * the dialog stages variation changes locally until Use scene is pressed.
  */
 public final class ScenerySelectorView extends LinearLayout {
 
@@ -154,6 +154,24 @@ public final class ScenerySelectorView extends LinearLayout {
                 ViewGroup.LayoutParams.MATCH_PARENT,
                 ViewGroup.LayoutParams.WRAP_CONTENT
         ));
+
+        TextView fullPreviewAction = createActionChip(
+                context,
+                getResources().getString(R.string.wallpaper_scenery_full_preview)
+        );
+        fullPreviewAction.setContentDescription(
+                getResources().getString(R.string.wallpaper_scenery_full_preview_accessibility)
+        );
+        fullPreviewAction.setOnClickListener(view -> {
+            performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY);
+            showScenePreview(selectedMode);
+        });
+        LinearLayout.LayoutParams fullPreviewParams = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.WRAP_CONTENT,
+                dp(48)
+        );
+        fullPreviewParams.topMargin = dp(8);
+        addView(fullPreviewAction, fullPreviewParams);
 
         TextView quickTitle = createSectionLabel(context, R.string.wallpaper_scenery_quick_presets);
         LinearLayout.LayoutParams quickTitleParams = new LinearLayout.LayoutParams(
@@ -353,6 +371,11 @@ public final class ScenerySelectorView extends LinearLayout {
                 SceneryVariantRuntimeState.VARIANT_COUNT
         ));
         card.setOnClickListener(view -> selectMode(mode));
+        card.setOnLongClickListener(view -> {
+            performHapticFeedback(HapticFeedbackConstants.LONG_PRESS);
+            showScenePreview(mode);
+            return true;
+        });
         return card;
     }
 
@@ -440,6 +463,23 @@ public final class ScenerySelectorView extends LinearLayout {
                 selectedVariant + 1,
                 SceneryVariantRuntimeState.VARIANT_COUNT
         ));
+    }
+
+    private void showScenePreview(@NonNull SceneryMode mode) {
+        SceneryPreviewDialog.show(
+                getContext(),
+                mode,
+                selectedVariant,
+                SceneryRuntimeState.get(),
+                getResources().getString(labelRes(mode)),
+                (useMode, useVariant) -> {
+                    applySceneAndVariant(useMode, useVariant);
+                    announceForAccessibility(getResources().getString(
+                            R.string.wallpaper_scenery_changed_accessibility,
+                            getResources().getString(labelRes(useMode))
+                    ));
+                }
+        );
     }
 
     private void applyPreset(int presetIndex) {
