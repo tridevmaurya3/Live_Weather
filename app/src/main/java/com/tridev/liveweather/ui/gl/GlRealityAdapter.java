@@ -66,6 +66,31 @@ public final class GlRealityAdapter {
         float observerLatitudeRadians = (float) Math.toRadians(clamp(latitude, -89.9d, 89.9d));
         float localSiderealRadians = (float) resolveLocalSiderealRadians(epochMillis, longitude);
         float thermalBias = resolveThermalBias(weather.getCurrent());
+        float windDirectionRadians = (float) Math.toRadians(state.getWindDirectionDegrees());
+
+        /*
+         * R11 world-light contract: weather truth stays unchanged. Only renderer-facing
+         * scene illumination receives bounded sun/cloud modulation so terrain, vegetation,
+         * water and wet-ground materials react to the same real sky. Broken-cloud variation
+         * is time-based and slow; full overcast and clear sky remain stable.
+         */
+        float worldSceneLight = clamp01((float) WorldLightingController.resolveSceneLight(
+                state.getSceneLight(),
+                sky.getSunAltitude(),
+                state.getSunVisibility(),
+                clouds.getCloudAmount(),
+                clouds.getDensity(),
+                clouds.getMidLayer(),
+                clouds.getNearLayer(),
+                clouds.getStormCeiling(),
+                clouds.getBrightness(),
+                state.getStormIntensity(),
+                state.getFogIntensity(),
+                state.getAirHazeIntensity(),
+                state.getWindStrength(),
+                windDirectionRadians,
+                epochMillis
+        ));
 
         return new GlSceneSnapshot(
                 skyProfile.topR,
@@ -104,8 +129,8 @@ public final class GlRealityAdapter {
                 clamp01((float) state.getStormIntensity()),
                 clamp01((float) state.getAirHazeIntensity()),
                 clamp01((float) state.getWindStrength()),
-                (float) Math.toRadians(state.getWindDirectionDegrees()),
-                clamp01((float) state.getSceneLight()),
+                windDirectionRadians,
+                worldSceneLight,
                 thermalBias,
                 clamp01((float) state.getVisibilityFactor()),
                 parallax
