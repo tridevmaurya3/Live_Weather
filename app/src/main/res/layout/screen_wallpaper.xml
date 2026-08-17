@@ -91,6 +91,26 @@
             android:text="@string/phase6_celestial_waiting"
             android:textColor="@color/weather_text_secondary" />
 
+        <TextView
+            style="@style/TextAppearance.LiveWeather.Section"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="@dimen/space_18"
+            android:text="@string/wallpaper_scenery_title" />
+
+        <TextView
+            style="@style/TextAppearance.LiveWeather.Body"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="@dimen/space_4"
+            android:text="@string/wallpaper_scenery_subtitle" />
+
+        <com.tridev.liveweather.ui.scene.ScenerySelectorView
+            android:id="@+id/wallpaperScenerySelector"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="@dimen/space_10" />
+
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
