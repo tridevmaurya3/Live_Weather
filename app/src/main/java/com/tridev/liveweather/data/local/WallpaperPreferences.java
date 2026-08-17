@@ -5,15 +5,18 @@ import android.content.SharedPreferences;
 
 import androidx.annotation.NonNull;
 
+import com.tridev.liveweather.domain.scene.AutoSceneryPolicy;
 import com.tridev.liveweather.domain.scene.SceneryMode;
 import com.tridev.liveweather.domain.scene.SceneryRuntimeState;
+import com.tridev.liveweather.domain.scene.SceneryVariantRuntimeState;
 
 /**
  * Shared visual preferences for the in-app animated preview and WallpaperService.
  * Reality sync (time, Sun/Moon position and weather state) remains always active.
  *
  * Scenery is a visual choice only. It is persisted separately from weather truth so
- * selecting Village, Farm, River, Urban, etc. can never fabricate a weather state.
+ * selecting Village, Farm, River, Urban or Auto can never fabricate a weather state.
+ * Auto Scene resolves outside the OpenGL frame loop to a concrete day-part scene.
  */
 public final class WallpaperPreferences {
 
@@ -30,16 +33,16 @@ public final class WallpaperPreferences {
     private final SharedPreferences preferences;
 
     public WallpaperPreferences(@NonNull Context context) {
-        preferences = context.getApplicationContext()
-                .getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
+        Context appContext = context.getApplicationContext();
+        preferences = appContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
+        SceneryVariantRuntimeState.initialize(appContext);
     }
 
     @NonNull
     public Options load() {
-        SceneryMode sceneryMode = SceneryMode.fromStorage(
-                preferences.getString(KEY_SCENERY_MODE, null)
-        );
-        SceneryRuntimeState.set(sceneryMode);
+        SceneryMode requestedMode = loadRequestedSceneryMode();
+        SceneryMode resolvedMode = resolveRuntimeScenery(requestedMode);
+        SceneryRuntimeState.setSelection(requestedMode, resolvedMode);
 
         return new Options(
                 preferences.getBoolean(KEY_RAIN, true),
@@ -49,12 +52,15 @@ public final class WallpaperPreferences {
                 preferences.getBoolean(KEY_FOG, true),
                 preferences.getBoolean(KEY_STARS, true),
                 preferences.getBoolean(KEY_BATTERY_ADAPTIVE, true),
-                sceneryMode
+                requestedMode
         );
     }
 
     public void save(@NonNull Options options) {
-        SceneryRuntimeState.set(options.getSceneryMode());
+        SceneryMode requestedMode = options.getSceneryMode();
+        SceneryMode resolvedMode = resolveRuntimeScenery(requestedMode);
+        SceneryRuntimeState.setSelection(requestedMode, resolvedMode);
+
         preferences.edit()
                 .putBoolean(KEY_RAIN, options.isRain())
                 .putBoolean(KEY_CLOUDS, options.isClouds())
@@ -63,8 +69,33 @@ public final class WallpaperPreferences {
                 .putBoolean(KEY_FOG, options.isFog())
                 .putBoolean(KEY_STARS, options.isStars())
                 .putBoolean(KEY_BATTERY_ADAPTIVE, options.isBatteryAdaptive())
-                .putString(KEY_SCENERY_MODE, options.getSceneryMode().getStorageKey())
+                .putString(KEY_SCENERY_MODE, requestedMode.getStorageKey())
                 .apply();
+    }
+
+    /**
+     * Re-resolves the currently persisted scene without changing any option.
+     * Useful after changing variation while Auto Scene is selected.
+     */
+    @NonNull
+    public SceneryMode refreshRuntimeScenery() {
+        SceneryMode requestedMode = loadRequestedSceneryMode();
+        SceneryMode resolvedMode = resolveRuntimeScenery(requestedMode);
+        SceneryRuntimeState.setSelection(requestedMode, resolvedMode);
+        return resolvedMode;
+    }
+
+    @NonNull
+    private SceneryMode loadRequestedSceneryMode() {
+        return SceneryMode.fromStorage(preferences.getString(KEY_SCENERY_MODE, null));
+    }
+
+    @NonNull
+    private SceneryMode resolveRuntimeScenery(@NonNull SceneryMode requestedMode) {
+        if (requestedMode != SceneryMode.AUTO) {
+            return requestedMode;
+        }
+        return AutoSceneryPolicy.resolveNow(SceneryVariantRuntimeState.get());
     }
 
     public static final class Options {
@@ -78,10 +109,10 @@ public final class WallpaperPreferences {
         @NonNull private final SceneryMode sceneryMode;
 
         /**
-         * Compatibility constructor used by existing callers. It deliberately preserves
-         * the process-local scenery selection instead of falling back to Natural Hills,
-         * so changing rain/cloud/lightning/snow/fog/star/battery switches can never reset
-         * a scene chosen by the user.
+         * Compatibility constructor used by existing callers. It preserves what the user
+         * requested, including AUTO, instead of copying Auto Scene's concrete render result.
+         * Therefore changing rain/cloud/lightning/snow/fog/star/battery switches can never
+         * silently turn Auto Scene into a manual scene.
          */
         public Options(
                 boolean rain,
@@ -100,7 +131,7 @@ public final class WallpaperPreferences {
                     fog,
                     stars,
                     batteryAdaptive,
-                    SceneryRuntimeState.get()
+                    SceneryRuntimeState.getRequested()
             );
         }
 
