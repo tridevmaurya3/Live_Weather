@@ -44,17 +44,22 @@ public final class UnifiedWindControllerTest {
     }
 
     @Test
-    public void rainAndSnowEquivalentConsumersReceiveSameMacroWind() {
+    public void rainSnowAndAtmosphereEquivalentConsumersReceiveSameMacroWind() {
         UnifiedWindController rain = new UnifiedWindController();
         UnifiedWindController snow = new UnifiedWindController();
+        UnifiedWindController atmosphere = new UnifiedWindController();
         float sharedTime = 246.75f;
 
         rain.sample(0.74f, 1.85f, 0.58f, sharedTime);
         snow.sample(0.74f, 1.85f, 0.58f, sharedTime);
+        atmosphere.sample(0.74f, 1.85f, 0.58f, sharedTime);
 
         assertEquals(rain.getEffectiveStrength(), snow.getEffectiveStrength(), 0.000001f);
+        assertEquals(rain.getEffectiveStrength(), atmosphere.getEffectiveStrength(), 0.000001f);
         assertEquals(rain.getDirectionRadians(), snow.getDirectionRadians(), 0.000001f);
+        assertEquals(rain.getDirectionRadians(), atmosphere.getDirectionRadians(), 0.000001f);
         assertEquals(rain.getTurbulence(), snow.getTurbulence(), 0.000001f);
+        assertEquals(rain.getTurbulence(), atmosphere.getTurbulence(), 0.000001f);
     }
 
     @Test
