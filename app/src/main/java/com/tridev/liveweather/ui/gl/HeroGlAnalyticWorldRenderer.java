@@ -17,7 +17,8 @@ import java.nio.FloatBuffer;
  * Scenery Step S1 adds a stable multi-scene foundation without changing weather truth.
  * The selected scenery controls only generic world silhouettes/materials. Rain, fog,
  * storm, Sun/Moon light and wetness continue to come from the shared current-weather
- * snapshot. Natural Hills remains the compatibility default.
+ * snapshot. Natural Hills remains the compatibility default and preserves the previous
+ * world profile until the user explicitly selects another scenery pack.
  */
 public final class HeroGlAnalyticWorldRenderer {
 
@@ -63,8 +64,8 @@ public final class HeroGlAnalyticWorldRenderer {
             " float mVillage=mode(3.0);float mFarm=mode(4.0);float mRiver=mode(5.0);",
             " float mFlowers=mode(6.0);float mUrban=mode(7.0);",
             " float terrainW=clamp(mNature+mVillage*0.72+mFarm*0.30+mRiver*0.46+mFlowers*0.40+mUrban*0.18,0.0,1.0);",
-            " float vegetationW=clamp(mNature*0.88+mVillage*0.72+mFarm*0.58+mRiver*0.72+mFlowers+mUrban*0.12,0.0,1.0);",
-            " float settlementW=clamp(mNature*0.10+mVillage*0.78+mUrban,0.0,1.0);",
+            " float vegetationW=clamp(mNature+mVillage*0.72+mFarm*0.58+mRiver*0.72+mFlowers+mUrban*0.12,0.0,1.0);",
+            " float settlementW=clamp(mNature+mVillage*0.78+mUrban,0.0,1.0);",
             " float openW=mOpen;",
             " float farLine=0.700+0.024*sin(TAU*(x*0.76)+0.3)+0.015*sin(TAU*(x*1.58)+1.1)+0.008*sin(TAU*(x*3.00)+0.4)+0.004*sin(TAU*(x*5.7)+2.0);",
             " float midLine=0.773+0.027*sin(TAU*(x*0.94)+1.8)+0.014*sin(TAU*(x*2.08)+0.5)+0.007*sin(TAU*(x*4.05)+2.0)+0.003*sin(TAU*(x*7.2)+0.8);",
@@ -101,13 +102,16 @@ public final class HeroGlAnalyticWorldRenderer {
             " color=mix(color,groundC,ground*(1.0-openW*0.72));alpha=max(alpha,ground*(1.0-openW*0.72));",
             " float settlement=clamp((0.018+night*0.22+precip*0.055+uStorm*0.045)*(1.0-uFog*0.70)*settlementW,0.0,0.40);",
             " float cityCell=floor(fract(x)*15.0);float cityLocal=fract(x*15.0);",
-            " float urbanHeight=mUrban*(0.028+0.040*(0.5+0.5*sin(cityCell*1.43)));",
-            " float villageHeight=mVillage*(0.012+0.020*(0.5+0.5*sin(cityCell*2.07+0.9)));",
-            " float cityTop=0.807-urbanHeight-villageHeight;",
+            " float legacyTop=0.775+0.035*(0.5+0.5*sin(cityCell*2.07+0.9));",
+            " float urbanHeight=0.028+0.040*(0.5+0.5*sin(cityCell*1.43));",
+            " float villageHeight=0.012+0.020*(0.5+0.5*sin(cityCell*2.07+0.9));",
+            " float designedTop=0.807-mUrban*urbanHeight-mVillage*villageHeight;",
+            " float designedScene=clamp(mUrban+mVillage,0.0,1.0);",
+            " float cityTop=mix(legacyTop,designedTop,designedScene);",
             " float footprint=mUrban>0.5?0.70:0.54;",
             " float building=step(cityTop,p.y)*step(cityLocal,footprint)*(1.0-smoothstep(0.912,0.941,p.y))*settlement;",
             " vec3 cityC=mix(vec3(0.026,0.039,0.052),vec3(0.045,0.055,0.064),light);",
-            " color=mix(color,cityC,building*0.64);alpha=max(alpha,building*0.64);",
+            " color=mix(color,cityC,building*mix(0.52,0.64,designedScene));alpha=max(alpha,building*mix(0.52,0.64,designedScene));",
             " float windowBand=step(0.84,fract(cityCell*0.618))*step(0.24,cityLocal)*step(cityLocal,0.42)*building*night*(1.0-uFog*0.70);",
             " color+=vec3(0.78,0.58,0.30)*windowBand*0.15;alpha=max(alpha,windowBand*0.10);",
             " float farmGround=mFarm*smoothstep(0.865,0.955,p.y);",
