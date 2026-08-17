@@ -5,7 +5,7 @@ import android.opengl.GLES20;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
-import com.tridev.liveweather.domain.scene.SceneryMode;
+import com.tridev.liveweather.domain.scene.SceneryRuntimeState;
 
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
@@ -169,9 +169,6 @@ public final class HeroGlAnalyticWorldRenderer {
     private int height = 1;
     private long startNanos;
 
-    @NonNull
-    private volatile SceneryMode sceneryMode = SceneryMode.NATURAL_HILLS;
-
     @Nullable
     private volatile GlSceneSnapshot snapshot;
 
@@ -183,10 +180,6 @@ public final class HeroGlAnalyticWorldRenderer {
 
     public void setSnapshot(@Nullable GlSceneSnapshot snapshot) {
         this.snapshot = snapshot;
-    }
-
-    public void setSceneryMode(@NonNull SceneryMode sceneryMode) {
-        this.sceneryMode = sceneryMode;
     }
 
     public void onSurfaceCreated() {
@@ -245,7 +238,7 @@ public final class HeroGlAnalyticWorldRenderer {
         GLES20.glUniform1f(uThermal, scene.thermalBias);
         GLES20.glUniform1f(uParallax, scene.parallax);
         GLES20.glUniform1f(uTime, (System.nanoTime() - startNanos) / 1_000_000_000f);
-        GLES20.glUniform1f(uScenery, sceneryMode.getShaderId());
+        GLES20.glUniform1f(uScenery, SceneryRuntimeState.get().getShaderId());
 
         quad.position(0);
         GLES20.glEnableVertexAttribArray(aPos);
