@@ -7,8 +7,35 @@ import org.junit.Test;
 public final class GroundWetnessControllerTest {
 
     @Test
+    public void heroAndWallpaperInstancesSharePhysicalGroundState() {
+        GroundWetnessController.resetSharedForTest();
+        GroundWetnessController hero = new GroundWetnessController();
+        GroundWetnessController wallpaper = new GroundWetnessController();
+
+        hero.reset(0.82f, 0.46f);
+
+        assertTrue(Math.abs(wallpaper.getWetness() - hero.getWetness()) < 0.0001f);
+        assertTrue(Math.abs(wallpaper.getPuddleCoverage() - hero.getPuddleCoverage()) < 0.0001f);
+        assertTrue(Math.abs(wallpaper.getSoilSaturation() - hero.getSoilSaturation()) < 0.0001f);
+        assertTrue(Math.abs(wallpaper.getSurfaceWater() - hero.getSurfaceWater()) < 0.0001f);
+
+        GroundWetnessController.resetSharedForTest();
+    }
+
+    @Test
+    public void isolatedControllersRemainIndependentForPhysicsTests() {
+        GroundWetnessController first = isolated();
+        GroundWetnessController second = isolated();
+        first.reset(0.80f, 0.35f);
+
+        assertTrue(first.getWetness() > 0.70f);
+        assertTrue(second.getWetness() == 0f);
+        assertTrue(second.getPuddleCoverage() == 0f);
+    }
+
+    @Test
     public void heavyRainBuildsWetnessAndPuddles() {
-        GroundWetnessController controller = new GroundWetnessController();
+        GroundWetnessController controller = isolated();
 
         for (int second = 0; second < 90; second++) {
             controller.advance(1f, 0f, 0.65f, 0f, 0.35f, 1f);
@@ -22,8 +49,8 @@ public final class GroundWetnessControllerTest {
 
     @Test
     public void longerRainAccumulatesMoreStandingWaterThanShortShower() {
-        GroundWetnessController shortShower = new GroundWetnessController();
-        GroundWetnessController longDownpour = new GroundWetnessController();
+        GroundWetnessController shortShower = isolated();
+        GroundWetnessController longDownpour = isolated();
 
         for (int second = 0; second < 20; second++) {
             shortShower.advance(0.90f, 0f, 0.35f, 0f, 0.20f, 1f);
@@ -38,7 +65,7 @@ public final class GroundWetnessControllerTest {
 
     @Test
     public void puddleDepthBuildsBeforeFootprintSpread() {
-        GroundWetnessController controller = new GroundWetnessController();
+        GroundWetnessController controller = isolated();
 
         for (int second = 0; second < 60; second++) {
             controller.advance(1f, 0f, 0.65f, 0f, 0.25f, 1f);
@@ -51,8 +78,8 @@ public final class GroundWetnessControllerTest {
 
     @Test
     public void prolongedRainBroadensPuddleFootprint() {
-        GroundWetnessController oneMinute = new GroundWetnessController();
-        GroundWetnessController fiveMinutes = new GroundWetnessController();
+        GroundWetnessController oneMinute = isolated();
+        GroundWetnessController fiveMinutes = isolated();
 
         for (int second = 0; second < 60; second++) {
             oneMinute.advance(1f, 0f, 0.55f, 0f, 0.20f, 1f);
@@ -67,8 +94,8 @@ public final class GroundWetnessControllerTest {
 
     @Test
     public void drizzleWetsGroundButProducesLessStandingWaterThanRain() {
-        GroundWetnessController drizzle = new GroundWetnessController();
-        GroundWetnessController rain = new GroundWetnessController();
+        GroundWetnessController drizzle = isolated();
+        GroundWetnessController rain = isolated();
 
         for (int second = 0; second < 120; second++) {
             drizzle.advance(0f, 0.90f, 0f, 0f, 0.10f, 1f);
@@ -82,7 +109,7 @@ public final class GroundWetnessControllerTest {
 
     @Test
     public void recentRainDoesNotDisappearWhenRainStops() {
-        GroundWetnessController controller = new GroundWetnessController();
+        GroundWetnessController controller = isolated();
 
         for (int second = 0; second < 60; second++) {
             controller.advance(0.85f, 0f, 0.25f, 0f, 0.20f, 1f);
@@ -101,7 +128,7 @@ public final class GroundWetnessControllerTest {
 
     @Test
     public void puddlesBecomeShallowerBeforeDampFootprintDisappears() {
-        GroundWetnessController controller = new GroundWetnessController();
+        GroundWetnessController controller = isolated();
 
         for (int second = 0; second < 180; second++) {
             controller.advance(0.95f, 0f, 0.45f, 0f, 0.20f, 1f);
@@ -117,7 +144,7 @@ public final class GroundWetnessControllerTest {
 
     @Test
     public void puddlesDrainBeforeDeepGroundMoisture() {
-        GroundWetnessController controller = new GroundWetnessController();
+        GroundWetnessController controller = isolated();
         controller.reset(0.95f, 0.75f);
 
         for (int second = 0; second < 900; second++) {
@@ -130,8 +157,8 @@ public final class GroundWetnessControllerTest {
 
     @Test
     public void warmWindDriesFasterThanCalmCoolAir() {
-        GroundWetnessController coolCalm = new GroundWetnessController();
-        GroundWetnessController warmWindy = new GroundWetnessController();
+        GroundWetnessController coolCalm = isolated();
+        GroundWetnessController warmWindy = isolated();
         coolCalm.reset(0.90f, 0.65f);
         warmWindy.reset(0.90f, 0.65f);
 
@@ -147,7 +174,7 @@ public final class GroundWetnessControllerTest {
 
     @Test
     public void valuesAlwaysStayNormalized() {
-        GroundWetnessController controller = new GroundWetnessController();
+        GroundWetnessController controller = isolated();
         controller.reset(4f, 7f);
 
         for (int i = 0; i < 20; i++) {
@@ -161,5 +188,9 @@ public final class GroundWetnessControllerTest {
         assertTrue(controller.getPuddleDepth() >= 0f && controller.getPuddleDepth() <= 1f);
         assertTrue(controller.getPuddleSpread() >= 0f && controller.getPuddleSpread() <= 1f);
         assertTrue(controller.getPuddleCoverage() <= controller.getWetness() + 0.0001f);
+    }
+
+    private static GroundWetnessController isolated() {
+        return GroundWetnessController.isolatedForTest();
     }
 }
