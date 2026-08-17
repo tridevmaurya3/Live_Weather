@@ -35,6 +35,29 @@ public final class UnifiedWindControllerTest {
     }
 
     @Test
+    public void sharedRendererClockIsNonNegativeAndMonotonic() {
+        float first = UnifiedWindController.sharedMonotonicSeconds();
+        float second = UnifiedWindController.sharedMonotonicSeconds();
+
+        assertTrue(first >= 0f);
+        assertTrue(second >= first);
+    }
+
+    @Test
+    public void rainAndSnowEquivalentConsumersReceiveSameMacroWind() {
+        UnifiedWindController rain = new UnifiedWindController();
+        UnifiedWindController snow = new UnifiedWindController();
+        float sharedTime = 246.75f;
+
+        rain.sample(0.74f, 1.85f, 0.58f, sharedTime);
+        snow.sample(0.74f, 1.85f, 0.58f, sharedTime);
+
+        assertEquals(rain.getEffectiveStrength(), snow.getEffectiveStrength(), 0.000001f);
+        assertEquals(rain.getDirectionRadians(), snow.getDirectionRadians(), 0.000001f);
+        assertEquals(rain.getTurbulence(), snow.getTurbulence(), 0.000001f);
+    }
+
+    @Test
     public void strongStormWindHasVisibleButBoundedGustVariation() {
         UnifiedWindController controller = new UnifiedWindController();
         float min = 1f;
