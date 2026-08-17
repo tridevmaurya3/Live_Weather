@@ -124,7 +124,9 @@ public final class SceneryPreviewCardView extends View {
         previewRect.set(previewLeft, previewTop, previewRight, previewBottom);
 
         int save = canvas.save();
-        canvas.clipRoundRect(previewRect, dpF(12f), dpF(12f));
+        path.reset();
+        path.addRoundRect(previewRect, dpF(12f), dpF(12f), Path.Direction.CW);
+        canvas.clipPath(path);
         drawPreview(canvas, mode == SceneryMode.AUTO ? autoResolvedMode : mode);
         canvas.restoreToCount(save);
 
