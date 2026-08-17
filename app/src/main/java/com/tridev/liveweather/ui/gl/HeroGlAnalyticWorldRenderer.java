@@ -19,7 +19,8 @@ import java.nio.FloatBuffer;
  * Scenery S8 keeps the S7 weather/material truth intact while stabilizing secondary
  * procedural detail. High-frequency micro-detail now follows the shared performance
  * detail tier and uses softer continuous masks to reduce shimmer/moire on real devices.
- * Base terrain, buildings, weather interaction and the frozen cloud layer are unchanged.
+ * R8.2 adds physical retained ground moisture and puddle reflections without changing
+ * resolved weather truth or the frozen cloud layer.
  */
 public final class HeroGlAnalyticWorldRenderer {
 
@@ -59,6 +60,8 @@ public final class HeroGlAnalyticWorldRenderer {
             "uniform float uWindDir;",
             "uniform float uTime;",
             "uniform float uDetail;",
+            "uniform float uGroundWetness;",
+            "uniform float uPuddleCoverage;",
             "uniform float uSceneryFrom;",
             "uniform float uSceneryTo;",
             "uniform float uSceneryMix;",
@@ -101,7 +104,8 @@ public final class HeroGlAnalyticWorldRenderer {
             " float canopy=smoothstep(canopyLine-0.008,canopyLine+0.010,p.y)*(1.0-smoothstep(0.928,0.954,p.y))*vegetationW;",
             " float forest=smoothstep(forestLine-0.007,forestLine+0.009,p.y)*vegetationW;",
             " float precip=max(uRain,uDrizzle*0.65);",
-            " float wetTruth=smoothstep(0.06,0.72,precip);",
+            " float wetTruth=max(smoothstep(0.06,0.72,precip),clamp(uGroundWetness,0.0,1.0));",
+            " float puddleTruth=clamp(uPuddleCoverage,0.0,1.0);",
             " float snowTruth=clamp(uSnow,0.0,1.0);",
             " float fogTruth=clamp(max(uFog,uHaze*0.45),0.0,1.0);",
             " float windAxis=sin(uWindDir)+cos(uWindDir)*0.35;",
@@ -324,24 +328,33 @@ public final class HeroGlAnalyticWorldRenderer {
             " flowerC=mix(flowerC,vec3(flowerLuma)*vec3(0.78,0.90,1.05),deepNight*0.16);",
             " flowerC=mix(flowerC,vec3(flowerLuma)*vec3(0.88,0.94,0.98),snowTruth*0.12);",
             " color=mix(color,flowerC,flowerDots*0.42);alpha=max(alpha,flowerDots*0.18);",
-            " float wet=smoothstep(0.16,0.74,precip)*ground*(1.0-mRiver);",
+            " float wet=wetTruth*ground*(1.0-mRiver);",
             " float reflectionBand=smoothstep(0.930,0.998,p.y);",
             " float ripple=0.5+0.5*sin(xNear*((31.0+variant*1.8)*mix(0.90,1.0,detail))+uTime*(0.68+uRain*1.20)+vPhase*0.2);",
-            " float ripple2=0.5+0.5*sin(xNear*((57.0+variant*2.6)*freqScale)-uTime*0.44+1.4-vPhase*0.2);",
+            " float ripple2=0.5+0.5*sin(xNear*((57.0+variant*2.6)*freqScale)-uTime*(0.44+uWind*0.12)+1.4-vPhase*0.2);",
             " float wetSheen=wet*reflectionBand*(0.016+0.014*ripple+0.008*ripple2*microContrast);",
             " vec3 reflected=mix(vec3(0.16,0.23,0.30),vec3(0.31,0.38,0.43),uSceneLight)*(0.62+uStorm*0.18);",
             " reflected=mix(reflected,vec3(0.48,0.29,0.16),golden*0.10*solarSide);",
             " reflected=mix(reflected,vec3(0.16,0.25,0.42),moonMaterial*0.10);",
             " color=mix(color,reflected,clamp(wetSheen*3.0,0.0,0.15));",
+            " float puddleShape=0.5+0.5*sin(xNear*((23.0+variant*1.4)*freqScale)+sin(xNear*(7.0+variant*0.3)+vPhase)*1.9+vPhase);",
+            " float puddleMask=puddleTruth*ground*(1.0-mRiver)*reflectionBand*smoothstep(0.58,0.82,puddleShape)*(1.0-uFog*0.55);",
+            " float puddleRipple=0.5+0.5*sin(xNear*((68.0+variant*3.0)*freqScale)+uTime*(0.20+uWind*0.34)+vPhase*0.7);",
+            " float rainRing=0.5+0.5*sin(xNear*((111.0+variant*4.0)*freqScale)+p.y*(79.0*freqScale)+uTime*(1.2+precip*2.4));",
+            " vec3 puddleC=mix(reflected,vec3(0.11,0.17,0.22),0.28);",
+            " puddleC+=vec3(0.035,0.050,0.060)*(0.35+0.65*puddleRipple)*detailMid;",
+            " color=mix(color,puddleC,clamp(puddleMask*(0.075+0.055*puddleRipple),0.0,0.13));",
+            " color+=vec3(0.055,0.070,0.075)*puddleMask*rainRing*precip*0.035*detailMid;",
             " float sceneWetMask=wetTruth*(mVillage*road+mUrban*buildingShape+mFarm*farmGround+mFlowers*meadow)*(1.0-uFog*0.55);",
             " float sceneWetGlint=(0.5+0.5*sin(xNear*(37.0*freqScale)+uTime*0.28+vPhase))*sceneWetMask*detailMid;",
             " color+=mix(vec3(0.025,0.038,0.048),vec3(0.095,0.12,0.13),light)*sceneWetGlint*0.018;",
             " float sunLow=smoothstep(0.60,0.94,uSunPos.y)*uSunVis*(1.0-night);",
-            " float sunColumn=exp(-abs(p.x-uSunPos.x)*10.0)*reflectionBand*max(wet,water)*sunLow*(0.009+0.022*ripple);",
-            " float moonColumn=exp(-abs(p.x-uMoonPos.x)*13.0)*reflectionBand*max(wet,water)*night*uMoonVis*uMoonIllum*(0.006+0.013*ripple2);",
+            " float reflectiveGround=max(wet,puddleMask);",
+            " float sunColumn=exp(-abs(p.x-uSunPos.x)*10.0)*reflectionBand*max(reflectiveGround,water)*sunLow*(0.009+0.022*ripple);",
+            " float moonColumn=exp(-abs(p.x-uMoonPos.x)*13.0)*reflectionBand*max(reflectiveGround,water)*night*uMoonVis*uMoonIllum*(0.006+0.013*ripple2);",
             " vec3 sunReflectionC=mix(vec3(0.94,0.55,0.24),vec3(1.00,0.38,0.14),golden*0.34);",
             " color+=sunReflectionC*sunColumn+vec3(0.42,0.58,0.78)*moonColumn;",
-            " float lightReflection=windowBand*wet*reflectionBand*(0.020+0.028*ripple);",
+            " float lightReflection=windowBand*max(wet,puddleMask)*reflectionBand*(0.020+0.028*ripple);",
             " color+=vec3(0.82,0.56,0.27)*lightReflection;",
             " float snowGround=snowTruth*ground*(1.0-mRiver)*(1.0-openW)*smoothstep(0.930,0.978,p.y)*(1.0-uFog*0.50);",
             " color=mix(color,snowTone,clamp(snowGround*0.075,0.0,0.07));",
@@ -355,6 +368,7 @@ public final class HeroGlAnalyticWorldRenderer {
             "}");
 
     private final FloatBuffer quad;
+    private final GroundWetnessController groundWetnessController = new GroundWetnessController();
 
     private int program;
     private int aPos;
@@ -379,6 +393,8 @@ public final class HeroGlAnalyticWorldRenderer {
     private int uWindDir;
     private int uTime;
     private int uDetail;
+    private int uGroundWetness;
+    private int uPuddleCoverage;
     private int uSceneryFrom;
     private int uSceneryTo;
     private int uSceneryMix;
@@ -388,6 +404,7 @@ public final class HeroGlAnalyticWorldRenderer {
     private int width = 1;
     private int height = 1;
     private long startNanos;
+    private long lastWetnessFrameNanos;
     private long sceneryTransitionStartedNanos;
     private volatile float detailScale = 1f;
 
@@ -439,12 +456,15 @@ public final class HeroGlAnalyticWorldRenderer {
         uWindDir = u("uWindDir");
         uTime = u("uTime");
         uDetail = u("uDetail");
+        uGroundWetness = u("uGroundWetness");
+        uPuddleCoverage = u("uPuddleCoverage");
         uSceneryFrom = u("uSceneryFrom");
         uSceneryTo = u("uSceneryTo");
         uSceneryMix = u("uSceneryMix");
         uVariantFrom = u("uVariantFrom");
         uVariantTo = u("uVariantTo");
         startNanos = System.nanoTime();
+        lastWetnessFrameNanos = startNanos;
         sceneryFrom = SceneryRuntimeState.get();
         sceneryTo = sceneryFrom;
         variantFrom = SceneryVariantRuntimeState.get();
@@ -466,6 +486,19 @@ public final class HeroGlAnalyticWorldRenderer {
         if (program == 0 || scene == null) return;
 
         long nowNanos = System.nanoTime();
+        float wetnessDeltaSeconds = Math.max(
+                0f,
+                (nowNanos - lastWetnessFrameNanos) / 1_000_000_000f
+        );
+        lastWetnessFrameNanos = nowNanos;
+        groundWetnessController.advance(
+                scene.rainIntensity,
+                scene.drizzleIntensity,
+                scene.stormIntensity,
+                scene.thermalBias,
+                scene.windStrength,
+                wetnessDeltaSeconds
+        );
         updateSceneryTransition(nowNanos);
 
         GLES20.glEnable(GLES20.GL_BLEND);
@@ -492,6 +525,8 @@ public final class HeroGlAnalyticWorldRenderer {
         GLES20.glUniform1f(uWindDir, scene.windDirectionRadians);
         GLES20.glUniform1f(uTime, (nowNanos - startNanos) / 1_000_000_000f);
         GLES20.glUniform1f(uDetail, detailScale);
+        GLES20.glUniform1f(uGroundWetness, groundWetnessController.getWetness());
+        GLES20.glUniform1f(uPuddleCoverage, groundWetnessController.getPuddleCoverage());
         GLES20.glUniform1f(uSceneryFrom, sceneryFrom.getShaderId());
         GLES20.glUniform1f(uSceneryTo, sceneryTo.getShaderId());
         GLES20.glUniform1f(uSceneryMix, sceneryMix);
