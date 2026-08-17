@@ -10,10 +10,14 @@ import androidx.annotation.Nullable;
  * only the visual presentation state used by the GL renderers. The same mutable
  * snapshot is reused for the lifetime of the surface; no snapshot is allocated
  * from the frame loop.
+ *
+ * Reality R2-R7 uses exponential, frame-rate-independent easing. A short frame
+ * clamp prevents a single janky/resume frame from visually teleporting clouds,
+ * precipitation, celestial positions or atmosphere toward a new target.
  */
 final class GlSceneTransitionController {
 
-    private static final float MAX_FRAME_SECONDS = 0.12f;
+    private static final float MAX_FRAME_SECONDS = 0.08f;
 
     @Nullable
     private GlSceneSnapshot target;
@@ -92,6 +96,19 @@ final class GlSceneTransitionController {
         );
         from.moonAltitude = approach(from.moonAltitude, to.moonAltitude, dt, 1.5f, 1.5f);
         from.starVisibility = approach(from.starVisibility, to.starVisibility, dt, 2.2f, 2.0f);
+        from.observerLatitudeRadians = approach(
+                from.observerLatitudeRadians,
+                to.observerLatitudeRadians,
+                dt,
+                2.6f,
+                2.6f
+        );
+        from.localSiderealRadians = approachAngle(
+                from.localSiderealRadians,
+                to.localSiderealRadians,
+                dt,
+                1.6f
+        );
 
         from.cloudCover = approach(from.cloudCover, to.cloudCover, dt, 3.4f, 4.4f);
         from.cloudDensity = approach(from.cloudDensity, to.cloudDensity, dt, 3.2f, 4.0f);
@@ -128,8 +145,8 @@ final class GlSceneTransitionController {
     }
 
     private static float approach(float from, float to, float dt, float upTau, float downTau) {
-        float tau = to >= from ? upTau : downTau;
-        float alpha = dt / Math.max(0.001f, tau + dt);
+        float tau = Math.max(0.001f, to >= from ? upTau : downTau);
+        float alpha = 1f - (float) Math.exp(-dt / tau);
         return from + (to - from) * alpha;
     }
 
@@ -137,7 +154,7 @@ final class GlSceneTransitionController {
         float delta = to - from;
         if (delta > 0.5f) delta -= 1f;
         if (delta < -0.5f) delta += 1f;
-        float alpha = dt / Math.max(0.001f, tau + dt);
+        float alpha = 1f - (float) Math.exp(-dt / Math.max(0.001f, tau));
         float value = from + delta * alpha;
         value %= 1f;
         return value < 0f ? value + 1f : value;
@@ -145,7 +162,7 @@ final class GlSceneTransitionController {
 
     private static float approachAngle(float from, float to, float dt, float tau) {
         float delta = wrapRadians(to - from);
-        float alpha = dt / Math.max(0.001f, tau + dt);
+        float alpha = 1f - (float) Math.exp(-dt / Math.max(0.001f, tau));
         return wrapPositiveRadians(from + delta * alpha);
     }
 
@@ -173,6 +190,8 @@ final class GlSceneTransitionController {
                 && Math.abs(wrapRadians(a.moonPhaseAngleRadians - b.moonPhaseAngleRadians)) < 0.008f
                 && near(a.moonAltitude, b.moonAltitude, 0.05f)
                 && near(a.starVisibility, b.starVisibility, 0.002f)
+                && near(a.observerLatitudeRadians, b.observerLatitudeRadians, 0.002f)
+                && Math.abs(wrapRadians(a.localSiderealRadians - b.localSiderealRadians)) < 0.008f
                 && near(a.cloudCover, b.cloudCover, 0.002f)
                 && near(a.cloudDensity, b.cloudDensity, 0.002f)
                 && near(a.cloudFarLayer, b.cloudFarLayer, 0.002f)
