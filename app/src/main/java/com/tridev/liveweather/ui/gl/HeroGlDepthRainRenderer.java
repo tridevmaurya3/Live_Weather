@@ -62,7 +62,7 @@ public final class HeroGlDepthRainRenderer {
             "  float d=rnd(id,seed+31.47);",
             "  float jitter=0.72+b*0.62;",
             "  // p.y is top-origin and grows toward the ground. Subtracting time makes",
-            "  // the procedural feature move toward larger p.y: physically downward.",",
+            "  // the procedural feature move toward larger p.y: physically downward.",
             "  float y=fract(q.y-uTime*speed*jitter+c*6.0);",
             "  float localSkew=(c-0.5)*(0.030+0.070*depth)+(d-0.5)*0.018*uWind;",
             "  float x=fract(q.x)-0.5+(a-0.5)*(0.65-0.15*depth)+(y-0.5)*localSkew;",
