@@ -24,12 +24,11 @@ import com.tridev.liveweather.domain.scene.SceneryVariantRuntimeState;
 import java.util.List;
 
 /**
- * Compact professional scenery selector for the Wallpaper page.
+ * Professional scenery library for the Wallpaper page.
  *
- * S10 adds current-condition-aware Auto Scene presentation, direct quick presets and up
- * to three persisted scene+variation favorites. This view changes only visual scenery
- * preferences. Weather truth, astronomy, precipitation, clouds, alerts and observations
- * are never modified.
+ * S11 replaces text-only scene discovery with lightweight procedural preview cards while
+ * preserving S10 Auto Scene intelligence, direct variations, quick presets and favorites.
+ * Preview cards represent scenery style only; they never render/infer current weather.
  */
 public final class ScenerySelectorView extends LinearLayout {
 
@@ -68,7 +67,8 @@ public final class ScenerySelectorView extends LinearLayout {
     private final TextView favoritesHint;
     private final HorizontalScrollView favoritesScroller;
     private final LinearLayout favoritesRow;
-    private final TextView[] sceneChips = new TextView[SELECTABLE_MODES.length];
+    private final SceneryPreviewCardView[] sceneCards =
+            new SceneryPreviewCardView[SELECTABLE_MODES.length];
     private final TextView[] variationChips =
             new TextView[SceneryVariantRuntimeState.VARIANT_COUNT];
 
@@ -117,6 +117,25 @@ public final class ScenerySelectorView extends LinearLayout {
         );
         detailParams.topMargin = dp(3);
         addView(selectionDetail, detailParams);
+
+        TextView libraryTitle = createSectionLabel(context, R.string.wallpaper_scenery_library_title);
+        LinearLayout.LayoutParams libraryTitleParams = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT
+        );
+        libraryTitleParams.topMargin = dp(12);
+        addView(libraryTitle, libraryTitleParams);
+
+        TextView libraryHint = new TextView(context);
+        libraryHint.setTextAppearance(R.style.TextAppearance_LiveWeather_Caption);
+        libraryHint.setTextColor(ContextCompat.getColor(context, R.color.weather_text_tertiary));
+        libraryHint.setText(R.string.wallpaper_scenery_library_hint);
+        LinearLayout.LayoutParams libraryHintParams = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT
+        );
+        libraryHintParams.topMargin = dp(3);
+        addView(libraryHint, libraryHintParams);
 
         addView(buildSceneScroller(context), new LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
@@ -241,19 +260,19 @@ public final class ScenerySelectorView extends LinearLayout {
         row.setGravity(Gravity.CENTER_VERTICAL);
         row.setClipChildren(false);
         row.setClipToPadding(false);
-        row.setPadding(0, dp(10), 0, 0);
+        row.setPadding(0, dp(8), 0, 0);
 
         for (int index = 0; index < SELECTABLE_MODES.length; index++) {
             SceneryMode mode = SELECTABLE_MODES[index];
-            TextView chip = createSceneChip(context, mode);
-            sceneChips[index] = chip;
+            SceneryPreviewCardView card = createSceneCard(context, mode);
+            sceneCards[index] = card;
 
             LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
-                    ViewGroup.LayoutParams.WRAP_CONTENT,
-                    dp(48)
+                    dp(136),
+                    dp(152)
             );
-            if (index < SELECTABLE_MODES.length - 1) params.setMarginEnd(dp(8));
-            row.addView(chip, params);
+            if (index < SELECTABLE_MODES.length - 1) params.setMarginEnd(dp(10));
+            row.addView(card, params);
         }
 
         scroller.addView(row, new HorizontalScrollView.LayoutParams(
@@ -319,15 +338,22 @@ public final class ScenerySelectorView extends LinearLayout {
     }
 
     @NonNull
-    private TextView createSceneChip(@NonNull Context context, @NonNull SceneryMode mode) {
-        TextView chip = createActionChip(context, getResources().getString(labelRes(mode)));
-        chip.setMinWidth(dp(mode == SceneryMode.AUTO ? 96 : 76));
-        chip.setContentDescription(getResources().getString(
-                R.string.wallpaper_scenery_select_accessibility,
-                getResources().getString(labelRes(mode))
+    private SceneryPreviewCardView createSceneCard(
+            @NonNull Context context,
+            @NonNull SceneryMode mode
+    ) {
+        SceneryPreviewCardView card = new SceneryPreviewCardView(context);
+        card.setScene(mode, getResources().getString(labelRes(mode)));
+        card.setVariant(selectedVariant);
+        card.setAutoResolvedMode(SceneryRuntimeState.get());
+        card.setContentDescription(getResources().getString(
+                R.string.wallpaper_scenery_preview_accessibility,
+                getResources().getString(labelRes(mode)),
+                selectedVariant + 1,
+                SceneryVariantRuntimeState.VARIANT_COUNT
         ));
-        chip.setOnClickListener(view -> selectMode(mode));
-        return chip;
+        card.setOnClickListener(view -> selectMode(mode));
+        return card;
     }
 
     @NonNull
@@ -448,8 +474,8 @@ public final class ScenerySelectorView extends LinearLayout {
     }
 
     private void renderSelection() {
+        SceneryMode resolved = SceneryRuntimeState.get();
         if (selectedMode == SceneryMode.AUTO) {
-            SceneryMode resolved = SceneryRuntimeState.get();
             selectionSummary.setText(getResources().getString(
                     R.string.wallpaper_scenery_auto_selected_format,
                     getResources().getString(labelRes(resolved))
@@ -464,7 +490,18 @@ public final class ScenerySelectorView extends LinearLayout {
         }
 
         for (int index = 0; index < SELECTABLE_MODES.length; index++) {
-            applyChipState(sceneChips[index], SELECTABLE_MODES[index] == selectedMode);
+            SceneryPreviewCardView card = sceneCards[index];
+            SceneryMode mode = SELECTABLE_MODES[index];
+            card.setVariant(selectedVariant);
+            card.setAutoResolvedMode(resolved);
+            card.setSelected(mode == selectedMode);
+            card.setActivated(mode == selectedMode);
+            card.setContentDescription(getResources().getString(
+                    R.string.wallpaper_scenery_preview_accessibility,
+                    getResources().getString(labelRes(mode)),
+                    selectedVariant + 1,
+                    SceneryVariantRuntimeState.VARIANT_COUNT
+            ));
         }
 
         renderVariation();
