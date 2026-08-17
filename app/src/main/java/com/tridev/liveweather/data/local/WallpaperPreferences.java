@@ -78,9 +78,10 @@ public final class WallpaperPreferences {
         @NonNull private final SceneryMode sceneryMode;
 
         /**
-         * Compatibility constructor used by existing callers. Keeping it avoids touching
-         * unrelated settings code in the scenery foundation step and preserves the current
-         * Natural Hills look until a scene selector is introduced.
+         * Compatibility constructor used by existing callers. It deliberately preserves
+         * the process-local scenery selection instead of falling back to Natural Hills,
+         * so changing rain/cloud/lightning/snow/fog/star/battery switches can never reset
+         * a scene chosen by the user.
          */
         public Options(
                 boolean rain,
@@ -99,7 +100,7 @@ public final class WallpaperPreferences {
                     fog,
                     stars,
                     batteryAdaptive,
-                    SceneryMode.NATURAL_HILLS
+                    SceneryRuntimeState.get()
             );
         }
 
