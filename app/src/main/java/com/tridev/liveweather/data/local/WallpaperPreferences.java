@@ -6,6 +6,7 @@ import android.content.SharedPreferences;
 import androidx.annotation.NonNull;
 
 import com.tridev.liveweather.domain.scene.SceneryMode;
+import com.tridev.liveweather.domain.scene.SceneryRuntimeState;
 
 /**
  * Shared visual preferences for the in-app animated preview and WallpaperService.
@@ -35,6 +36,11 @@ public final class WallpaperPreferences {
 
     @NonNull
     public Options load() {
+        SceneryMode sceneryMode = SceneryMode.fromStorage(
+                preferences.getString(KEY_SCENERY_MODE, null)
+        );
+        SceneryRuntimeState.set(sceneryMode);
+
         return new Options(
                 preferences.getBoolean(KEY_RAIN, true),
                 preferences.getBoolean(KEY_CLOUDS, true),
@@ -43,11 +49,12 @@ public final class WallpaperPreferences {
                 preferences.getBoolean(KEY_FOG, true),
                 preferences.getBoolean(KEY_STARS, true),
                 preferences.getBoolean(KEY_BATTERY_ADAPTIVE, true),
-                SceneryMode.fromStorage(preferences.getString(KEY_SCENERY_MODE, null))
+                sceneryMode
         );
     }
 
     public void save(@NonNull Options options) {
+        SceneryRuntimeState.set(options.getSceneryMode());
         preferences.edit()
                 .putBoolean(KEY_RAIN, options.isRain())
                 .putBoolean(KEY_CLOUDS, options.isClouds())
