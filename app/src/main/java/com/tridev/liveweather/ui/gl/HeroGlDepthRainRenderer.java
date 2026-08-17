@@ -15,8 +15,8 @@ import java.nio.FloatBuffer;
  * Device-video correction: top-origin scene coordinates mean increasing Y is downward.
  * Rain phase therefore advances with -time so the visible droplets travel with gravity.
  * Streaks are intentionally short, translucent and depth-weighted rather than bright
- * white lines laid over the scene. R9.2 drives macro rain lean/speed from the same
- * process-wide UnifiedWindController gust sample used by snowfall.
+ * white lines laid over the scene. R9 consumes the centralized coherent visual wind
+ * sample shared by snowfall, atmosphere, scenery, storms and clouds.
  */
 public final class HeroGlDepthRainRenderer {
 
@@ -116,7 +116,7 @@ public final class HeroGlDepthRainRenderer {
             "  vec2 sceneP=vec2((p.x-0.5)*aspect+0.5,p.y);",
             "  float side=sin(uWindDir);",
             "  float forward=cos(uWindDir);",
-            "  // uWind already contains the shared coherent gust sample from UnifiedWindController.",
+            "  // uWind already contains the shared coherent gust sample from the scene controller.",
             "  // Wind changes horizontal lean only; gravity remains downward.",
             "  float lean=side*(0.020+uWind*0.22)+forward*0.010*side;",
             "  float windSpeed=0.82+uWind*0.68;",
@@ -183,7 +183,6 @@ public final class HeroGlDepthRainRenderer {
             "}");
 
     private final FloatBuffer quad;
-    private final UnifiedWindController windController = new UnifiedWindController();
     private int program;
     private int noiseTexture;
     private int aPosition;
@@ -252,11 +251,10 @@ public final class HeroGlDepthRainRenderer {
         }
 
         float renderSeconds = UnifiedWindController.sharedMonotonicSeconds();
-        windController.sample(
-                state.windStrength,
-                state.windDirectionRadians,
-                state.stormIntensity,
-                renderSeconds
+        float turbulence = clamp(
+                state.windStrength * 0.62f + state.stormIntensity * 0.32f,
+                0f,
+                1f
         );
 
         GLES20.glEnable(GLES20.GL_BLEND);
@@ -270,9 +268,9 @@ public final class HeroGlDepthRainRenderer {
         GLES20.glUniform1f(uRain, state.rainIntensity);
         GLES20.glUniform1f(uDrizzle, state.drizzleIntensity);
         GLES20.glUniform1f(uStorm, state.stormIntensity);
-        GLES20.glUniform1f(uWind, windController.getEffectiveStrength());
-        GLES20.glUniform1f(uWindDir, windController.getDirectionRadians());
-        GLES20.glUniform1f(uTurbulence, windController.getTurbulence());
+        GLES20.glUniform1f(uWind, state.windStrength);
+        GLES20.glUniform1f(uWindDir, state.windDirectionRadians);
+        GLES20.glUniform1f(uTurbulence, turbulence);
         GLES20.glUniform1f(uVisibility, state.visibilityFactor);
         GLES20.glUniform1f(uSceneLight, state.sceneLight);
         GLES20.glUniform1f(uDetail, detailScale);
