@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="wallpaper_scenery_title">Choose scenery</string>
+    <string name="wallpaper_scenery_subtitle">Pick the world below the live sky. Weather, Sun, Moon, clouds and precipitation stay driven by the same real-time state.</string>
+    <string name="wallpaper_scenery_open_sky">Open Sky</string>
+    <string name="wallpaper_scenery_natural_hills">Natural Hills</string>
+    <string name="wallpaper_scenery_village">Village</string>
+    <string name="wallpaper_scenery_farm">Farm / Crops</string>
+    <string name="wallpaper_scenery_river">River / Lake</string>
+    <string name="wallpaper_scenery_flowers">Flowers / Greenery</string>
+    <string name="wallpaper_scenery_urban">Urban / Buildings</string>
+    <string name="wallpaper_scenery_auto">Auto</string>
+    <string name="wallpaper_scenery_selected_format">Selected scene · %1$s</string>
+    <string name="wallpaper_scenery_select_accessibility">Select %1$s scenery</string>
+    <string name="wallpaper_scenery_changed_accessibility">%1$s scenery selected</string>
+</resources>
