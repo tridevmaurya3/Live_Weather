@@ -18,7 +18,7 @@
     <string name="wallpaper_scenery_changed_accessibility">%1$s scenery selected</string>
 
     <string name="wallpaper_scenery_library_title">Visual scene library</string>
-    <string name="wallpaper_scenery_library_hint">Tap a preview to apply it. Preview cards show scenery style only; live weather remains driven by current observations.</string>
+    <string name="wallpaper_scenery_library_hint">Tap a preview to use it, or long press a card to inspect it full screen before applying. Preview artwork shows scenery style only; live weather remains driven by current observations.</string>
     <string name="wallpaper_scenery_preview_accessibility">Preview and select %1$s scenery, variation %2$d of %3$d</string>
 
     <string name="wallpaper_scenery_variation_format">Variation %1$d of %2$d</string>
@@ -26,6 +26,28 @@
     <string name="wallpaper_scenery_variation_accessibility">Change scenery variation. Current variation %1$d of %2$d</string>
     <string name="wallpaper_scenery_variation_select_accessibility">Select scenery variation %1$d of %2$d</string>
     <string name="wallpaper_scenery_variation_changed_accessibility">Scenery variation %1$d of %2$d selected</string>
+
+    <string name="wallpaper_scenery_full_preview">Full preview</string>
+    <string name="wallpaper_scenery_full_preview_accessibility">Open full-screen preview of the selected scenery</string>
+    <string name="wallpaper_scenery_preview_title">SCENE PREVIEW</string>
+    <string name="wallpaper_scenery_preview_close">Close</string>
+    <string name="wallpaper_scenery_preview_cancel">Cancel</string>
+    <string name="wallpaper_scenery_preview_use">Use scene</string>
+    <string name="wallpaper_scenery_preview_use_auto">Use Auto Scene</string>
+    <string name="wallpaper_scenery_preview_use_accessibility">Use %1$s, variation %2$d</string>
+    <string name="wallpaper_scenery_preview_variation_title">Preview variation</string>
+    <string name="wallpaper_scenery_preview_auto_status_format">Auto currently resolves to %1$s · Variation %2$d</string>
+    <string name="wallpaper_scenery_preview_manual_status_format">Manual scenery · Variation %1$d</string>
+    <string name="wallpaper_scenery_preview_truth_note">Representative scenery preview only. Current rain, clouds, fog, storm, snow, Sun and Moon remain controlled by the live weather and astronomy pipeline.</string>
+
+    <string name="wallpaper_scenery_preview_auto_detail">Auto Scene chooses a suitable scenery family from current observed-condition context and day-part. The preview shows its current resolved scenery, not a fabricated weather condition.</string>
+    <string name="wallpaper_scenery_preview_open_sky_detail">A minimal foreground that keeps the live sky, Sun, Moon, stars and weather layers visually dominant.</string>
+    <string name="wallpaper_scenery_preview_hills_detail">Layered natural terrain designed for atmospheric depth, sunrise, sunset, fog and changing daylight.</string>
+    <string name="wallpaper_scenery_preview_village_detail">A restrained rural composition with houses, terrain, vegetation edges and a subtle path.</string>
+    <string name="wallpaper_scenery_preview_farm_detail">Perspective crop fields and agricultural foreground detail with motion driven only by the current wind signal.</string>
+    <string name="wallpaper_scenery_preview_river_detail">A calm river or lake composition with banks, restrained ripples and lighting response to the current scene.</string>
+    <string name="wallpaper_scenery_preview_flowers_detail">Green meadow, grass and flower detail with subtle depth and current-wind-driven vegetation motion.</string>
+    <string name="wallpaper_scenery_preview_urban_detail">A restrained building skyline with layered facade depth and night material response without overpowering the weather.</string>
 
     <string name="wallpaper_scenery_quick_presets">Quick presets</string>
     <string name="wallpaper_scenery_preset_sky">Sky</string>
