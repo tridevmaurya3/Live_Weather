@@ -5,7 +5,7 @@ import android.content.SharedPreferences;
 
 import androidx.annotation.NonNull;
 
-import com.tridev.liveweather.domain.scene.AutoSceneryPolicy;
+import com.tridev.liveweather.domain.scene.AutoSceneryContextState;
 import com.tridev.liveweather.domain.scene.SceneryMode;
 import com.tridev.liveweather.domain.scene.SceneryRuntimeState;
 import com.tridev.liveweather.domain.scene.SceneryVariantRuntimeState;
@@ -16,7 +16,8 @@ import com.tridev.liveweather.domain.scene.SceneryVariantRuntimeState;
  *
  * Scenery is a visual choice only. It is persisted separately from weather truth so
  * selecting Village, Farm, River, Urban or Auto can never fabricate a weather state.
- * Auto Scene resolves outside the OpenGL frame loop to a concrete day-part scene.
+ * Auto Scene resolves outside the OpenGL frame loop using the latest current-condition
+ * presentation context, with day-part fallback before any current truth is available.
  */
 public final class WallpaperPreferences {
 
@@ -95,7 +96,7 @@ public final class WallpaperPreferences {
         if (requestedMode != SceneryMode.AUTO) {
             return requestedMode;
         }
-        return AutoSceneryPolicy.resolveNow(SceneryVariantRuntimeState.get());
+        return AutoSceneryContextState.resolve(SceneryVariantRuntimeState.get());
     }
 
     public static final class Options {
