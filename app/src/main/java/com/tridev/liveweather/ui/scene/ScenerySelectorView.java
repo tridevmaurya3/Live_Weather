@@ -16,19 +16,23 @@ import androidx.core.content.ContextCompat;
 import com.tridev.liveweather.R;
 import com.tridev.liveweather.data.local.WallpaperPreferences;
 import com.tridev.liveweather.domain.scene.SceneryMode;
+import com.tridev.liveweather.domain.scene.SceneryRuntimeState;
 import com.tridev.liveweather.domain.scene.SceneryVariantRuntimeState;
 
 /**
- * Compact user-facing scenery selector for the Wallpaper page.
+ * Compact professional scenery selector for the Wallpaper page.
  *
- * The selector changes only persisted visual scenery preferences. Weather truth,
- * astronomy, precipitation, cloud state, alerts and cached observations are untouched.
- * S4 adds four stable composition variations per scenery mode, producing 28 selectable
- * visual combinations across the seven user-facing scene categories.
+ * S9 exposes the existing AUTO preference as a real user-facing mode, clearly separates
+ * requested Auto/manual selection from the currently resolved render scene, and replaces
+ * the old cycle-only variation action with direct 1..4 variation chips.
+ *
+ * This view changes only visual scenery preferences. Weather truth, astronomy,
+ * precipitation, cloud state, alerts and cached observations are untouched.
  */
 public final class ScenerySelectorView extends LinearLayout {
 
     private static final SceneryMode[] SELECTABLE_MODES = {
+            SceneryMode.AUTO,
             SceneryMode.OPEN_SKY,
             SceneryMode.NATURAL_HILLS,
             SceneryMode.VILLAGE,
@@ -40,9 +44,11 @@ public final class ScenerySelectorView extends LinearLayout {
 
     private final WallpaperPreferences preferences;
     private final TextView selectionSummary;
+    private final TextView selectionDetail;
     private final TextView variationSummary;
-    private final TextView variationAction;
-    private final TextView[] chips = new TextView[SELECTABLE_MODES.length];
+    private final TextView[] sceneChips = new TextView[SELECTABLE_MODES.length];
+    private final TextView[] variationChips =
+            new TextView[SceneryVariantRuntimeState.VARIANT_COUNT];
 
     @NonNull
     private SceneryMode selectedMode;
@@ -68,11 +74,10 @@ public final class ScenerySelectorView extends LinearLayout {
 
         preferences = new WallpaperPreferences(context);
         selectedMode = preferences.load().getSceneryMode();
-        SceneryVariantRuntimeState.initialize(context);
         selectedVariant = SceneryVariantRuntimeState.get();
 
         selectionSummary = new TextView(context);
-        selectionSummary.setTextAppearance(R.style.TextAppearance_LiveWeather_Caption);
+        selectionSummary.setTextAppearance(R.style.TextAppearance_LiveWeather_Body);
         selectionSummary.setTextColor(ContextCompat.getColor(context, R.color.weather_aqua));
         selectionSummary.setImportantForAccessibility(IMPORTANT_FOR_ACCESSIBILITY_YES);
         addView(selectionSummary, new LayoutParams(
@@ -80,24 +85,34 @@ public final class ScenerySelectorView extends LinearLayout {
                 ViewGroup.LayoutParams.WRAP_CONTENT
         ));
 
-        HorizontalScrollView scroller = new HorizontalScrollView(context);
-        scroller.setHorizontalScrollBarEnabled(false);
-        scroller.setVerticalScrollBarEnabled(false);
-        scroller.setFillViewport(false);
-        scroller.setClipToPadding(false);
-        scroller.setOverScrollMode(OVER_SCROLL_NEVER);
+        selectionDetail = new TextView(context);
+        selectionDetail.setTextAppearance(R.style.TextAppearance_LiveWeather_Caption);
+        selectionDetail.setTextColor(ContextCompat.getColor(context, R.color.weather_text_secondary));
+        LinearLayout.LayoutParams detailParams = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT
+        );
+        detailParams.topMargin = dp(3);
+        addView(selectionDetail, detailParams);
 
-        LinearLayout row = new LinearLayout(context);
-        row.setOrientation(HORIZONTAL);
-        row.setGravity(Gravity.CENTER_VERTICAL);
-        row.setClipChildren(false);
-        row.setClipToPadding(false);
-        row.setPadding(0, dp(8), 0, 0);
+        HorizontalScrollView sceneScroller = new HorizontalScrollView(context);
+        sceneScroller.setHorizontalScrollBarEnabled(false);
+        sceneScroller.setVerticalScrollBarEnabled(false);
+        sceneScroller.setFillViewport(false);
+        sceneScroller.setClipToPadding(false);
+        sceneScroller.setOverScrollMode(OVER_SCROLL_NEVER);
+
+        LinearLayout sceneRow = new LinearLayout(context);
+        sceneRow.setOrientation(HORIZONTAL);
+        sceneRow.setGravity(Gravity.CENTER_VERTICAL);
+        sceneRow.setClipChildren(false);
+        sceneRow.setClipToPadding(false);
+        sceneRow.setPadding(0, dp(10), 0, 0);
 
         for (int index = 0; index < SELECTABLE_MODES.length; index++) {
             SceneryMode mode = SELECTABLE_MODES[index];
-            TextView chip = createChip(context, mode);
-            chips[index] = chip;
+            TextView chip = createSceneChip(context, mode);
+            sceneChips[index] = chip;
 
             LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
                     ViewGroup.LayoutParams.WRAP_CONTENT,
@@ -106,54 +121,43 @@ public final class ScenerySelectorView extends LinearLayout {
             if (index < SELECTABLE_MODES.length - 1) {
                 params.setMarginEnd(dp(8));
             }
-            row.addView(chip, params);
+            sceneRow.addView(chip, params);
         }
 
-        scroller.addView(row, new HorizontalScrollView.LayoutParams(
+        sceneScroller.addView(sceneRow, new HorizontalScrollView.LayoutParams(
                 ViewGroup.LayoutParams.WRAP_CONTENT,
                 ViewGroup.LayoutParams.WRAP_CONTENT
         ));
-        addView(scroller, new LayoutParams(
+        addView(sceneScroller, new LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
                 ViewGroup.LayoutParams.WRAP_CONTENT
         ));
-
-        LinearLayout variationRow = new LinearLayout(context);
-        variationRow.setOrientation(HORIZONTAL);
-        variationRow.setGravity(Gravity.CENTER_VERTICAL);
-        variationRow.setPadding(0, dp(8), 0, 0);
 
         variationSummary = new TextView(context);
         variationSummary.setTextAppearance(R.style.TextAppearance_LiveWeather_Caption);
         variationSummary.setTextColor(ContextCompat.getColor(context, R.color.weather_text_secondary));
         variationSummary.setGravity(Gravity.CENTER_VERTICAL);
-        variationSummary.setMinHeight(dp(48));
-
-        LinearLayout.LayoutParams summaryParams = new LinearLayout.LayoutParams(
-                0,
-                dp(48),
-                1f
+        LinearLayout.LayoutParams variationSummaryParams = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT
         );
-        variationRow.addView(variationSummary, summaryParams);
+        variationSummaryParams.topMargin = dp(10);
+        addView(variationSummary, variationSummaryParams);
 
-        variationAction = new TextView(context);
-        variationAction.setTextAppearance(R.style.TextAppearance_LiveWeather_Body);
-        variationAction.setText(R.string.wallpaper_scenery_variation_action);
-        variationAction.setGravity(Gravity.CENTER);
-        variationAction.setSingleLine(true);
-        variationAction.setMinWidth(dp(126));
-        variationAction.setMinHeight(dp(48));
-        variationAction.setPadding(dp(14), 0, dp(14), 0);
-        variationAction.setClickable(true);
-        variationAction.setFocusable(true);
-        variationAction.setBackgroundResource(R.drawable.bg_weather_chip);
-        variationAction.setTextColor(ContextCompat.getColor(context, R.color.weather_text_primary));
-        variationAction.setOnClickListener(view -> changeVariation());
+        LinearLayout variationRow = new LinearLayout(context);
+        variationRow.setOrientation(HORIZONTAL);
+        variationRow.setGravity(Gravity.CENTER_VERTICAL);
+        variationRow.setPadding(0, dp(6), 0, 0);
 
-        variationRow.addView(variationAction, new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.WRAP_CONTENT,
-                dp(48)
-        ));
+        for (int variant = 0; variant < SceneryVariantRuntimeState.VARIANT_COUNT; variant++) {
+            TextView chip = createVariationChip(context, variant);
+            variationChips[variant] = chip;
+            LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(dp(48), dp(48));
+            if (variant < SceneryVariantRuntimeState.VARIANT_COUNT - 1) {
+                params.setMarginEnd(dp(8));
+            }
+            variationRow.addView(chip, params);
+        }
 
         addView(variationRow, new LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
@@ -163,14 +167,22 @@ public final class ScenerySelectorView extends LinearLayout {
         renderSelection();
     }
 
+    @Override
+    protected void onAttachedToWindow() {
+        super.onAttachedToWindow();
+        selectedMode = preferences.load().getSceneryMode();
+        selectedVariant = SceneryVariantRuntimeState.get();
+        renderSelection();
+    }
+
     @NonNull
-    private TextView createChip(@NonNull Context context, @NonNull SceneryMode mode) {
+    private TextView createSceneChip(@NonNull Context context, @NonNull SceneryMode mode) {
         TextView chip = new TextView(context);
         chip.setTextAppearance(R.style.TextAppearance_LiveWeather_Body);
         chip.setText(labelRes(mode));
         chip.setGravity(Gravity.CENTER);
         chip.setSingleLine(true);
-        chip.setMinWidth(dp(76));
+        chip.setMinWidth(dp(mode == SceneryMode.AUTO ? 96 : 76));
         chip.setMinHeight(dp(48));
         chip.setPadding(dp(14), 0, dp(14), 0);
         chip.setClickable(true);
@@ -183,9 +195,34 @@ public final class ScenerySelectorView extends LinearLayout {
         return chip;
     }
 
+    @NonNull
+    private TextView createVariationChip(@NonNull Context context, int variant) {
+        TextView chip = new TextView(context);
+        chip.setTextAppearance(R.style.TextAppearance_LiveWeather_Body);
+        chip.setText(String.valueOf(variant + 1));
+        chip.setGravity(Gravity.CENTER);
+        chip.setSingleLine(true);
+        chip.setMinWidth(dp(48));
+        chip.setMinHeight(dp(48));
+        chip.setClickable(true);
+        chip.setFocusable(true);
+        chip.setContentDescription(getResources().getString(
+                R.string.wallpaper_scenery_variation_select_accessibility,
+                variant + 1,
+                SceneryVariantRuntimeState.VARIANT_COUNT
+        ));
+        chip.setOnClickListener(view -> selectVariation(variant));
+        return chip;
+    }
+
     private void selectMode(@NonNull SceneryMode mode) {
         performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY);
+
         if (selectedMode == mode) {
+            if (mode == SceneryMode.AUTO) {
+                preferences.refreshRuntimeScenery();
+            }
+            renderSelection();
             return;
         }
 
@@ -201,10 +238,18 @@ public final class ScenerySelectorView extends LinearLayout {
         ));
     }
 
-    private void changeVariation() {
+    private void selectVariation(int variant) {
+        if (selectedVariant == variant) {
+            return;
+        }
+
         performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY);
-        selectedVariant = SceneryVariantRuntimeState.nextAndPersist(getContext());
-        renderVariation();
+        selectedVariant = SceneryVariantRuntimeState.setAndPersist(getContext(), variant);
+        if (selectedMode == SceneryMode.AUTO) {
+            preferences.refreshRuntimeScenery();
+        }
+        renderSelection();
+
         announceForAccessibility(getResources().getString(
                 R.string.wallpaper_scenery_variation_changed_accessibility,
                 selectedVariant + 1,
@@ -213,23 +258,25 @@ public final class ScenerySelectorView extends LinearLayout {
     }
 
     private void renderSelection() {
-        selectionSummary.setText(getResources().getString(
-                R.string.wallpaper_scenery_selected_format,
-                getResources().getString(labelRes(selectedMode))
-        ));
+        if (selectedMode == SceneryMode.AUTO) {
+            SceneryMode resolved = SceneryRuntimeState.get();
+            selectionSummary.setText(getResources().getString(
+                    R.string.wallpaper_scenery_auto_selected_format,
+                    getResources().getString(labelRes(resolved))
+            ));
+            selectionDetail.setText(R.string.wallpaper_scenery_auto_detail);
+        } else {
+            selectionSummary.setText(getResources().getString(
+                    R.string.wallpaper_scenery_selected_format,
+                    getResources().getString(labelRes(selectedMode))
+            ));
+            selectionDetail.setText(R.string.wallpaper_scenery_manual_detail);
+        }
 
         for (int index = 0; index < SELECTABLE_MODES.length; index++) {
-            TextView chip = chips[index];
+            TextView chip = sceneChips[index];
             boolean selected = SELECTABLE_MODES[index] == selectedMode;
-            chip.setSelected(selected);
-            chip.setActivated(selected);
-            chip.setBackgroundResource(
-                    selected ? R.drawable.bg_weather_chip_selected : R.drawable.bg_weather_chip
-            );
-            chip.setTextColor(ContextCompat.getColor(
-                    getContext(),
-                    selected ? R.color.weather_aqua : R.color.weather_text_primary
-            ));
+            applyChipState(chip, selected);
         }
 
         renderVariation();
@@ -241,15 +288,28 @@ public final class ScenerySelectorView extends LinearLayout {
                 selectedVariant + 1,
                 SceneryVariantRuntimeState.VARIANT_COUNT
         ));
-        variationAction.setContentDescription(getResources().getString(
-                R.string.wallpaper_scenery_variation_accessibility,
-                selectedVariant + 1,
-                SceneryVariantRuntimeState.VARIANT_COUNT
+
+        for (int variant = 0; variant < variationChips.length; variant++) {
+            applyChipState(variationChips[variant], variant == selectedVariant);
+        }
+    }
+
+    private void applyChipState(@NonNull TextView chip, boolean selected) {
+        chip.setSelected(selected);
+        chip.setActivated(selected);
+        chip.setBackgroundResource(
+                selected ? R.drawable.bg_weather_chip_selected : R.drawable.bg_weather_chip
+        );
+        chip.setTextColor(ContextCompat.getColor(
+                getContext(),
+                selected ? R.color.weather_aqua : R.color.weather_text_primary
         ));
     }
 
     private int labelRes(@NonNull SceneryMode mode) {
         switch (mode) {
+            case AUTO:
+                return R.string.wallpaper_scenery_auto;
             case OPEN_SKY:
                 return R.string.wallpaper_scenery_open_sky;
             case VILLAGE:
@@ -262,8 +322,6 @@ public final class ScenerySelectorView extends LinearLayout {
                 return R.string.wallpaper_scenery_flowers;
             case URBAN_BUILDINGS:
                 return R.string.wallpaper_scenery_urban;
-            case AUTO:
-                return R.string.wallpaper_scenery_auto;
             case NATURAL_HILLS:
             default:
                 return R.string.wallpaper_scenery_natural_hills;
