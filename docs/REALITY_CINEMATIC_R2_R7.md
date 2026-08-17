@@ -1,8 +1,22 @@
 # Live Weather — Cinematic Reality Pass R2–R7
 
-Status: **SOURCE IMPLEMENTATION COMPLETE — automated build gate pending/required; real-device GPU visual acceptance remains authoritative**
+Status: **SOURCE IMPLEMENTATION COMPLETE — automated Debug/tests/Release lint/R8 APK+AAB gate PASSED; real-device GPU visual acceptance remains authoritative**
 
 Play Store release is intentionally out of scope for this pass.
+
+## Automated gate record
+
+- GitHub Actions run: `32003788817` (run #78)
+- Authoritative code head: `49395d5d3613c3ffa2d80a0d85faf68a54133d31`
+- Result: **success**
+- Debug build: passed
+- Unit tests: passed
+- Release lint: passed
+- Minified/R8 Release APK: passed
+- Release AAB: passed
+- Release output verification: passed
+- Verification artifact ID: `9279398018`
+- Artifact SHA-256: `c8327a768504e1f7721ab77d77620b703c195bd6a53c907afd99dea8ac3322c3`
 
 ## Goal
 
@@ -189,4 +203,4 @@ After pulling `main`, verify on a physical phone:
 
 ## Acceptance boundary
 
-Java/resource/R8 CI can validate the Android source graph, but GLSL programs compile on the actual GLES driver when the surface is created. Therefore the real-device GPU/visual pass remains mandatory before declaring this cinematic reality checkpoint visually accepted.
+Java/resource/R8 CI validates the Android source graph and release build outputs, but GLSL programs compile on the actual GLES driver when the surface is created. Therefore the real-device GPU/visual pass remains mandatory before declaring this cinematic reality checkpoint visually accepted.
