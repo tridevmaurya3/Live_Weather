@@ -15,7 +15,8 @@ import java.nio.FloatBuffer;
  * Device-video correction: top-origin scene coordinates mean increasing Y is downward.
  * Rain phase therefore advances with -time so the visible droplets travel with gravity.
  * Streaks are intentionally short, translucent and depth-weighted rather than bright
- * white lines laid over the scene.
+ * white lines laid over the scene. R9.2 drives macro rain lean/speed from the same
+ * process-wide UnifiedWindController gust sample used by snowfall.
  */
 public final class HeroGlDepthRainRenderer {
 
@@ -41,6 +42,7 @@ public final class HeroGlDepthRainRenderer {
             "uniform float uStorm;",
             "uniform float uWind;",
             "uniform float uWindDir;",
+            "uniform float uTurbulence;",
             "uniform float uVisibility;",
             "uniform float uSceneLight;",
             "uniform float uDetail;",
@@ -50,7 +52,7 @@ public final class HeroGlDepthRainRenderer {
             "}",
             "float rainBand(vec2 p,vec2 grid,float speed,float width,float length,float lean,float seed,float density,float depth){",
             "  vec2 q=p;",
-            "  float broadSway=sin(uTime*(0.48+depth*0.24)+p.y*3.1+seed)*0.0042*uWind;",
+            "  float broadSway=sin(uTime*(0.48+depth*0.24)+p.y*3.1+seed)*0.0042*uWind*(0.72+uTurbulence*0.38);",
             "  q.x+=q.y*lean+broadSway;",
             "  q*=grid;",
             "  vec2 id=floor(q);",
@@ -60,7 +62,7 @@ public final class HeroGlDepthRainRenderer {
             "  float d=rnd(id,seed+31.47);",
             "  float jitter=0.72+b*0.62;",
             "  // p.y is top-origin and grows toward the ground. Subtracting time makes",
-            "  // the procedural feature move toward larger p.y: physically downward.",
+            "  // the procedural feature move toward larger p.y: physically downward.",",
             "  float y=fract(q.y-uTime*speed*jitter+c*6.0);",
             "  float localSkew=(c-0.5)*(0.030+0.070*depth)+(d-0.5)*0.018*uWind;",
             "  float x=fract(q.x)-0.5+(a-0.5)*(0.65-0.15*depth)+(y-0.5)*localSkew;",
@@ -114,11 +116,10 @@ public final class HeroGlDepthRainRenderer {
             "  vec2 sceneP=vec2((p.x-0.5)*aspect+0.5,p.y);",
             "  float side=sin(uWindDir);",
             "  float forward=cos(uWindDir);",
-            "  float gust=0.93+0.07*sin(uTime*(0.42+uWind*0.40)+uWindDir*1.7);",
-            "  float microGust=0.97+0.03*sin(uTime*(1.03+uWind*0.56)+1.9);",
+            "  // uWind already contains the shared coherent gust sample from UnifiedWindController.",
             "  // Wind changes horizontal lean only; gravity remains downward.",
             "  float lean=side*(0.020+uWind*0.22)+forward*0.010*side;",
-            "  float windSpeed=(0.82+uWind*0.68)*gust*microGust;",
+            "  float windSpeed=0.82+uWind*0.68;",
             "  float drizzleGate=drizzle*(1.0-smoothstep(0.22,0.58,rain));",
             "  float farGate=clamp(0.10+rain*0.38+drizzleGate*0.24,0.0,0.58);",
             "  float midGate=clamp(0.075+rain*0.42+drizzleGate*0.14,0.0,0.60);",
@@ -132,7 +133,7 @@ public final class HeroGlDepthRainRenderer {
             "  }",
             "  float crossSpray=0.0;",
             "  if(detail>0.84&&uWind>0.58&&rain>0.50){",
-            "    crossSpray=rainBand(sceneP+vec2(0.08,0.33),vec2(62.0,38.0),0.80*windSpeed,0.0052,0.20,lean*1.18+side*0.018,27.4,0.16+rain*0.16,0.46);",
+            "    crossSpray=rainBand(sceneP+vec2(0.08,0.33),vec2(62.0,38.0),0.80*windSpeed,0.0052,0.20,lean*1.18+side*(0.014+uTurbulence*0.010),27.4,0.16+rain*0.16,0.46);",
             "  }",
             "  float lineAlpha=drizzleFine*drizzleGate*0.12",
             "      +farRain*rain*(0.075+rain*0.045)",
@@ -142,7 +143,7 @@ public final class HeroGlDepthRainRenderer {
             "  float perspective=mix(0.68,1.02,smoothstep(0.20,0.96,p.y));",
             "  lineAlpha=clamp(lineAlpha*perspective,0.0,0.44);",
             "  float heavy=smoothstep(0.54,0.92,rain);",
-            "  vec2 mistUv=vec2(sceneP.x*0.45+uTime*side*0.005,sceneP.y*0.38-uTime*(0.008+rain*0.011));",
+            "  vec2 mistUv=vec2(sceneP.x*0.45+uTime*side*(0.0015+uWind*0.0055),sceneP.y*0.38-uTime*(0.008+rain*0.011));",
             "  float mistNoise=texture2D(uNoise,mistUv).r;",
             "  if(detail>0.70){",
             "    mistNoise=mistNoise*0.68+texture2D(uNoise,mistUv*1.91+vec2(0.17,0.23)).r*0.32;",
@@ -182,6 +183,7 @@ public final class HeroGlDepthRainRenderer {
             "}");
 
     private final FloatBuffer quad;
+    private final UnifiedWindController windController = new UnifiedWindController();
     private int program;
     private int noiseTexture;
     private int aPosition;
@@ -193,12 +195,12 @@ public final class HeroGlDepthRainRenderer {
     private int uStorm;
     private int uWind;
     private int uWindDir;
+    private int uTurbulence;
     private int uVisibility;
     private int uSceneLight;
     private int uDetail;
     private int width = 1;
     private int height = 1;
-    private long startNanos;
     private volatile float detailScale = 1f;
     @Nullable private volatile GlSceneSnapshot snapshot;
 
@@ -228,10 +230,10 @@ public final class HeroGlDepthRainRenderer {
         uStorm = u("uStorm");
         uWind = u("uWind");
         uWindDir = u("uWindDir");
+        uTurbulence = u("uTurbulence");
         uVisibility = u("uVisibility");
         uSceneLight = u("uSceneLight");
         uDetail = u("uDetail");
-        startNanos = System.nanoTime();
         GLES20.glDisable(GLES20.GL_DEPTH_TEST);
         GLES20.glDisable(GLES20.GL_CULL_FACE);
     }
@@ -249,6 +251,14 @@ public final class HeroGlDepthRainRenderer {
             return;
         }
 
+        float renderSeconds = UnifiedWindController.sharedMonotonicSeconds();
+        windController.sample(
+                state.windStrength,
+                state.windDirectionRadians,
+                state.stormIntensity,
+                renderSeconds
+        );
+
         GLES20.glEnable(GLES20.GL_BLEND);
         GLES20.glBlendFunc(GLES20.GL_SRC_ALPHA, GLES20.GL_ONE_MINUS_SRC_ALPHA);
         GLES20.glUseProgram(program);
@@ -256,12 +266,13 @@ public final class HeroGlDepthRainRenderer {
         GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, noiseTexture);
         GLES20.glUniform1i(uNoise, 0);
         GLES20.glUniform2f(uResolution, width, height);
-        GLES20.glUniform1f(uTime, (System.nanoTime() - startNanos) / 1_000_000_000f);
+        GLES20.glUniform1f(uTime, renderSeconds);
         GLES20.glUniform1f(uRain, state.rainIntensity);
         GLES20.glUniform1f(uDrizzle, state.drizzleIntensity);
         GLES20.glUniform1f(uStorm, state.stormIntensity);
-        GLES20.glUniform1f(uWind, state.windStrength);
-        GLES20.glUniform1f(uWindDir, state.windDirectionRadians);
+        GLES20.glUniform1f(uWind, windController.getEffectiveStrength());
+        GLES20.glUniform1f(uWindDir, windController.getDirectionRadians());
+        GLES20.glUniform1f(uTurbulence, windController.getTurbulence());
         GLES20.glUniform1f(uVisibility, state.visibilityFactor);
         GLES20.glUniform1f(uSceneLight, state.sceneLight);
         GLES20.glUniform1f(uDetail, detailScale);
