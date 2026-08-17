@@ -6,7 +6,7 @@ import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
 import com.tridev.liveweather.data.local.WallpaperPreferences;
-import com.tridev.liveweather.domain.scene.AutoSceneryPolicy;
+import com.tridev.liveweather.domain.scene.AutoSceneryContextState;
 import com.tridev.liveweather.domain.scene.SceneryMode;
 import com.tridev.liveweather.domain.scene.SceneryRuntimeState;
 import com.tridev.liveweather.domain.scene.SceneryVariantRuntimeState;
@@ -357,15 +357,11 @@ public final class HeroGlPipeline {
      * only the concrete scenery identity. It never alters snapshot/weather fields.
      */
     private void updateAutoSceneryFromTruth(@Nullable GlSceneSnapshot snapshot) {
-        if (SceneryRuntimeState.getRequested() != SceneryMode.AUTO) {
-            return;
-        }
         if (snapshot == null) {
             return;
         }
 
-        SceneryMode resolved = AutoSceneryPolicy.resolveNowForCurrentTruth(
-                SceneryVariantRuntimeState.get(),
+        AutoSceneryContextState.update(
                 snapshot.cloudCover,
                 snapshot.rainIntensity,
                 snapshot.drizzleIntensity,
@@ -373,6 +369,14 @@ public final class HeroGlPipeline {
                 snapshot.stormIntensity,
                 snapshot.fogIntensity,
                 snapshot.airHazeIntensity
+        );
+
+        if (SceneryRuntimeState.getRequested() != SceneryMode.AUTO) {
+            return;
+        }
+
+        SceneryMode resolved = AutoSceneryContextState.resolve(
+                SceneryVariantRuntimeState.get()
         );
         SceneryRuntimeState.setSelection(SceneryMode.AUTO, resolved);
     }
