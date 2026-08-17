@@ -5,8 +5,9 @@ package com.tridev.liveweather.ui.gl;
  *
  * <p>This controller never changes resolved weather truth. It models what recent observed
  * rain/drizzle has already done to the rendered ground: surface wetness, soil saturation and
- * standing water. R8.3 separates those reservoirs so a long downpour can accumulate deeper,
- * broader puddles while a short shower mostly darkens the surface.</p>
+ * standing water. R8.4 adds separate puddle depth and puddle spread reservoirs so the existing
+ * irregular low-point shader masks can fill, broaden and recede more naturally instead of
+ * behaving like one uniform glossy layer.</p>
  *
  * <p>The state is advanced with monotonic frame delta time. Large lifecycle gaps are clamped so
  * returning to the app or wallpaper cannot cause a one-frame flood or instant dry-out.</p>
@@ -20,7 +21,7 @@ public final class GroundWetnessController {
     /** Visible dampness used by terrain/road/vegetation materials. */
     private float wetness;
 
-    /** Visible low-point standing-water coverage used by the world shader. */
+    /** Visible low-point standing-water coverage sent to the world shader. */
     private float puddleCoverage;
 
     /** Slower underground reservoir; keeps the world damp after surface water drains. */
@@ -31,6 +32,12 @@ public final class GroundWetnessController {
 
     /** Bounded recent liquid-precipitation exposure used to distinguish showers from downpours. */
     private float rainExposureSeconds;
+
+    /** Fast-filling local basin depth: reacts to runoff before the puddle footprint fully spreads. */
+    private float puddleDepth;
+
+    /** Slow spatial spread memory: broadens irregular low-point puddles during prolonged rain. */
+    private float puddleSpread;
 
     /**
      * Advances retained ground moisture.
@@ -81,6 +88,7 @@ public final class GroundWetnessController {
         }
 
         normalizeState();
+        updateVisiblePuddleCoverage();
     }
 
     private void advanceRainAccumulation(
@@ -131,18 +139,25 @@ public final class GroundWetnessController {
 
         float basinWater = smoothstep(0.06f, 0.78f, surfaceWater);
         float saturatedBase = smoothstep(0.34f, 0.90f, soilSaturation);
-        float targetPuddles = basinWater
-                * saturatedBase
-                * clamp01(0.42f + liquidLoad * 0.58f);
-        float puddleResponse = 0.010f + liquidLoad * 0.052f;
+        float durationSpread = smoothstep(20f, 300f, rainExposureSeconds);
 
-        // Standing water builds gradually; no one-frame puddle pop when rain begins.
-        if (targetPuddles > puddleCoverage) {
-            puddleCoverage = approach(
-                    puddleCoverage,
-                    targetPuddles,
-                    puddleResponse * dt
-            );
+        // Basin depth fills first. Spatial spread is intentionally slower, so a short shower
+        // produces smaller/deeper low-point patches while sustained rain broadens their footprint.
+        float targetDepth = basinWater
+                * saturatedBase
+                * clamp01(0.48f + liquidLoad * 0.52f);
+        float targetSpread = basinWater
+                * saturatedBase
+                * clamp01(0.24f + durationSpread * 0.56f + liquidLoad * 0.20f);
+
+        float depthResponse = 0.014f + liquidLoad * 0.058f;
+        float spreadResponse = 0.005f + liquidLoad * 0.026f;
+
+        if (targetDepth > puddleDepth) {
+            puddleDepth = approach(puddleDepth, targetDepth, depthResponse * dt);
+        }
+        if (targetSpread > puddleSpread) {
+            puddleSpread = approach(puddleSpread, targetSpread, spreadResponse * dt);
         }
     }
 
@@ -167,14 +182,32 @@ public final class GroundWetnessController {
         float groundDryRate = 0.00012f + warm * 0.00044f + wind * 0.00024f;
         wetness = Math.max(retainedWetness, wetness - groundDryRate * dt);
 
-        float retainedPuddleTarget = smoothstep(0.06f, 0.78f, surfaceWater)
-                * smoothstep(0.34f, 0.90f, soilSaturation);
-        if (retainedPuddleTarget < puddleCoverage) {
-            float puddleDrainRate = 0.00028f + warm * 0.00058f + wind * 0.00048f;
-            puddleCoverage = Math.max(
-                    retainedPuddleTarget,
-                    puddleCoverage - puddleDrainRate * dt
+        float basinWater = smoothstep(0.06f, 0.78f, surfaceWater);
+        float saturatedBase = smoothstep(0.34f, 0.90f, soilSaturation);
+        float retainedDepthTarget = basinWater * saturatedBase;
+        float retainedSpreadTarget = retainedDepthTarget * smoothstep(0.20f, 0.82f, wetness);
+
+        // Depth drains faster than footprint. This makes puddles become shallower before their
+        // damp edge footprint fully disappears, which reads more naturally in the existing shader.
+        float depthDrainRate = 0.00042f + warm * 0.00070f + wind * 0.00054f;
+        float spreadDrainRate = 0.00020f + warm * 0.00032f + wind * 0.00025f;
+
+        if (retainedDepthTarget < puddleDepth) {
+            puddleDepth = Math.max(
+                    retainedDepthTarget,
+                    puddleDepth - depthDrainRate * dt
             );
+        } else {
+            puddleDepth = Math.max(0f, puddleDepth - depthDrainRate * dt);
+        }
+
+        if (retainedSpreadTarget < puddleSpread) {
+            puddleSpread = Math.max(
+                    retainedSpreadTarget,
+                    puddleSpread - spreadDrainRate * dt
+            );
+        } else {
+            puddleSpread = Math.max(0f, puddleSpread - spreadDrainRate * dt);
         }
     }
 
@@ -183,15 +216,24 @@ public final class GroundWetnessController {
         this.wetness = clamp01(wetness);
         this.puddleCoverage = Math.min(clamp01(puddleCoverage), this.wetness);
 
-        // Reconstruct conservative physical reservoirs from the public visual state. This keeps
-        // reset/test behavior compatible while giving R8.3 enough information to dry naturally.
+        // Reconstruct conservative physical reservoirs from the public visual state.
         soilSaturation = this.wetness;
         surfaceWater = clamp01(
                 this.puddleCoverage * 0.85f
                         + Math.max(0f, this.wetness - 0.75f) * 0.25f
         );
         rainExposureSeconds = this.puddleCoverage * 120f;
+
+        // Treat restored coverage as mostly basin depth, with a slightly smaller edge spread.
+        puddleDepth = this.puddleCoverage;
+        puddleSpread = Math.min(
+                this.puddleCoverage,
+                smoothstep(0.20f, 0.90f, this.wetness)
+                        * (0.55f + this.puddleCoverage * 0.45f)
+        );
+
         normalizeState();
+        updateVisiblePuddleCoverage();
     }
 
     public float getWetness() {
@@ -212,18 +254,36 @@ public final class GroundWetnessController {
         return surfaceWater;
     }
 
+    /** Package-private diagnostics/tests: fast-filling low-point basin depth. */
+    float getPuddleDepth() {
+        return puddleDepth;
+    }
+
+    /** Package-private diagnostics/tests: slower irregular puddle footprint spread. */
+    float getPuddleSpread() {
+        return puddleSpread;
+    }
+
+    private void updateVisiblePuddleCoverage() {
+        // Existing world shader already owns the irregular puddle mask and rain-ring pattern.
+        // This blended signal controls how strongly that low-point pattern fills and broadens.
+        puddleCoverage = Math.min(
+                wetness,
+                clamp01(puddleDepth * 0.62f + puddleSpread * 0.48f)
+        );
+    }
+
     private void normalizeState() {
         wetness = clamp01(wetness);
         soilSaturation = clamp01(soilSaturation);
         surfaceWater = clamp01(surfaceWater);
+        puddleDepth = Math.min(clamp01(puddleDepth), wetness);
+        puddleSpread = Math.min(clamp01(puddleSpread), wetness);
         rainExposureSeconds = clamp(
                 rainExposureSeconds,
                 0f,
                 MAX_RAIN_EXPOSURE_SECONDS
         );
-
-        // Visible puddles can never exceed the overall wet surface state.
-        puddleCoverage = Math.min(clamp01(puddleCoverage), wetness);
     }
 
     private static float approach(float current, float target, float amount) {
