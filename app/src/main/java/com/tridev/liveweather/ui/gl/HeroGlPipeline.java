@@ -6,6 +6,10 @@ import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
 import com.tridev.liveweather.data.local.WallpaperPreferences;
+import com.tridev.liveweather.domain.scene.AutoSceneryPolicy;
+import com.tridev.liveweather.domain.scene.SceneryMode;
+import com.tridev.liveweather.domain.scene.SceneryRuntimeState;
+import com.tridev.liveweather.domain.scene.SceneryVariantRuntimeState;
 
 /**
  * Shared GPU composition pipeline for the app Hero and Android Live Wallpaper.
@@ -14,6 +18,9 @@ import com.tridev.liveweather.data.local.WallpaperPreferences;
  * values move through an allocation-free temporal transition controller. New
  * weather therefore changes the sky naturally instead of looking like a page or
  * scene refresh.
+ *
+ * Scenery S10 resolves AUTO only when authoritative current truth/options change.
+ * The OpenGL draw hot path never reads preferences, the clock or network data.
  */
 public final class HeroGlPipeline {
 
@@ -115,6 +122,7 @@ public final class HeroGlPipeline {
         }
 
         applyPerformanceDetail();
+        updateAutoSceneryFromTruth(fullSnapshot);
         GlSceneSnapshot visual = transitionController.current();
         if (visual != null) {
             applyVisualSnapshot(visual);
@@ -197,6 +205,7 @@ public final class HeroGlPipeline {
 
         // Diagnostics reflect current resolved truth immediately, before visual easing.
         diagnostics.setSnapshot(snapshot);
+        updateAutoSceneryFromTruth(snapshot);
         transitionController.setTarget(snapshot);
 
         GlSceneSnapshot visual = transitionController.current();
@@ -210,6 +219,12 @@ public final class HeroGlPipeline {
     public void setOptions(@NonNull WallpaperPreferences.Options options) {
         this.options = options;
         diagnostics.setOptions(options);
+
+        if (options.getSceneryMode() == SceneryMode.AUTO) {
+            updateAutoSceneryFromTruth(fullSnapshot);
+        } else {
+            SceneryRuntimeState.setSelection(options.getSceneryMode(), options.getSceneryMode());
+        }
 
         GlSceneSnapshot visual = transitionController.current();
         if (visual == null) {
@@ -335,6 +350,31 @@ public final class HeroGlPipeline {
         stormRenderer.setDetailScale(detail);
         rainRenderer.setDetailScale(detail);
         snowRenderer.setDetailScale(detail);
+    }
+
+    /**
+     * S10 Auto Scene intelligence consumes only current resolved snapshot truth and updates
+     * only the concrete scenery identity. It never alters snapshot/weather fields.
+     */
+    private void updateAutoSceneryFromTruth(@Nullable GlSceneSnapshot snapshot) {
+        if (SceneryRuntimeState.getRequested() != SceneryMode.AUTO) {
+            return;
+        }
+        if (snapshot == null) {
+            return;
+        }
+
+        SceneryMode resolved = AutoSceneryPolicy.resolveNowForCurrentTruth(
+                SceneryVariantRuntimeState.get(),
+                snapshot.cloudCover,
+                snapshot.rainIntensity,
+                snapshot.drizzleIntensity,
+                snapshot.snowIntensity,
+                snapshot.stormIntensity,
+                snapshot.fogIntensity,
+                snapshot.airHazeIntensity
+        );
+        SceneryRuntimeState.setSelection(SceneryMode.AUTO, resolved);
     }
 
     /**
