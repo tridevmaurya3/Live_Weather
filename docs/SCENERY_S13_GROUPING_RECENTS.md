@@ -1,5 +1,7 @@
 # S13 — Scene Library Grouping + Recent Scenes
 
+Status: **COMPLETE — source implementation, automated release gate and user real-device acceptance passed on 2026-08-17.**
+
 ## Goal
 
 Keep the growing Live Wallpaper scenery catalog fast to browse without changing weather truth, the live rendering pipeline, or the frozen cloud renderer.
@@ -55,22 +57,46 @@ S13 does not remove or replace the existing systems:
 
 `dc3b5db66c92cdf4520b0210857426e4bca853d8`
 
+## Automated verification
+
+Authoritative S13 source release-gate run:
+
+- GitHub Actions run: `32007014547`
+- source head: `1223328a014a83d41674407140bc405081884ec7`
+- result: **SUCCESS**
+- artifact: `phase-26-release-verification`
+- artifact ID: `9280456673`
+- artifact digest: `sha256:1f4202838e91728a64c831fb5817faff554af26a5db5d7c8c2954cada95bc40d`
+
+Passed:
+
+- Gradle wrapper verification
+- Debug build
+- unit tests
+- Release lint
+- Release APK / AAB
+- R8 / minification gate
+- release-output verification
+- release verification artifact upload
+
 ## Real-device acceptance
 
-After pulling `main`, open **Wallpaper** and verify:
+Accepted by the user on **2026-08-17** after pulling `main` and testing the S13 Wallpaper experience.
 
-1. Visual scene library shows **Sky & smart**, **Nature**, and **Places** groups.
-2. Select several manual scenes and different variations.
-3. **Recent scenes** appears and keeps the newest combination first.
-4. Re-select the exact same scene + variation and confirm it moves to the front without a duplicate.
-5. Use more than five different combinations and confirm only the newest five remain.
-6. Tap a recent entry and confirm both scene and variation restore together.
-7. Long press a recent entry, change preview variation, then Cancel; active selection must remain unchanged.
-8. Repeat and press **Use scene**; only then should the previewed scene + variation become active.
-9. Select Auto Scene and confirm Auto is not added as a misleading fixed recent shortcut.
-10. Re-test Quick Presets, Favorites, and full-screen preview.
-11. Confirm cloud visuals are unchanged from the frozen baseline.
+Acceptance covered the requested checkpoint set:
+
+1. Visual scene library groups: **Sky & smart**, **Nature**, **Places**.
+2. Multiple manual scenes and variations.
+3. Recent scenes newest-first behavior.
+4. Duplicate prevention / MRU promotion.
+5. Five-entry cap.
+6. Exact scene + variation restore.
+7. Long-press preview + Cancel non-destructive behavior.
+8. Long-press preview + Use scene apply behavior.
+9. Auto Scene excluded from misleading fixed recents.
+10. Quick Presets, Favorites and full-screen preview regression.
+11. Frozen cloud visual regression.
 
 ## S13 status
 
-Source implementation complete. Final status depends on the repository release gate and real-device acceptance.
+**COMPLETE.** No separate S14 scenery step is documented in the repository. Further work returns to the authoritative Phase 26 consolidated real-device acceptance plan.
