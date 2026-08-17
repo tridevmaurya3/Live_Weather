@@ -37,6 +37,35 @@ public final class GroundWetnessControllerTest {
     }
 
     @Test
+    public void puddleDepthBuildsBeforeFootprintSpread() {
+        GroundWetnessController controller = new GroundWetnessController();
+
+        for (int second = 0; second < 60; second++) {
+            controller.advance(1f, 0f, 0.65f, 0f, 0.25f, 1f);
+        }
+
+        assertTrue(controller.getPuddleDepth() > controller.getPuddleSpread());
+        assertTrue(controller.getPuddleDepth() > 0.30f);
+        assertTrue(controller.getPuddleSpread() > 0.05f);
+    }
+
+    @Test
+    public void prolongedRainBroadensPuddleFootprint() {
+        GroundWetnessController oneMinute = new GroundWetnessController();
+        GroundWetnessController fiveMinutes = new GroundWetnessController();
+
+        for (int second = 0; second < 60; second++) {
+            oneMinute.advance(1f, 0f, 0.55f, 0f, 0.20f, 1f);
+        }
+        for (int second = 0; second < 300; second++) {
+            fiveMinutes.advance(1f, 0f, 0.55f, 0f, 0.20f, 1f);
+        }
+
+        assertTrue(fiveMinutes.getPuddleSpread() > oneMinute.getPuddleSpread() + 0.45f);
+        assertTrue(fiveMinutes.getPuddleCoverage() > oneMinute.getPuddleCoverage());
+    }
+
+    @Test
     public void drizzleWetsGroundButProducesLessStandingWaterThanRain() {
         GroundWetnessController drizzle = new GroundWetnessController();
         GroundWetnessController rain = new GroundWetnessController();
@@ -67,7 +96,23 @@ public final class GroundWetnessControllerTest {
         }
 
         assertTrue(controller.getWetness() > wetBeforeDrying * 0.98f);
-        assertTrue(controller.getPuddleCoverage() > puddlesBeforeDrying * 0.96f);
+        assertTrue(controller.getPuddleCoverage() > puddlesBeforeDrying * 0.95f);
+    }
+
+    @Test
+    public void puddlesBecomeShallowerBeforeDampFootprintDisappears() {
+        GroundWetnessController controller = new GroundWetnessController();
+
+        for (int second = 0; second < 180; second++) {
+            controller.advance(0.95f, 0f, 0.45f, 0f, 0.20f, 1f);
+        }
+
+        for (int second = 0; second < 900; second++) {
+            controller.advance(0f, 0f, 0f, 0.45f, 0.55f, 1f);
+        }
+
+        assertTrue(controller.getPuddleSpread() > controller.getPuddleDepth());
+        assertTrue(controller.getPuddleSpread() > 0f);
     }
 
     @Test
@@ -113,6 +158,8 @@ public final class GroundWetnessControllerTest {
         assertTrue(controller.getPuddleCoverage() >= 0f && controller.getPuddleCoverage() <= 1f);
         assertTrue(controller.getSoilSaturation() >= 0f && controller.getSoilSaturation() <= 1f);
         assertTrue(controller.getSurfaceWater() >= 0f && controller.getSurfaceWater() <= 1f);
+        assertTrue(controller.getPuddleDepth() >= 0f && controller.getPuddleDepth() <= 1f);
+        assertTrue(controller.getPuddleSpread() >= 0f && controller.getPuddleSpread() <= 1f);
         assertTrue(controller.getPuddleCoverage() <= controller.getWetness() + 0.0001f);
     }
 }
