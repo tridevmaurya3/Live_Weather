@@ -16,6 +16,7 @@ import androidx.core.content.ContextCompat;
 
 import com.tridev.liveweather.R;
 import com.tridev.liveweather.data.local.SceneryFavoritesPreferences;
+import com.tridev.liveweather.data.local.SceneryRecentPreferences;
 import com.tridev.liveweather.data.local.WallpaperPreferences;
 import com.tridev.liveweather.domain.scene.SceneryMode;
 import com.tridev.liveweather.domain.scene.SceneryRuntimeState;
@@ -26,9 +27,9 @@ import java.util.List;
 /**
  * Professional scenery library for the Wallpaper page.
  *
- * S12 preserves S11 one-tap visual scene selection and adds a non-destructive full-screen
- * detail preview. Long-pressing a scene card previews that candidate without applying it;
- * the dialog stages variation changes locally until Use scene is pressed.
+ * S13 keeps S12 full-screen preview behavior, groups the visual catalog into faster browsing
+ * sections and adds a small persistent MRU list of manual scene + variation combinations.
+ * Recent/favorite storage remains presentation-only and is never touched by the GL frame loop.
  */
 public final class ScenerySelectorView extends LinearLayout {
 
@@ -40,6 +41,23 @@ public final class ScenerySelectorView extends LinearLayout {
             SceneryMode.FARM_CROPS,
             SceneryMode.RIVER_LAKE,
             SceneryMode.FLOWERS_GREENERY,
+            SceneryMode.URBAN_BUILDINGS
+    };
+
+    private static final SceneryMode[] GROUP_SKY_SMART = {
+            SceneryMode.AUTO,
+            SceneryMode.OPEN_SKY
+    };
+
+    private static final SceneryMode[] GROUP_NATURE = {
+            SceneryMode.NATURAL_HILLS,
+            SceneryMode.FARM_CROPS,
+            SceneryMode.RIVER_LAKE,
+            SceneryMode.FLOWERS_GREENERY
+    };
+
+    private static final SceneryMode[] GROUP_PLACES = {
+            SceneryMode.VILLAGE,
             SceneryMode.URBAN_BUILDINGS
     };
 
@@ -60,6 +78,7 @@ public final class ScenerySelectorView extends LinearLayout {
 
     private final WallpaperPreferences preferences;
     private final SceneryFavoritesPreferences favoritesPreferences;
+    private final SceneryRecentPreferences recentPreferences;
     private final TextView selectionSummary;
     private final TextView selectionDetail;
     private final TextView variationSummary;
@@ -67,6 +86,9 @@ public final class ScenerySelectorView extends LinearLayout {
     private final TextView favoritesHint;
     private final HorizontalScrollView favoritesScroller;
     private final LinearLayout favoritesRow;
+    private final TextView recentHint;
+    private final HorizontalScrollView recentScroller;
+    private final LinearLayout recentRow;
     private final SceneryPreviewCardView[] sceneCards =
             new SceneryPreviewCardView[SELECTABLE_MODES.length];
     private final TextView[] variationChips =
@@ -96,6 +118,7 @@ public final class ScenerySelectorView extends LinearLayout {
 
         preferences = new WallpaperPreferences(context);
         favoritesPreferences = new SceneryFavoritesPreferences(context);
+        recentPreferences = new SceneryRecentPreferences(context);
         selectedMode = preferences.load().getSceneryMode();
         selectedVariant = SceneryVariantRuntimeState.get();
 
@@ -137,10 +160,48 @@ public final class ScenerySelectorView extends LinearLayout {
         libraryHintParams.topMargin = dp(3);
         addView(libraryHint, libraryHintParams);
 
-        addView(buildSceneScroller(context), new LayoutParams(
+        TextView recentTitle = createSectionLabel(context, R.string.wallpaper_scenery_recent_title);
+        LinearLayout.LayoutParams recentTitleParams = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT
+        );
+        recentTitleParams.topMargin = dp(12);
+        addView(recentTitle, recentTitleParams);
+
+        recentHint = new TextView(context);
+        recentHint.setTextAppearance(R.style.TextAppearance_LiveWeather_Caption);
+        recentHint.setTextColor(ContextCompat.getColor(context, R.color.weather_text_secondary));
+        recentHint.setText(R.string.wallpaper_scenery_recent_empty);
+        LinearLayout.LayoutParams recentHintParams = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT
+        );
+        recentHintParams.topMargin = dp(3);
+        addView(recentHint, recentHintParams);
+
+        recentScroller = new HorizontalScrollView(context);
+        recentScroller.setHorizontalScrollBarEnabled(false);
+        recentScroller.setVerticalScrollBarEnabled(false);
+        recentScroller.setFillViewport(false);
+        recentScroller.setClipToPadding(false);
+        recentScroller.setOverScrollMode(OVER_SCROLL_NEVER);
+
+        recentRow = new LinearLayout(context);
+        recentRow.setOrientation(HORIZONTAL);
+        recentRow.setGravity(Gravity.CENTER_VERTICAL);
+        recentRow.setPadding(0, dp(6), 0, 0);
+        recentScroller.addView(recentRow, new HorizontalScrollView.LayoutParams(
+                ViewGroup.LayoutParams.WRAP_CONTENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT
+        ));
+        addView(recentScroller, new LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
                 ViewGroup.LayoutParams.WRAP_CONTENT
         ));
+
+        addSceneGroup(context, R.string.wallpaper_scenery_group_sky_smart, GROUP_SKY_SMART);
+        addSceneGroup(context, R.string.wallpaper_scenery_group_nature, GROUP_NATURE);
+        addSceneGroup(context, R.string.wallpaper_scenery_group_places, GROUP_PLACES);
 
         variationSummary = createSectionLabel(context, R.string.wallpaper_scenery_variation_format);
         LinearLayout.LayoutParams variationSummaryParams = new LinearLayout.LayoutParams(
@@ -164,7 +225,7 @@ public final class ScenerySelectorView extends LinearLayout {
         );
         fullPreviewAction.setOnClickListener(view -> {
             performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY);
-            showScenePreview(selectedMode);
+            showScenePreview(selectedMode, selectedVariant);
         });
         LinearLayout.LayoutParams fullPreviewParams = new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.WRAP_CONTENT,
@@ -264,8 +325,30 @@ public final class ScenerySelectorView extends LinearLayout {
         }
     }
 
+    private void addSceneGroup(
+            @NonNull Context context,
+            int titleRes,
+            @NonNull SceneryMode[] modes
+    ) {
+        TextView title = createSectionLabel(context, titleRes);
+        LinearLayout.LayoutParams titleParams = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT
+        );
+        titleParams.topMargin = dp(12);
+        addView(title, titleParams);
+
+        addView(buildSceneScroller(context, modes), new LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT
+        ));
+    }
+
     @NonNull
-    private HorizontalScrollView buildSceneScroller(@NonNull Context context) {
+    private HorizontalScrollView buildSceneScroller(
+            @NonNull Context context,
+            @NonNull SceneryMode[] modes
+    ) {
         HorizontalScrollView scroller = new HorizontalScrollView(context);
         scroller.setHorizontalScrollBarEnabled(false);
         scroller.setVerticalScrollBarEnabled(false);
@@ -280,16 +363,16 @@ public final class ScenerySelectorView extends LinearLayout {
         row.setClipToPadding(false);
         row.setPadding(0, dp(8), 0, 0);
 
-        for (int index = 0; index < SELECTABLE_MODES.length; index++) {
-            SceneryMode mode = SELECTABLE_MODES[index];
+        for (int index = 0; index < modes.length; index++) {
+            SceneryMode mode = modes[index];
             SceneryPreviewCardView card = createSceneCard(context, mode);
-            sceneCards[index] = card;
+            sceneCards[indexOfMode(mode)] = card;
 
             LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
                     dp(136),
                     dp(152)
             );
-            if (index < SELECTABLE_MODES.length - 1) params.setMarginEnd(dp(10));
+            if (index < modes.length - 1) params.setMarginEnd(dp(10));
             row.addView(card, params);
         }
 
@@ -373,7 +456,7 @@ public final class ScenerySelectorView extends LinearLayout {
         card.setOnClickListener(view -> selectMode(mode));
         card.setOnLongClickListener(view -> {
             performHapticFeedback(HapticFeedbackConstants.LONG_PRESS);
-            showScenePreview(mode);
+            showScenePreview(mode, selectedVariant);
             return true;
         });
         return card;
@@ -433,7 +516,11 @@ public final class ScenerySelectorView extends LinearLayout {
         performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY);
 
         if (selectedMode == mode) {
-            if (mode == SceneryMode.AUTO) preferences.refreshRuntimeScenery();
+            if (mode == SceneryMode.AUTO) {
+                preferences.refreshRuntimeScenery();
+            } else {
+                recentPreferences.record(mode, selectedVariant);
+            }
             renderSelection();
             return;
         }
@@ -442,6 +529,9 @@ public final class ScenerySelectorView extends LinearLayout {
         WallpaperPreferences.Options updated = current.withSceneryMode(mode);
         preferences.save(updated);
         selectedMode = mode;
+        if (mode != SceneryMode.AUTO) {
+            recentPreferences.record(mode, selectedVariant);
+        }
         renderSelection();
 
         announceForAccessibility(getResources().getString(
@@ -455,7 +545,11 @@ public final class ScenerySelectorView extends LinearLayout {
 
         performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY);
         selectedVariant = SceneryVariantRuntimeState.setAndPersist(getContext(), variant);
-        if (selectedMode == SceneryMode.AUTO) preferences.refreshRuntimeScenery();
+        if (selectedMode == SceneryMode.AUTO) {
+            preferences.refreshRuntimeScenery();
+        } else {
+            recentPreferences.record(selectedMode, selectedVariant);
+        }
         renderSelection();
 
         announceForAccessibility(getResources().getString(
@@ -465,11 +559,11 @@ public final class ScenerySelectorView extends LinearLayout {
         ));
     }
 
-    private void showScenePreview(@NonNull SceneryMode mode) {
+    private void showScenePreview(@NonNull SceneryMode mode, int initialVariant) {
         SceneryPreviewDialog.show(
                 getContext(),
                 mode,
-                selectedVariant,
+                initialVariant,
                 SceneryRuntimeState.get(),
                 getResources().getString(labelRes(mode)),
                 (useMode, useVariant) -> {
@@ -492,12 +586,20 @@ public final class ScenerySelectorView extends LinearLayout {
         applySceneAndVariant(favorite.getMode(), favorite.getVariant());
     }
 
+    private void applyRecent(@NonNull SceneryRecentPreferences.Recent recent) {
+        performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY);
+        applySceneAndVariant(recent.getMode(), recent.getVariant());
+    }
+
     private void applySceneAndVariant(@NonNull SceneryMode mode, int variant) {
         selectedVariant = SceneryVariantRuntimeState.setAndPersist(getContext(), variant);
         WallpaperPreferences.Options current = preferences.load();
         WallpaperPreferences.Options updated = current.withSceneryMode(mode);
         preferences.save(updated);
         selectedMode = mode;
+        if (mode != SceneryMode.AUTO) {
+            recentPreferences.record(mode, selectedVariant);
+        }
         renderSelection();
     }
 
@@ -532,6 +634,7 @@ public final class ScenerySelectorView extends LinearLayout {
         for (int index = 0; index < SELECTABLE_MODES.length; index++) {
             SceneryPreviewCardView card = sceneCards[index];
             SceneryMode mode = SELECTABLE_MODES[index];
+            if (card == null) continue;
             card.setVariant(selectedVariant);
             card.setAutoResolvedMode(resolved);
             card.setSelected(mode == selectedMode);
@@ -544,8 +647,64 @@ public final class ScenerySelectorView extends LinearLayout {
             ));
         }
 
+        renderRecents();
         renderVariation();
         renderFavorites();
+    }
+
+    private void renderRecents() {
+        List<SceneryRecentPreferences.Recent> recents = recentPreferences.load();
+        recentRow.removeAllViews();
+        if (recents.isEmpty()) {
+            recentHint.setVisibility(VISIBLE);
+            recentScroller.setVisibility(GONE);
+            return;
+        }
+
+        recentHint.setVisibility(GONE);
+        recentScroller.setVisibility(VISIBLE);
+        for (int index = 0; index < recents.size(); index++) {
+            SceneryRecentPreferences.Recent recent = recents.get(index);
+            TextView chip = createActionChip(
+                    getContext(),
+                    getResources().getString(
+                            R.string.wallpaper_scenery_recent_format,
+                            getResources().getString(labelRes(recent.getMode())),
+                            recent.getVariant() + 1
+                    )
+            );
+            chip.setContentDescription(
+                    getResources().getString(
+                            R.string.wallpaper_scenery_recent_accessibility,
+                            getResources().getString(labelRes(recent.getMode())),
+                            recent.getVariant() + 1
+                    )
+                            + ". "
+                            + getResources().getString(
+                            R.string.wallpaper_scenery_recent_preview_accessibility,
+                            getResources().getString(labelRes(recent.getMode())),
+                            recent.getVariant() + 1
+                    )
+            );
+            chip.setOnClickListener(view -> applyRecent(recent));
+            chip.setOnLongClickListener(view -> {
+                performHapticFeedback(HapticFeedbackConstants.LONG_PRESS);
+                showScenePreview(recent.getMode(), recent.getVariant());
+                return true;
+            });
+
+            boolean selected = selectedMode != SceneryMode.AUTO
+                    && selectedMode == recent.getMode()
+                    && selectedVariant == recent.getVariant();
+            applyChipState(chip, selected);
+
+            LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.WRAP_CONTENT,
+                    dp(48)
+            );
+            if (index < recents.size() - 1) params.setMarginEnd(dp(8));
+            recentRow.addView(chip, params);
+        }
     }
 
     private void renderVariation() {
@@ -631,6 +790,13 @@ public final class ScenerySelectorView extends LinearLayout {
     @NonNull
     private SceneryMode currentConcreteMode() {
         return selectedMode == SceneryMode.AUTO ? SceneryRuntimeState.get() : selectedMode;
+    }
+
+    private int indexOfMode(@NonNull SceneryMode mode) {
+        for (int index = 0; index < SELECTABLE_MODES.length; index++) {
+            if (SELECTABLE_MODES[index] == mode) return index;
+        }
+        return 0;
     }
 
     private void applyChipState(@NonNull TextView chip, boolean selected) {
