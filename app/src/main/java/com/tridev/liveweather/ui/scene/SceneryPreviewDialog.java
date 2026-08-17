@@ -49,6 +49,7 @@ public final class SceneryPreviewDialog {
         final SceneryMode resolved = autoResolvedMode == SceneryMode.AUTO
                 ? SceneryMode.NATURAL_HILLS
                 : autoResolvedMode;
+        final TextView[] useActionHolder = new TextView[1];
 
         Dialog dialog = new Dialog(context);
         dialog.requestWindowFeature(Window.FEATURE_NO_TITLE);
@@ -195,6 +196,13 @@ public final class SceneryPreviewDialog {
                 preview.setVariant(value);
                 updateVariationStates(context, variationChips, value);
                 updateStatus(context, status, mode, resolved, value);
+                if (useActionHolder[0] != null) {
+                    useActionHolder[0].setContentDescription(context.getString(
+                            R.string.wallpaper_scenery_preview_use_accessibility,
+                            sceneLabel,
+                            value + 1
+                    ));
+                }
             });
         }
         updateVariationStates(context, variationChips, stagedVariant[0]);
@@ -232,6 +240,7 @@ public final class SceneryPreviewDialog {
         actions.addView(cancel, cancelParams);
 
         TextView useScene = new TextView(context);
+        useActionHolder[0] = useScene;
         useScene.setTextAppearance(R.style.TextAppearance_LiveWeather_Body);
         useScene.setText(mode == SceneryMode.AUTO
                 ? R.string.wallpaper_scenery_preview_use_auto
