@@ -330,6 +330,7 @@ public final class HeroGlPipeline {
 
     private void applyPerformanceDetail() {
         float detail = performanceDetailScale;
+        worldRenderer.setDetailScale(detail);
         cloudRenderer.setDetailScale(detail);
         stormRenderer.setDetailScale(detail);
         rainRenderer.setDetailScale(detail);
