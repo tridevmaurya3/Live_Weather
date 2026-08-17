@@ -8,12 +8,14 @@ package com.tridev.liveweather.ui.gl;
  * sway so rain, snow, fog and scenery can eventually respond to one coherent air mass instead of
  * each shader inventing an unrelated gust rhythm.</p>
  *
- * <p>Callers provide a shared monotonic time value. The controller stores its latest sample in
- * primitive fields and allocates nothing on the render hot path.</p>
+ * <p>R9.2 exposes one process-monotonic render clock so independent Hero/Wallpaper precipitation
+ * renderers sample the same gust phase. The controller stores its latest sample in primitive fields
+ * and allocates nothing on the render hot path.</p>
  */
 final class UnifiedWindController {
 
     private static final float TWO_PI = (float) (Math.PI * 2.0);
+    private static final long SHARED_ORIGIN_NANOS = System.nanoTime();
 
     private float baseStrength;
     private float effectiveStrength;
@@ -22,6 +24,12 @@ final class UnifiedWindController {
     private float forward;
     private float gustFactor = 1f;
     private float turbulence;
+
+    /** One lifecycle-stable monotonic phase shared by Hero and Live Wallpaper renderers. */
+    static float sharedMonotonicSeconds() {
+        long elapsed = Math.max(0L, System.nanoTime() - SHARED_ORIGIN_NANOS);
+        return elapsed / 1_000_000_000f;
+    }
 
     /**
      * Updates the coherent visual wind sample.
