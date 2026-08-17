@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="wallpaper_scenery_title">Choose scenery</string>
-    <string name="wallpaper_scenery_subtitle">Pick the world below the live sky. Weather, Sun, Moon, clouds and precipitation stay driven by the same real-time state.</string>
+    <string name="wallpaper_scenery_subtitle">Pick the world below the live sky. Auto can adapt the scenery to current observed conditions; weather, Sun, Moon, clouds and precipitation remain driven by the same real-time truth.</string>
     <string name="wallpaper_scenery_open_sky">Open Sky</string>
     <string name="wallpaper_scenery_natural_hills">Natural Hills</string>
     <string name="wallpaper_scenery_village">Village</string>
@@ -12,13 +12,30 @@
     <string name="wallpaper_scenery_auto">Auto Scene</string>
     <string name="wallpaper_scenery_selected_format">Selected scene · %1$s</string>
     <string name="wallpaper_scenery_auto_selected_format">Auto now · %1$s</string>
-    <string name="wallpaper_scenery_auto_detail">Auto Scene changes only the scenery by local time of day. Live weather and astronomy remain untouched.</string>
-    <string name="wallpaper_scenery_manual_detail">Manual scene stays selected until you choose another scene or Auto Scene.</string>
+    <string name="wallpaper_scenery_auto_detail">Auto adapts only scenery to current observed conditions and day-part. It never changes weather truth.</string>
+    <string name="wallpaper_scenery_manual_detail">Manual scene stays fixed until you choose another scene or Auto.</string>
     <string name="wallpaper_scenery_select_accessibility">Select %1$s scenery</string>
     <string name="wallpaper_scenery_changed_accessibility">%1$s scenery selected</string>
-    <string name="wallpaper_scenery_variation_format">Scene variation · %1$d of %2$d</string>
+    <string name="wallpaper_scenery_variation_format">Variation %1$d of %2$d</string>
     <string name="wallpaper_scenery_variation_action">Change variation</string>
     <string name="wallpaper_scenery_variation_accessibility">Change scenery variation. Current variation %1$d of %2$d</string>
     <string name="wallpaper_scenery_variation_select_accessibility">Select scenery variation %1$d of %2$d</string>
     <string name="wallpaper_scenery_variation_changed_accessibility">Scenery variation %1$d of %2$d selected</string>
+
+    <string name="wallpaper_scenery_quick_presets">Quick presets</string>
+    <string name="wallpaper_scenery_preset_sky">Sky</string>
+    <string name="wallpaper_scenery_preset_green">Green</string>
+    <string name="wallpaper_scenery_preset_water">Water</string>
+    <string name="wallpaper_scenery_preset_city">City</string>
+    <string name="wallpaper_scenery_preset_accessibility">Use %1$s scenery preset</string>
+
+    <string name="wallpaper_scenery_favorites_title">Favorites</string>
+    <string name="wallpaper_scenery_favorite_save">☆ Save current</string>
+    <string name="wallpaper_scenery_favorite_saved">★ Saved</string>
+    <string name="wallpaper_scenery_favorites_empty">Save up to 3 scene + variation combinations for one-tap access.</string>
+    <string name="wallpaper_scenery_favorite_format">%1$s · %2$d</string>
+    <string name="wallpaper_scenery_favorite_accessibility">Use favorite %1$s, variation %2$d</string>
+    <string name="wallpaper_scenery_favorite_remove_accessibility">Long press to remove favorite %1$s, variation %2$d</string>
+    <string name="wallpaper_scenery_favorite_saved_accessibility">Current scenery saved to favorites</string>
+    <string name="wallpaper_scenery_favorite_removed_accessibility">Scenery favorite removed</string>
 </resources>
