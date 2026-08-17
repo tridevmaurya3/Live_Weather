@@ -17,8 +17,8 @@ import java.nio.FloatBuffer;
  * the noise only changes local density. Secondary atmosphere sampling is governed by
  * the same performance detail tier used by Hero and Live Wallpaper.
  *
- * R9.3 feeds the atmospheric drift from the same process-wide UnifiedWindController
- * phase used by rain and snow, so fog/haze move as part of one coherent air mass.
+ * R9 consumes the centralized visual wind sample from GlSceneTransitionController,
+ * keeping fog/haze on the same air-mass phase as rain, snow, scenery, storms and clouds.
  */
 public final class HeroGlAtmosphereOverlayRenderer {
 
@@ -77,7 +77,6 @@ public final class HeroGlAtmosphereOverlayRenderer {
             " gl_FragColor=vec4(clamp(color,0.0,1.0),clamp(alpha,0.0,0.48));}");
 
     private final FloatBuffer quadBuffer;
-    private final UnifiedWindController windController = new UnifiedWindController();
     private int program;
     private int noiseTexture;
     private int width=1;
@@ -133,15 +132,12 @@ public final class HeroGlAtmosphereOverlayRenderer {
     public void drawFrame(){
         GlSceneSnapshot s=snapshot;
         if(program==0||noiseTexture==0||s==null)return;
-
         float renderSeconds=UnifiedWindController.sharedMonotonicSeconds();
-        windController.sample(s.windStrength,s.windDirectionRadians,s.stormIntensity,renderSeconds);
-
         GLES20.glEnable(GLES20.GL_BLEND);GLES20.glBlendFunc(GLES20.GL_SRC_ALPHA,GLES20.GL_ONE_MINUS_SRC_ALPHA);GLES20.glUseProgram(program);
         GLES20.glActiveTexture(GLES20.GL_TEXTURE0);GLES20.glBindTexture(GLES20.GL_TEXTURE_2D,noiseTexture);GLES20.glUniform1i(uNoise,0);
         GLES20.glUniform2f(uResolution,width,height);GLES20.glUniform2f(uSunPos,s.sunX,s.sunY);GLES20.glUniform1f(uSunVis,s.sunVisibility);GLES20.glUniform2f(uMoonPos,s.moonX,s.moonY);GLES20.glUniform1f(uMoonVis,s.moonVisibility);GLES20.glUniform1f(uMoonIllum,s.moonIllumination);
         GLES20.glUniform1f(uCloud,s.cloudCover);GLES20.glUniform1f(uRain,s.rainIntensity);GLES20.glUniform1f(uDrizzle,s.drizzleIntensity);GLES20.glUniform1f(uFog,s.fogIntensity);GLES20.glUniform1f(uStorm,s.stormIntensity);GLES20.glUniform1f(uHaze,s.airHazeIntensity);GLES20.glUniform1f(uSceneLight,s.sceneLight);GLES20.glUniform1f(uVisibility,s.visibilityFactor);
-        GLES20.glUniform1f(uTime,renderSeconds);GLES20.glUniform1f(uWind,windController.getEffectiveStrength());GLES20.glUniform1f(uWindDir,windController.getDirectionRadians());GLES20.glUniform1f(uThermal,s.thermalBias);GLES20.glUniform1f(uDetail,detailScale);
+        GLES20.glUniform1f(uTime,renderSeconds);GLES20.glUniform1f(uWind,s.windStrength);GLES20.glUniform1f(uWindDir,s.windDirectionRadians);GLES20.glUniform1f(uThermal,s.thermalBias);GLES20.glUniform1f(uDetail,detailScale);
         quadBuffer.position(0);GLES20.glEnableVertexAttribArray(aPosition);GLES20.glVertexAttribPointer(aPosition,2,GLES20.GL_FLOAT,false,0,quadBuffer);GLES20.glDrawArrays(GLES20.GL_TRIANGLE_STRIP,0,4);GLES20.glDisableVertexAttribArray(aPosition);
         GLES20.glBindTexture(GLES20.GL_TEXTURE_2D,0);GLES20.glDisable(GLES20.GL_BLEND);
     }
