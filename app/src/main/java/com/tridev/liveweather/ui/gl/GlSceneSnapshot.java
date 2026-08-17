@@ -35,6 +35,11 @@ public final class GlSceneSnapshot {
     public float moonAltitude;
 
     public float starVisibility;
+
+    /** Observer latitude and local sidereal angle used by the real-time star projection. */
+    public float observerLatitudeRadians;
+    public float localSiderealRadians;
+
     public float cloudCover;
     public float cloudDensity;
     public float cloudFarLayer;
@@ -83,6 +88,8 @@ public final class GlSceneSnapshot {
             float moonPhaseAngleRadians,
             float moonAltitude,
             float starVisibility,
+            float observerLatitudeRadians,
+            float localSiderealRadians,
             float cloudCover,
             float cloudDensity,
             float cloudFarLayer,
@@ -123,6 +130,8 @@ public final class GlSceneSnapshot {
         this.moonPhaseAngleRadians = moonPhaseAngleRadians;
         this.moonAltitude = moonAltitude;
         this.starVisibility = starVisibility;
+        this.observerLatitudeRadians = observerLatitudeRadians;
+        this.localSiderealRadians = localSiderealRadians;
         this.cloudCover = cloudCover;
         this.cloudDensity = cloudDensity;
         this.cloudFarLayer = cloudFarLayer;
@@ -155,6 +164,8 @@ public final class GlSceneSnapshot {
                 source.moonX, source.moonY, source.moonVisibility, source.moonIllumination,
                 source.moonPhaseAngleRadians, source.moonAltitude,
                 source.starVisibility,
+                source.observerLatitudeRadians,
+                source.localSiderealRadians,
                 source.cloudCover,
                 source.cloudDensity,
                 source.cloudFarLayer,
@@ -198,6 +209,8 @@ public final class GlSceneSnapshot {
         moonPhaseAngleRadians = source.moonPhaseAngleRadians;
         moonAltitude = source.moonAltitude;
         starVisibility = source.starVisibility;
+        observerLatitudeRadians = source.observerLatitudeRadians;
+        localSiderealRadians = source.localSiderealRadians;
         cloudCover = source.cloudCover;
         cloudDensity = source.cloudDensity;
         cloudFarLayer = source.cloudFarLayer;
