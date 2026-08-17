@@ -6,6 +6,7 @@ import androidx.annotation.Nullable;
 import com.tridev.liveweather.data.remote.dto.AirQualityResponse;
 import com.tridev.liveweather.data.remote.dto.WeatherResponse;
 import com.tridev.liveweather.domain.AirQualityReality;
+import com.tridev.liveweather.domain.AtmosphericDepthReality;
 import com.tridev.liveweather.domain.LiveConditionResolver;
 import com.tridev.liveweather.domain.SkyRealityEngine;
 import com.tridev.liveweather.domain.SkyRealityState;
@@ -47,12 +48,12 @@ public final class DynamicRealityComposer {
 
         int code = condition.getWeatherCode() == null ? 0 : condition.getWeatherCode();
 
-        double visibilityMeters = current == null || current.getVisibility() == null
-                ? 16000d
-                : Math.max(0d, current.getVisibility());
-        double visibilityFactor = clamp(visibilityMeters / 16000d, 0.08d, 1d);
         double airHaze = AirQualityReality.hazeIntensity(airQuality);
-        visibilityFactor = clamp(visibilityFactor * (1d - airHaze * 0.48d), 0.05d, 1d);
+        AtmosphericDepthReality.DepthState atmosphericDepth = AtmosphericDepthReality.resolve(
+                current,
+                airHaze
+        );
+        double visibilityFactor = atmosphericDepth.getVisibilityFactor();
 
         double windSpeed = current == null || current.getWindSpeed10m() == null
                 ? 0d
