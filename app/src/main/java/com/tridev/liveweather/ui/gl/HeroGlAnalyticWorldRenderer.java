@@ -16,10 +16,10 @@ import java.nio.FloatBuffer;
 /**
  * Deterministic atmospheric world shared by app Hero and Live Wallpaper.
  *
- * Scenery S7 adds restrained scene-aware weather interaction on top of the S6
- * time-of-day material response. Rain/wetness, fog, snow/cold surface response and
- * wind interaction are driven only by the authoritative GlSceneSnapshot values.
- * Falling precipitation and cloud rendering remain separate frozen/shared layers.
+ * Scenery S8 keeps the S7 weather/material truth intact while stabilizing secondary
+ * procedural detail. High-frequency micro-detail now follows the shared performance
+ * detail tier and uses softer continuous masks to reduce shimmer/moire on real devices.
+ * Base terrain, buildings, weather interaction and the frozen cloud layer are unchanged.
  */
 public final class HeroGlAnalyticWorldRenderer {
 
@@ -58,6 +58,7 @@ public final class HeroGlAnalyticWorldRenderer {
             "uniform float uWind;",
             "uniform float uWindDir;",
             "uniform float uTime;",
+            "uniform float uDetail;",
             "uniform float uSceneryFrom;",
             "uniform float uSceneryTo;",
             "uniform float uSceneryMix;",
@@ -71,6 +72,11 @@ public final class HeroGlAnalyticWorldRenderer {
             " float aspect=uResolution.x/max(1.0,uResolution.y);",
             " float baseX=(p.x-0.5)*(aspect/0.45)+0.5;",
             " float par=uParallax-0.5;",
+            " float detail=clamp(uDetail,0.5,1.0);",
+            " float detailMid=smoothstep(0.54,0.82,detail);",
+            " float detailHigh=smoothstep(0.78,0.98,detail);",
+            " float freqScale=mix(0.72,1.0,detail);",
+            " float microContrast=mix(0.52,1.0,detail);",
             " float variant=mix(uVariantFrom,uVariantTo,uSceneryMix);",
             " float vNorm=clamp(variant/3.0,0.0,1.0);",
             " float vPhase=variant*1.6180339;",
@@ -106,7 +112,7 @@ public final class HeroGlAnalyticWorldRenderer {
             " float light=clamp(0.18+uSceneLight*0.74+lunar*0.18,0.16,0.95);",
             " float rainAir=precip*(0.08+uStorm*0.08);",
             " float haze=max(max(uFog*0.55,uHaze*0.25),rainAir);",
-            " float detailVis=clamp((1.0-haze*0.86)*(0.52+light*0.48)*(1.0-uStorm*0.22),0.0,1.0);",
+            " float detailVis=clamp((1.0-haze*0.86)*(0.52+light*0.48)*(1.0-uStorm*0.22)*(0.70+0.30*detailMid),0.0,1.0);",
             " float daylight=smoothstep(-6.0,14.0,uSunAltitude);",
             " float deepNight=1.0-smoothstep(-10.0,-3.0,uSunAltitude);",
             " float horizonBand=1.0-smoothstep(5.0,18.0,abs(uSunAltitude));",
@@ -149,9 +155,9 @@ public final class HeroGlAnalyticWorldRenderer {
             " color+=vec3(0.055,0.080,0.12)*moonTerrain*0.12;",
             " float terrainSnow=snowTruth*(farEdge*0.45+midEdge*0.72)*(1.0-uFog*0.55)*(1.0-openW);",
             " color=mix(color,snowTone,clamp(terrainSnow*0.26,0.0,0.22));",
-            " float ridgeTexture=0.5+0.5*sin(xMid*(46.0+variant*2.1)+sin(xMid*13.0+vPhase)*1.35);",
+            " float ridgeTexture=0.5+0.5*sin(xMid*((46.0+variant*2.1)*freqScale)+sin(xMid*(13.0*freqScale)+vPhase)*1.35);",
             " float ridgeDetail=mNature*midM*(1.0-nearM)*smoothstep(midLine+0.008,midLine+0.060,p.y)*detailVis;",
-            " color=mix(color,mix(vec3(0.075,0.115,0.110),vec3(0.13,0.18,0.16),light),ridgeDetail*ridgeTexture*0.055);",
+            " color=mix(color,mix(vec3(0.075,0.115,0.110),vec3(0.13,0.18,0.16),light),ridgeDetail*ridgeTexture*0.055*microContrast);",
             " float groundStart=mix(0.925-vNorm*0.004*sin(vPhase),0.975-vNorm*0.005,mOpen);",
             " float ground=smoothstep(groundStart,min(0.998,groundStart+0.033),p.y);",
             " vec3 groundC=mix(vec3(0.008,0.018,0.024),vec3(0.025,0.046,0.052),light);",
@@ -221,12 +227,12 @@ public final class HeroGlAnalyticWorldRenderer {
             " float windowBand=windowShape*buildingShape*night*(1.0-uFog*0.70)*(0.20*mUrban+0.13*mVillage+0.10*mNature);",
             " color+=vec3(0.78,0.58,0.30)*windowBand*0.55;alpha=max(alpha,windowBand*0.14);",
             " float roofEdge=mUrban*buildingShape*(1.0-smoothstep(cityTop+0.005,cityTop+0.014,p.y))*detailVis;",
-            " float roofRhythm=0.45+0.55*(0.5+0.5*sin(cityCell*3.17+cityLocal*8.0+vPhase));",
+            " float roofRhythm=0.45+0.55*(0.5+0.5*sin(cityCell*3.17+cityLocal*mix(5.6,8.0,detail)+vPhase));",
             " vec3 roofEdgeC=mix(vec3(0.055,0.070,0.080),vec3(0.12,0.14,0.15),light);",
             " roofEdgeC=mix(roofEdgeC,vec3(0.18,0.12,0.075),golden*0.12*solarSide);",
             " roofEdgeC=mix(roofEdgeC,vec3(0.050,0.070,0.105),moonMaterial*0.10);",
             " roofEdgeC=mix(roofEdgeC,snowTone,snowTruth*0.22);",
-            " color+=roofEdgeC*roofEdge*roofRhythm*0.050;",
+            " color+=roofEdgeC*roofEdge*roofRhythm*0.050*(0.62+0.38*detailMid);",
             " float sway=(sin(uTime*(0.42+uWind*0.72)+xNear*(19.0+variant*1.6)+vPhase)*uWind+windPulse*0.35);",
             " float farmGround=mFarm*smoothstep(0.855-vNorm*0.004,0.950,p.y);",
             " float farmPerspective=max(0.0,p.y-(0.850-vNorm*0.003));",
@@ -237,20 +243,20 @@ public final class HeroGlAnalyticWorldRenderer {
             " fieldBase=mix(fieldBase,fieldBase*vec3(0.62,0.78,0.66),wetTruth*0.28);",
             " fieldBase=mix(fieldBase,snowTone,snowTruth*0.08);",
             " color=mix(color,fieldBase,farmGround*(0.22+light*0.12)*(1.0-uFog*0.52));alpha=max(alpha,farmGround*0.28);",
-            " float farmFreq=8.0+variant*1.25;",
-            " float farmRows=0.5+0.5*sin((xNear/(0.16+farmPerspective*1.9))*farmFreq+farmPerspective*(42.0+variant*4.0)+sway*0.10+vPhase);",
+            " float farmFreq=(8.0+variant*1.25)*mix(0.88,1.0,detail);",
+            " float farmRows=0.5+0.5*sin((xNear/(0.16+farmPerspective*1.9))*farmFreq+farmPerspective*((42.0+variant*4.0)*mix(0.90,1.0,detail))+sway*0.10+vPhase);",
             " float rowMask=farmGround*smoothstep(0.48,0.74,farmRows)*(1.0-uFog*0.55);",
-            " float fineRows=0.5+0.5*sin((xNear/(0.11+farmPerspective*2.5))*(13.0+variant*1.7)+farmPerspective*(61.0+variant*3.2)-sway*0.07-vPhase*0.5);",
+            " float fineRows=0.5+0.5*sin((xNear/(0.11+farmPerspective*2.5))*((13.0+variant*1.7)*freqScale)+farmPerspective*((61.0+variant*3.2)*freqScale)-sway*0.07-vPhase*0.5);",
             " vec3 farmC=mix(vec3(0.035,0.060,0.030),vec3(0.18,0.25,0.085),light);",
             " farmC=mix(farmC,vec3(0.30,0.21,0.070),golden*0.12*(0.60+0.40*solarSide));",
             " farmC=mix(farmC,vec3(0.030,0.065,0.070),moonMaterial*0.08);",
             " farmC=mix(farmC,farmC*vec3(0.64,0.80,0.68),wetTruth*0.22);",
             " farmC=mix(farmC,snowTone,snowTruth*0.10);",
             " color=mix(color,farmC,rowMask*(0.34+vNorm*0.04));alpha=max(alpha,rowMask*0.25);",
-            " color+=vec3(0.10,0.12,0.045)*fineRows*farmGround*(0.026+vNorm*0.006)*(1.0-uFog*0.60);",
-            " float cropHeadNoise=0.5+0.5*sin(xNear*(121.0+variant*6.0)+farmPerspective*88.0+sway*0.22+vPhase);",
-            " float cropHeadBand=farmGround*rowMask*smoothstep(0.858,0.884,p.y)*(1.0-smoothstep(0.925,0.953,p.y))*detailVis;",
-            " float cropHeads=cropHeadBand*smoothstep(0.72,0.94,cropHeadNoise);",
+            " color+=vec3(0.10,0.12,0.045)*fineRows*farmGround*(0.026+vNorm*0.006)*(1.0-uFog*0.60)*microContrast;",
+            " float cropHeadNoise=0.5+0.5*sin(xNear*((121.0+variant*6.0)*freqScale)+farmPerspective*(88.0*freqScale)+sway*0.22+vPhase);",
+            " float cropHeadBand=farmGround*rowMask*smoothstep(0.858,0.884,p.y)*(1.0-smoothstep(0.925,0.953,p.y))*detailVis*detailHigh;",
+            " float cropHeads=cropHeadBand*smoothstep(0.76,0.95,cropHeadNoise);",
             " vec3 cropHeadC=mix(vec3(0.10,0.15,0.050),vec3(0.24,0.22,0.075),light);",
             " cropHeadC=mix(cropHeadC,vec3(0.34,0.24,0.085),golden*0.14);",
             " cropHeadC=mix(cropHeadC,snowTone,snowTruth*0.18);",
@@ -264,50 +270,52 @@ public final class HeroGlAnalyticWorldRenderer {
             " bankC=mix(bankC,snowTone,snowTruth*0.14);",
             " color=mix(color,bankC,bank*(0.45-haze*0.16));alpha=max(alpha,bank*0.40);",
             " float water=mRiver*smoothstep(0.885+riverShift,0.945,p.y);",
-            " float wave=0.5+0.5*sin(xMid*(26.0+variant*2.8)+uTime*(0.18+precip*0.70)+vPhase);",
-            " float wave2=0.5+0.5*sin(xNear*(51.0+variant*4.0)-uTime*(0.12+precip*0.36)+1.7-vPhase*0.6);",
-            " float microWave=0.5+0.5*sin(xNear*(91.0+variant*7.0)+uTime*(0.16+uWind*0.32)+vPhase*0.4);",
-            " float rainDimple=0.5+0.5*sin(xNear*(129.0+variant*5.0)+p.y*81.0+uTime*(2.0+precip*2.4));",
+            " float wave=0.5+0.5*sin(xMid*((26.0+variant*2.8)*mix(0.90,1.0,detail))+uTime*(0.18+precip*0.70)+vPhase);",
+            " float wave2=0.5+0.5*sin(xNear*((51.0+variant*4.0)*freqScale)-uTime*(0.12+precip*0.36)+1.7-vPhase*0.6);",
+            " float microWave=0.5+0.5*sin(xNear*((91.0+variant*7.0)*freqScale)+uTime*(0.16+uWind*0.32)+vPhase*0.4);",
+            " float rainDimple=0.5+0.5*sin(xNear*((129.0+variant*5.0)*freqScale)+p.y*(81.0*freqScale)+uTime*(1.6+precip*2.0));",
             " vec3 waterC=mix(vec3(0.020,0.044,0.060),vec3(0.095,0.18,0.22),light);",
             " waterC=mix(waterC,vec3(0.070,0.155,0.145),vNorm*0.10);",
             " waterC=mix(waterC,vec3(0.22,0.135,0.075),golden*0.055*solarSide);",
             " waterC=mix(waterC,vec3(0.035,0.075,0.125),moonMaterial*0.10);",
             " waterC=mix(waterC,waterC*vec3(0.78,0.88,0.94),wetTruth*0.08);",
-            " waterC+=vec3(0.025,0.038,0.050)*(wave*0.55+wave2*0.32+microWave*0.13);",
-            " waterC+=vec3(0.030,0.040,0.045)*rainDimple*precip*0.025;",
+            " waterC+=vec3(0.025,0.038,0.050)*(wave*0.55+wave2*0.32+microWave*0.13*microContrast);",
+            " waterC+=vec3(0.030,0.040,0.045)*rainDimple*precip*0.025*detailMid;",
             " color=mix(color,waterC,water*(0.64-haze*0.18));alpha=max(alpha,water*0.55);",
             " float waterGlint=water*(1.0-uFog*0.72)*(0.5+0.5*microWave)*(0.008+uSunVis*0.020+uMoonVis*night*0.008);",
             " vec3 waterGlintC=mix(vec3(0.17,0.24,0.30),vec3(0.52,0.60,0.63),light);",
             " waterGlintC=mix(waterGlintC,vec3(0.86,0.48,0.20),golden*0.22*solarSide);",
             " waterGlintC=mix(waterGlintC,vec3(0.31,0.47,0.72),moonMaterial*0.18);",
             " color+=waterGlintC*waterGlint;",
-            " float reedNoise=0.5+0.5*sin(xNear*(83.0+variant*4.5)+sway*0.18+windPulse*0.35+vPhase*0.6);",
+            " float reedNoise=0.5+0.5*sin(xNear*((83.0+variant*4.5)*freqScale)+sway*0.18+windPulse*0.35+vPhase*0.6);",
             " float reedBand=mRiver*smoothstep(0.866+riverShift,0.878+riverShift,p.y)*(1.0-smoothstep(0.889+riverShift,0.903+riverShift,p.y))*detailVis;",
-            " float reeds=reedBand*smoothstep(0.74,0.94,reedNoise);",
+            " float reeds=reedBand*smoothstep(0.76,0.94,reedNoise)*(0.62+0.38*detailMid);",
             " vec3 reedC=mix(vec3(0.020,0.052,0.030),vec3(0.105,0.145,0.065),light);",
             " reedC=mix(reedC,vec3(0.16,0.13,0.055),golden*0.10);",
             " reedC=mix(reedC,reedC*vec3(0.68,0.82,0.74),wetTruth*0.18);",
             " reedC=mix(reedC,snowTone,snowTruth*0.10);",
             " color=mix(color,reedC,reeds*0.24);alpha=max(alpha,reeds*0.08);",
             " float meadow=mFlowers*smoothstep(0.850-vNorm*0.005,0.935,p.y);",
-            " float leafTexture=0.5+0.5*sin(xNear*(67.0+variant*5.0)+sin(xNear*(19.0+variant*1.2)+sway*0.12+vPhase)*2.2);",
+            " float leafTexture=0.5+0.5*sin(xNear*((67.0+variant*5.0)*freqScale)+sin(xNear*((19.0+variant*1.2)*freqScale)+sway*0.12+vPhase)*2.2);",
             " vec3 meadowC=mix(vec3(0.018,0.048,0.034),vec3(0.080,0.18,0.090),light);",
             " meadowC=mix(meadowC,vec3(0.065,0.17,0.11),vNorm*0.12);",
             " meadowC=mix(meadowC,vec3(0.14,0.13,0.055),golden*0.09);",
             " meadowC=mix(meadowC,vec3(0.028,0.062,0.078),moonMaterial*0.08);",
             " meadowC=mix(meadowC,meadowC*vec3(0.64,0.82,0.70),wetTruth*0.24);",
             " meadowC=mix(meadowC,snowTone,snowTruth*0.09);",
-            " color=mix(color,meadowC,meadow*(0.42+leafTexture*0.16)*(1.0-uFog*0.42));alpha=max(alpha,meadow*0.46);",
-            " float grassFine=0.5+0.5*sin(xNear*(137.0+variant*5.0)+p.y*73.0+sway*0.25+windPulse*0.22+vPhase*0.5);",
-            " float grassDetail=meadow*smoothstep(0.72,0.94,grassFine)*detailVis;",
+            " color=mix(color,meadowC,meadow*(0.42+leafTexture*0.16*microContrast)*(1.0-uFog*0.42));alpha=max(alpha,meadow*0.46);",
+            " float grassFine=0.5+0.5*sin(xNear*((137.0+variant*5.0)*freqScale)+p.y*(73.0*freqScale)+sway*0.25+windPulse*0.22+vPhase*0.5);",
+            " float grassDetail=meadow*smoothstep(0.76,0.95,grassFine)*detailVis*detailHigh;",
             " vec3 grassC=mix(vec3(0.020,0.060,0.030),vec3(0.075,0.14,0.060),light);",
             " grassC=mix(grassC,vec3(0.13,0.11,0.050),golden*0.09);",
             " grassC=mix(grassC,grassC*vec3(0.66,0.82,0.70),wetTruth*0.20);",
             " grassC=mix(grassC,snowTone,snowTruth*0.08);",
             " color+=grassC*grassDetail*0.038;",
-            " float flowerA=step(0.955-vNorm*0.018,0.5+0.5*sin(xNear*(113.0+variant*4.0)+floor(p.y*112.0)*2.31+sway*0.16+vPhase));",
-            " float flowerB=step(0.965-vNorm*0.016,0.5+0.5*sin(xNear*(79.0+variant*3.0)-floor(p.y*96.0)*1.73+1.4-sway*0.11-vPhase*0.7));",
-            " float flowerDots=meadow*max(flowerA,flowerB)*(1.0-uFog*0.72)*(0.34+light*0.44);",
+            " float flowerSignalA=0.5+0.5*sin(xNear*((113.0+variant*4.0)*freqScale)+p.y*mix(72.0,112.0,detail)+sway*0.16+vPhase);",
+            " float flowerSignalB=0.5+0.5*sin(xNear*((79.0+variant*3.0)*freqScale)-p.y*mix(64.0,96.0,detail)+1.4-sway*0.11-vPhase*0.7);",
+            " float flowerA=smoothstep(0.89,0.97,flowerSignalA);",
+            " float flowerB=smoothstep(0.91,0.98,flowerSignalB);",
+            " float flowerDots=meadow*max(flowerA,flowerB)*(1.0-uFog*0.72)*(0.34+light*0.44)*(0.55+0.45*detailMid);",
             " vec3 flowerPaletteA=mix(vec3(0.92,0.50,0.64),vec3(0.70,0.58,0.95),vNorm);",
             " vec3 flowerPaletteB=mix(vec3(0.96,0.78,0.34),vec3(0.96,0.66,0.40),vNorm);",
             " vec3 flowerC=mix(flowerPaletteA,flowerPaletteB,flowerB);",
@@ -318,15 +326,15 @@ public final class HeroGlAnalyticWorldRenderer {
             " color=mix(color,flowerC,flowerDots*0.42);alpha=max(alpha,flowerDots*0.18);",
             " float wet=smoothstep(0.16,0.74,precip)*ground*(1.0-mRiver);",
             " float reflectionBand=smoothstep(0.930,0.998,p.y);",
-            " float ripple=0.5+0.5*sin(xNear*(31.0+variant*1.8)+uTime*(0.68+uRain*1.20)+vPhase*0.2);",
-            " float ripple2=0.5+0.5*sin(xNear*(57.0+variant*2.6)-uTime*0.44+1.4-vPhase*0.2);",
-            " float wetSheen=wet*reflectionBand*(0.016+0.014*ripple+0.008*ripple2);",
+            " float ripple=0.5+0.5*sin(xNear*((31.0+variant*1.8)*mix(0.90,1.0,detail))+uTime*(0.68+uRain*1.20)+vPhase*0.2);",
+            " float ripple2=0.5+0.5*sin(xNear*((57.0+variant*2.6)*freqScale)-uTime*0.44+1.4-vPhase*0.2);",
+            " float wetSheen=wet*reflectionBand*(0.016+0.014*ripple+0.008*ripple2*microContrast);",
             " vec3 reflected=mix(vec3(0.16,0.23,0.30),vec3(0.31,0.38,0.43),uSceneLight)*(0.62+uStorm*0.18);",
             " reflected=mix(reflected,vec3(0.48,0.29,0.16),golden*0.10*solarSide);",
             " reflected=mix(reflected,vec3(0.16,0.25,0.42),moonMaterial*0.10);",
             " color=mix(color,reflected,clamp(wetSheen*3.0,0.0,0.15));",
             " float sceneWetMask=wetTruth*(mVillage*road+mUrban*buildingShape+mFarm*farmGround+mFlowers*meadow)*(1.0-uFog*0.55);",
-            " float sceneWetGlint=(0.5+0.5*sin(xNear*37.0+uTime*0.32+vPhase))*sceneWetMask;",
+            " float sceneWetGlint=(0.5+0.5*sin(xNear*(37.0*freqScale)+uTime*0.28+vPhase))*sceneWetMask*detailMid;",
             " color+=mix(vec3(0.025,0.038,0.048),vec3(0.095,0.12,0.13),light)*sceneWetGlint*0.018;",
             " float sunLow=smoothstep(0.60,0.94,uSunPos.y)*uSunVis*(1.0-night);",
             " float sunColumn=exp(-abs(p.x-uSunPos.x)*10.0)*reflectionBand*max(wet,water)*sunLow*(0.009+0.022*ripple);",
@@ -370,6 +378,7 @@ public final class HeroGlAnalyticWorldRenderer {
     private int uWind;
     private int uWindDir;
     private int uTime;
+    private int uDetail;
     private int uSceneryFrom;
     private int uSceneryTo;
     private int uSceneryMix;
@@ -380,6 +389,7 @@ public final class HeroGlAnalyticWorldRenderer {
     private int height = 1;
     private long startNanos;
     private long sceneryTransitionStartedNanos;
+    private volatile float detailScale = 1f;
 
     @NonNull private SceneryMode sceneryFrom = SceneryMode.NATURAL_HILLS;
     @NonNull private SceneryMode sceneryTo = SceneryMode.NATURAL_HILLS;
@@ -398,6 +408,11 @@ public final class HeroGlAnalyticWorldRenderer {
 
     public void setSnapshot(@Nullable GlSceneSnapshot snapshot) {
         this.snapshot = snapshot;
+    }
+
+    /** Changes only secondary scenery micro-detail. Base scenery and weather truth are untouched. */
+    public void setDetailScale(float value) {
+        detailScale = clamp(value, 0.5f, 1f);
     }
 
     public void onSurfaceCreated() {
@@ -423,6 +438,7 @@ public final class HeroGlAnalyticWorldRenderer {
         uWind = u("uWind");
         uWindDir = u("uWindDir");
         uTime = u("uTime");
+        uDetail = u("uDetail");
         uSceneryFrom = u("uSceneryFrom");
         uSceneryTo = u("uSceneryTo");
         uSceneryMix = u("uSceneryMix");
@@ -475,6 +491,7 @@ public final class HeroGlAnalyticWorldRenderer {
         GLES20.glUniform1f(uWind, scene.windStrength);
         GLES20.glUniform1f(uWindDir, scene.windDirectionRadians);
         GLES20.glUniform1f(uTime, (nowNanos - startNanos) / 1_000_000_000f);
+        GLES20.glUniform1f(uDetail, detailScale);
         GLES20.glUniform1f(uSceneryFrom, sceneryFrom.getShaderId());
         GLES20.glUniform1f(uSceneryTo, sceneryTo.getShaderId());
         GLES20.glUniform1f(uSceneryMix, sceneryMix);
