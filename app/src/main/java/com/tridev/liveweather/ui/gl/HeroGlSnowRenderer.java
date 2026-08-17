@@ -11,8 +11,8 @@ import java.nio.FloatBuffer;
 
 /**
  * Depth-aware snowfall with unified wind turbulence, thermal tone and governor-controlled detail.
- * R9.2 uses the same process-wide UnifiedWindController gust phase as rain while preserving
- * flake-scale wobble as local particle motion.
+ * R9 consumes the centralized visual wind sample so snow shares the same gust phase as rain,
+ * fog/haze, scenery, storms and clouds while preserving flake-scale local wobble.
  */
 public final class HeroGlSnowRenderer {
 
@@ -28,7 +28,6 @@ public final class HeroGlSnowRenderer {
             " float flakeAlpha=clamp(far*0.24+mid*0.48+near*0.76,0.0,0.88)*snow;float lowVis=1.0-uVisibility;float depthMist=smoothstep(0.56,1.0,p.y)*smoothstep(0.34,0.92,snow)*(0.012+snow*0.046)*(0.58+0.42*lowVis);float cold=max(0.0,-uThermal);vec3 flakeColor=mix(vec3(0.78,0.86,0.92),vec3(0.97,0.99,1.0),0.42+uSceneLight*0.42);flakeColor=mix(flakeColor,vec3(0.88,0.95,1.0),cold*0.16);vec3 color=flakeColor*flakeAlpha+vec3(0.70,0.79,0.86)*depthMist;float alpha=1.0-(1.0-flakeAlpha)*(1.0-depthMist);gl_FragColor=vec4(clamp(color,0.0,1.0),clamp(alpha,0.0,0.90));}");
 
     private final FloatBuffer quad;
-    private final UnifiedWindController windController=new UnifiedWindController();
     private int program,noiseTexture,aPosition,uNoise,uTime,uSnow,uWind,uWindDir,uTurbulence,uSceneLight,uVisibility,uThermal,uDetail;
     private volatile float detailScale=1f;
     @Nullable private volatile GlSceneSnapshot snapshot;
@@ -51,15 +50,14 @@ public final class HeroGlSnowRenderer {
         GlSceneSnapshot s=snapshot;
         if(program==0||noiseTexture==0||s==null||s.snowIntensity<=0.003f)return;
         float renderSeconds=UnifiedWindController.sharedMonotonicSeconds();
-        windController.sample(s.windStrength,s.windDirectionRadians,s.stormIntensity,renderSeconds);
+        float turbulence=clamp(s.windStrength*0.62f+s.stormIntensity*0.32f,0f,1f);
         GLES20.glEnable(GLES20.GL_BLEND);GLES20.glBlendFunc(GLES20.GL_SRC_ALPHA,GLES20.GL_ONE_MINUS_SRC_ALPHA);GLES20.glUseProgram(program);GLES20.glActiveTexture(GLES20.GL_TEXTURE0);GLES20.glBindTexture(GLES20.GL_TEXTURE_2D,noiseTexture);GLES20.glUniform1i(uNoise,0);
-        GLES20.glUniform1f(uTime,renderSeconds);GLES20.glUniform1f(uSnow,s.snowIntensity);GLES20.glUniform1f(uWind,windController.getEffectiveStrength());GLES20.glUniform1f(uWindDir,windController.getDirectionRadians());GLES20.glUniform1f(uTurbulence,windController.getTurbulence());GLES20.glUniform1f(uSceneLight,s.sceneLight);GLES20.glUniform1f(uVisibility,s.visibilityFactor);GLES20.glUniform1f(uThermal,s.thermalBias);GLES20.glUniform1f(uDetail,detailScale);
+        GLES20.glUniform1f(uTime,renderSeconds);GLES20.glUniform1f(uSnow,s.snowIntensity);GLES20.glUniform1f(uWind,s.windStrength);GLES20.glUniform1f(uWindDir,s.windDirectionRadians);GLES20.glUniform1f(uTurbulence,turbulence);GLES20.glUniform1f(uSceneLight,s.sceneLight);GLES20.glUniform1f(uVisibility,s.visibilityFactor);GLES20.glUniform1f(uThermal,s.thermalBias);GLES20.glUniform1f(uDetail,detailScale);
         quad.position(0);GLES20.glEnableVertexAttribArray(aPosition);GLES20.glVertexAttribPointer(aPosition,2,GLES20.GL_FLOAT,false,0,quad);GLES20.glDrawArrays(GLES20.GL_TRIANGLE_STRIP,0,4);GLES20.glDisableVertexAttribArray(aPosition);GLES20.glBindTexture(GLES20.GL_TEXTURE_2D,0);GLES20.glDisable(GLES20.GL_BLEND);
     }
 
     public void release(){if(noiseTexture!=0){int[] ids={noiseTexture};GLES20.glDeleteTextures(1,ids,0);noiseTexture=0;}if(program!=0){GLES20.glDeleteProgram(program);program=0;}}
-    private int u(@NonNull String name){return GLES20.glGetUniformLocation(program,name);}
-    private static float clamp(float v,float min,float max){return Math.max(min,Math.min(max,v));}
+    private int u(@NonNull String name){return GLES20.glGetUniformLocation(program,name);}private static float clamp(float v,float min,float max){return Math.max(min,Math.min(max,v));}
     private static int createProgram(String vs,String fs){int v=compile(GLES20.GL_VERTEX_SHADER,vs),f=compile(GLES20.GL_FRAGMENT_SHADER,fs),p=GLES20.glCreateProgram();GLES20.glAttachShader(p,v);GLES20.glAttachShader(p,f);GLES20.glLinkProgram(p);int[] st=new int[1];GLES20.glGetProgramiv(p,GLES20.GL_LINK_STATUS,st,0);GLES20.glDeleteShader(v);GLES20.glDeleteShader(f);if(st[0]==0){String log=GLES20.glGetProgramInfoLog(p);GLES20.glDeleteProgram(p);throw new IllegalStateException("OpenGL snow program link failed: "+log);}return p;}
     private static int compile(int type,String src){int s=GLES20.glCreateShader(type);GLES20.glShaderSource(s,src);GLES20.glCompileShader(s);int[] st=new int[1];GLES20.glGetShaderiv(s,GLES20.GL_COMPILE_STATUS,st,0);if(st[0]==0){String log=GLES20.glGetShaderInfoLog(s);GLES20.glDeleteShader(s);throw new IllegalStateException("OpenGL snow shader compile failed: "+log);}return s;}
 }
