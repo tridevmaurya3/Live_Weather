@@ -5,9 +5,14 @@ import android.content.SharedPreferences;
 
 import androidx.annotation.NonNull;
 
+import com.tridev.liveweather.domain.scene.SceneryMode;
+
 /**
  * Shared visual preferences for the in-app animated preview and WallpaperService.
  * Reality sync (time, Sun/Moon position and weather state) remains always active.
+ *
+ * Scenery is a visual choice only. It is persisted separately from weather truth so
+ * selecting Village, Farm, River, Urban, etc. can never fabricate a weather state.
  */
 public final class WallpaperPreferences {
 
@@ -19,6 +24,7 @@ public final class WallpaperPreferences {
     private static final String KEY_FOG = "fog";
     private static final String KEY_STARS = "stars";
     private static final String KEY_BATTERY_ADAPTIVE = "battery_adaptive";
+    private static final String KEY_SCENERY_MODE = "scenery_mode";
 
     private final SharedPreferences preferences;
 
@@ -36,7 +42,8 @@ public final class WallpaperPreferences {
                 preferences.getBoolean(KEY_SNOW, true),
                 preferences.getBoolean(KEY_FOG, true),
                 preferences.getBoolean(KEY_STARS, true),
-                preferences.getBoolean(KEY_BATTERY_ADAPTIVE, true)
+                preferences.getBoolean(KEY_BATTERY_ADAPTIVE, true),
+                SceneryMode.fromStorage(preferences.getString(KEY_SCENERY_MODE, null))
         );
     }
 
@@ -49,6 +56,7 @@ public final class WallpaperPreferences {
                 .putBoolean(KEY_FOG, options.isFog())
                 .putBoolean(KEY_STARS, options.isStars())
                 .putBoolean(KEY_BATTERY_ADAPTIVE, options.isBatteryAdaptive())
+                .putString(KEY_SCENERY_MODE, options.getSceneryMode().getStorageKey())
                 .apply();
     }
 
@@ -60,7 +68,13 @@ public final class WallpaperPreferences {
         private final boolean fog;
         private final boolean stars;
         private final boolean batteryAdaptive;
+        @NonNull private final SceneryMode sceneryMode;
 
+        /**
+         * Compatibility constructor used by existing callers. Keeping it avoids touching
+         * unrelated settings code in the scenery foundation step and preserves the current
+         * Natural Hills look until a scene selector is introduced.
+         */
         public Options(
                 boolean rain,
                 boolean clouds,
@@ -70,6 +84,28 @@ public final class WallpaperPreferences {
                 boolean stars,
                 boolean batteryAdaptive
         ) {
+            this(
+                    rain,
+                    clouds,
+                    lightning,
+                    snow,
+                    fog,
+                    stars,
+                    batteryAdaptive,
+                    SceneryMode.NATURAL_HILLS
+            );
+        }
+
+        public Options(
+                boolean rain,
+                boolean clouds,
+                boolean lightning,
+                boolean snow,
+                boolean fog,
+                boolean stars,
+                boolean batteryAdaptive,
+                @NonNull SceneryMode sceneryMode
+        ) {
             this.rain = rain;
             this.clouds = clouds;
             this.lightning = lightning;
@@ -77,6 +113,7 @@ public final class WallpaperPreferences {
             this.fog = fog;
             this.stars = stars;
             this.batteryAdaptive = batteryAdaptive;
+            this.sceneryMode = sceneryMode;
         }
 
         public boolean isRain() {
@@ -105,6 +142,25 @@ public final class WallpaperPreferences {
 
         public boolean isBatteryAdaptive() {
             return batteryAdaptive;
+        }
+
+        @NonNull
+        public SceneryMode getSceneryMode() {
+            return sceneryMode;
+        }
+
+        @NonNull
+        public Options withSceneryMode(@NonNull SceneryMode mode) {
+            return new Options(
+                    rain,
+                    clouds,
+                    lightning,
+                    snow,
+                    fog,
+                    stars,
+                    batteryAdaptive,
+                    mode
+            );
         }
     }
 }
