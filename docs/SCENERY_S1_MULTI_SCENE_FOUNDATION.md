@@ -1,6 +1,6 @@
 # Scenery S1 — Multi-Scene Foundation
 
-Status: **SOURCE IMPLEMENTATION COMPLETE — automated gate pending at this checkpoint**
+Status: **SOURCE IMPLEMENTATION COMPLETE — automated Debug/tests/Release lint/R8 APK+AAB gate passed; real-device GLSL/visual acceptance remains the device checkpoint**
 
 ## Purpose
 
@@ -56,6 +56,21 @@ These are foundation channels only. Rich scene composition and user-facing selec
 ## Cloud freeze boundary
 
 The active cloud renderer remains the restored stable blob `dc3b5db66c92cdf4520b0210857426e4bca853d8`. S1 does not modify cloud shape, cloud atlas logic, or cloud motion.
+
+## Verification
+
+Authoritative source gate: GitHub Actions run `31995321279` on source commit `67d18ab1c60a6422376a433a1c9a9a129a5a5d5c`.
+
+Passed steps:
+
+- Debug build,
+- unit tests,
+- Release lint,
+- minified/R8 Release APK,
+- Release AAB,
+- release output verification and artifact upload.
+
+GLSL programs are still compiled by the device OpenGL driver at runtime, so real-device rendering remains the visual/GPU acceptance boundary.
 
 ## Next step
 
