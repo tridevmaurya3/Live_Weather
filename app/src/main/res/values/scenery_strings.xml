@@ -18,8 +18,17 @@
     <string name="wallpaper_scenery_changed_accessibility">%1$s scenery selected</string>
 
     <string name="wallpaper_scenery_library_title">Visual scene library</string>
-    <string name="wallpaper_scenery_library_hint">Tap a preview to use it, or long press a card to inspect it full screen before applying. Preview artwork shows scenery style only; live weather remains driven by current observations.</string>
+    <string name="wallpaper_scenery_library_hint">Scenes are grouped for faster browsing. Tap a preview to use it, or long press a card to inspect it full screen before applying. Preview artwork shows scenery style only; live weather remains driven by current observations.</string>
     <string name="wallpaper_scenery_preview_accessibility">Preview and select %1$s scenery, variation %2$d of %3$d</string>
+    <string name="wallpaper_scenery_group_sky_smart">Sky &amp; smart</string>
+    <string name="wallpaper_scenery_group_nature">Nature</string>
+    <string name="wallpaper_scenery_group_places">Places</string>
+
+    <string name="wallpaper_scenery_recent_title">Recent scenes</string>
+    <string name="wallpaper_scenery_recent_empty">Recently used manual scene + variation combinations will appear here automatically.</string>
+    <string name="wallpaper_scenery_recent_format">%1$s · %2$d</string>
+    <string name="wallpaper_scenery_recent_accessibility">Use recent %1$s, variation %2$d</string>
+    <string name="wallpaper_scenery_recent_preview_accessibility">Long press to preview recent %1$s, variation %2$d</string>
 
     <string name="wallpaper_scenery_variation_format">Variation %1$d of %2$d</string>
     <string name="wallpaper_scenery_variation_action">Change variation</string>
