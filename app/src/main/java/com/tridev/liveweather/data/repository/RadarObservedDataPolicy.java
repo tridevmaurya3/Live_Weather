@@ -28,6 +28,7 @@ public final class RadarObservedDataPolicy {
 
     private static final long FUTURE_TOLERANCE_SECONDS = 2L * 60L;
     private static final long STALE_METADATA_SECONDS = 30L * 60L;
+    private static final int MAX_RADAR_FRAME_ID_LENGTH = 80;
 
     private RadarObservedDataPolicy() {
     }
@@ -121,16 +122,20 @@ public final class RadarObservedDataPolicy {
         if (!path.startsWith("/v") || !path.contains("/radar/")) return false;
         if (path.contains("..") || path.contains("?") || path.contains("#")) return false;
 
-        // RainViewer currently publishes /v2/radar/<epoch>. Keep the version
-        // component forward-compatible while requiring a radar-only path.
+        /*
+         * RainViewer frame paths are provider-owned identifiers. Older metadata used a numeric
+         * epoch-like final segment while newer v2 metadata may use an opaque alphanumeric ID.
+         * Keep both forms compatible, but allow only one bounded path token so provider metadata
+         * can never inject an extra path/query/fragment into the tile URL assembled by the map.
+         */
         String[] parts = path.split("/");
-        if (parts.length < 4) return false;
+        if (parts.length != 4) return false;
         if (!parts[1].matches("v\\d+")) return false;
         if (!"radar".equals(parts[2])) return false;
-        try {
-            return Long.parseLong(parts[3]) > 0L;
-        } catch (NumberFormatException ignored) {
-            return false;
-        }
+
+        String frameId = parts[3];
+        return !frameId.isEmpty()
+                && frameId.length() <= MAX_RADAR_FRAME_ID_LENGTH
+                && frameId.matches("[A-Za-z0-9_-]+");
     }
 }
