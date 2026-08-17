@@ -16,6 +16,11 @@
     <string name="wallpaper_scenery_manual_detail">Manual scene stays fixed until you choose another scene or Auto.</string>
     <string name="wallpaper_scenery_select_accessibility">Select %1$s scenery</string>
     <string name="wallpaper_scenery_changed_accessibility">%1$s scenery selected</string>
+
+    <string name="wallpaper_scenery_library_title">Visual scene library</string>
+    <string name="wallpaper_scenery_library_hint">Tap a preview to apply it. Preview cards show scenery style only; live weather remains driven by current observations.</string>
+    <string name="wallpaper_scenery_preview_accessibility">Preview and select %1$s scenery, variation %2$d of %3$d</string>
+
     <string name="wallpaper_scenery_variation_format">Variation %1$d of %2$d</string>
     <string name="wallpaper_scenery_variation_action">Change variation</string>
     <string name="wallpaper_scenery_variation_accessibility">Change scenery variation. Current variation %1$d of %2$d</string>
