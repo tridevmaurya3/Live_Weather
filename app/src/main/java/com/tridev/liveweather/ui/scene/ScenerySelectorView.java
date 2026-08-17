@@ -16,14 +16,15 @@ import androidx.core.content.ContextCompat;
 import com.tridev.liveweather.R;
 import com.tridev.liveweather.data.local.WallpaperPreferences;
 import com.tridev.liveweather.domain.scene.SceneryMode;
+import com.tridev.liveweather.domain.scene.SceneryVariantRuntimeState;
 
 /**
  * Compact user-facing scenery selector for the Wallpaper page.
  *
- * The selector changes only the persisted visual scenery preference. Weather truth,
+ * The selector changes only persisted visual scenery preferences. Weather truth,
  * astronomy, precipitation, cloud state, alerts and cached observations are untouched.
- * The shared OpenGL world renderer observes the process-local scenery state, so the
- * Home Hero, Wallpaper preview and active system Live Wallpaper stay aligned.
+ * S4 adds four stable composition variations per scenery mode, producing 28 selectable
+ * visual combinations across the seven user-facing scene categories.
  */
 public final class ScenerySelectorView extends LinearLayout {
 
@@ -39,10 +40,13 @@ public final class ScenerySelectorView extends LinearLayout {
 
     private final WallpaperPreferences preferences;
     private final TextView selectionSummary;
+    private final TextView variationSummary;
+    private final TextView variationAction;
     private final TextView[] chips = new TextView[SELECTABLE_MODES.length];
 
     @NonNull
     private SceneryMode selectedMode;
+    private int selectedVariant;
 
     public ScenerySelectorView(@NonNull Context context) {
         this(context, null);
@@ -64,6 +68,8 @@ public final class ScenerySelectorView extends LinearLayout {
 
         preferences = new WallpaperPreferences(context);
         selectedMode = preferences.load().getSceneryMode();
+        SceneryVariantRuntimeState.initialize(context);
+        selectedVariant = SceneryVariantRuntimeState.get();
 
         selectionSummary = new TextView(context);
         selectionSummary.setTextAppearance(R.style.TextAppearance_LiveWeather_Caption);
@@ -112,6 +118,48 @@ public final class ScenerySelectorView extends LinearLayout {
                 ViewGroup.LayoutParams.WRAP_CONTENT
         ));
 
+        LinearLayout variationRow = new LinearLayout(context);
+        variationRow.setOrientation(HORIZONTAL);
+        variationRow.setGravity(Gravity.CENTER_VERTICAL);
+        variationRow.setPadding(0, dp(8), 0, 0);
+
+        variationSummary = new TextView(context);
+        variationSummary.setTextAppearance(R.style.TextAppearance_LiveWeather_Caption);
+        variationSummary.setTextColor(ContextCompat.getColor(context, R.color.weather_text_secondary));
+        variationSummary.setGravity(Gravity.CENTER_VERTICAL);
+        variationSummary.setMinHeight(dp(48));
+
+        LinearLayout.LayoutParams summaryParams = new LinearLayout.LayoutParams(
+                0,
+                dp(48),
+                1f
+        );
+        variationRow.addView(variationSummary, summaryParams);
+
+        variationAction = new TextView(context);
+        variationAction.setTextAppearance(R.style.TextAppearance_LiveWeather_Body);
+        variationAction.setText(R.string.wallpaper_scenery_variation_action);
+        variationAction.setGravity(Gravity.CENTER);
+        variationAction.setSingleLine(true);
+        variationAction.setMinWidth(dp(126));
+        variationAction.setMinHeight(dp(48));
+        variationAction.setPadding(dp(14), 0, dp(14), 0);
+        variationAction.setClickable(true);
+        variationAction.setFocusable(true);
+        variationAction.setBackgroundResource(R.drawable.bg_weather_chip);
+        variationAction.setTextColor(ContextCompat.getColor(context, R.color.weather_text_primary));
+        variationAction.setOnClickListener(view -> changeVariation());
+
+        variationRow.addView(variationAction, new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.WRAP_CONTENT,
+                dp(48)
+        ));
+
+        addView(variationRow, new LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT
+        ));
+
         renderSelection();
     }
 
@@ -153,6 +201,17 @@ public final class ScenerySelectorView extends LinearLayout {
         ));
     }
 
+    private void changeVariation() {
+        performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY);
+        selectedVariant = SceneryVariantRuntimeState.nextAndPersist(getContext());
+        renderVariation();
+        announceForAccessibility(getResources().getString(
+                R.string.wallpaper_scenery_variation_changed_accessibility,
+                selectedVariant + 1,
+                SceneryVariantRuntimeState.VARIANT_COUNT
+        ));
+    }
+
     private void renderSelection() {
         selectionSummary.setText(getResources().getString(
                 R.string.wallpaper_scenery_selected_format,
@@ -172,6 +231,21 @@ public final class ScenerySelectorView extends LinearLayout {
                     selected ? R.color.weather_aqua : R.color.weather_text_primary
             ));
         }
+
+        renderVariation();
+    }
+
+    private void renderVariation() {
+        variationSummary.setText(getResources().getString(
+                R.string.wallpaper_scenery_variation_format,
+                selectedVariant + 1,
+                SceneryVariantRuntimeState.VARIANT_COUNT
+        ));
+        variationAction.setContentDescription(getResources().getString(
+                R.string.wallpaper_scenery_variation_accessibility,
+                selectedVariant + 1,
+                SceneryVariantRuntimeState.VARIANT_COUNT
+        ));
     }
 
     private int labelRes(@NonNull SceneryMode mode) {
