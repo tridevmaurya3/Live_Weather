@@ -9,12 +9,16 @@
     <string name="wallpaper_scenery_river">River / Lake</string>
     <string name="wallpaper_scenery_flowers">Flowers / Greenery</string>
     <string name="wallpaper_scenery_urban">Urban / Buildings</string>
-    <string name="wallpaper_scenery_auto">Auto</string>
+    <string name="wallpaper_scenery_auto">Auto Scene</string>
     <string name="wallpaper_scenery_selected_format">Selected scene · %1$s</string>
+    <string name="wallpaper_scenery_auto_selected_format">Auto now · %1$s</string>
+    <string name="wallpaper_scenery_auto_detail">Auto Scene changes only the scenery by local time of day. Live weather and astronomy remain untouched.</string>
+    <string name="wallpaper_scenery_manual_detail">Manual scene stays selected until you choose another scene or Auto Scene.</string>
     <string name="wallpaper_scenery_select_accessibility">Select %1$s scenery</string>
     <string name="wallpaper_scenery_changed_accessibility">%1$s scenery selected</string>
-    <string name="wallpaper_scenery_variation_format">Variation %1$d of %2$d</string>
+    <string name="wallpaper_scenery_variation_format">Scene variation · %1$d of %2$d</string>
     <string name="wallpaper_scenery_variation_action">Change variation</string>
     <string name="wallpaper_scenery_variation_accessibility">Change scenery variation. Current variation %1$d of %2$d</string>
+    <string name="wallpaper_scenery_variation_select_accessibility">Select scenery variation %1$d of %2$d</string>
     <string name="wallpaper_scenery_variation_changed_accessibility">Scenery variation %1$d of %2$d selected</string>
 </resources>
