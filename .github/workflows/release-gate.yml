@@ -36,11 +36,12 @@ jobs:
       - name: Verify Gradle wrapper
         run: ./gradlew --version
 
-      - name: Debug, tests, Release lint, APK, AAB and R8 gate
+      - name: Debug, tests, device-test APK, Release lint, APK, AAB and R8 gate
         run: >-
           ./gradlew --no-daemon --stacktrace --configuration-cache
           assembleDebug
           testDebugUnitTest
+          assembleDebugAndroidTest
           lintRelease
           assembleRelease
           bundleRelease
@@ -50,6 +51,7 @@ jobs:
         run: |
           set -euo pipefail
           find app/build/outputs/apk/debug -maxdepth 1 -type f -name '*.apk' -print -quit | grep -q .
+          find app/build/outputs/apk/androidTest/debug -maxdepth 1 -type f -name '*.apk' -print -quit | grep -q .
           find app/build/outputs/apk/release -maxdepth 1 -type f -name '*.apk' -print -quit | grep -q .
           find app/build/outputs/bundle/release -maxdepth 1 -type f -name '*.aab' -print -quit | grep -q .
           test -f app/build/outputs/mapping/release/mapping.txt
@@ -64,6 +66,7 @@ jobs:
           retention-days: 7
           path: |
             app/build/outputs/apk/debug/*.apk
+            app/build/outputs/apk/androidTest/debug/*.apk
             app/build/outputs/apk/release/*.apk
             app/build/outputs/bundle/release/*.aab
             app/build/outputs/mapping/release/mapping.txt
