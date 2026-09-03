@@ -43,6 +43,8 @@ public final class HeroGlDepthRainRenderer {
             "uniform float uWind;",
             "uniform float uWindDir;",
             "uniform float uTurbulence;",
+            "uniform float uFallScale;",
+            "uniform float uLeanScale;",
             "uniform float uVisibility;",
             "uniform float uSceneLight;",
             "uniform float uDetail;",
@@ -118,8 +120,8 @@ public final class HeroGlDepthRainRenderer {
             "  float forward=cos(uWindDir);",
             "  // uWind already contains the shared coherent gust sample from the scene controller.",
             "  // Wind changes horizontal lean only; gravity remains downward.",
-            "  float lean=side*(0.020+uWind*0.22)+forward*0.010*side;",
-            "  float windSpeed=0.82+uWind*0.68;",
+            "  float lean=side*uLeanScale+forward*0.010*side;",
+            "  float windSpeed=uFallScale;",
             "  float drizzleGate=drizzle*(1.0-smoothstep(0.22,0.58,rain));",
             "  float farGate=clamp(0.10+rain*0.38+drizzleGate*0.24,0.0,0.58);",
             "  float midGate=clamp(0.075+rain*0.42+drizzleGate*0.14,0.0,0.60);",
@@ -195,6 +197,8 @@ public final class HeroGlDepthRainRenderer {
     private int uWind;
     private int uWindDir;
     private int uTurbulence;
+    private int uFallScale;
+    private int uLeanScale;
     private int uVisibility;
     private int uSceneLight;
     private int uDetail;
@@ -230,6 +234,8 @@ public final class HeroGlDepthRainRenderer {
         uWind = u("uWind");
         uWindDir = u("uWindDir");
         uTurbulence = u("uTurbulence");
+        uFallScale = u("uFallScale");
+        uLeanScale = u("uLeanScale");
         uVisibility = u("uVisibility");
         uSceneLight = u("uSceneLight");
         uDetail = u("uDetail");
@@ -251,11 +257,12 @@ public final class HeroGlDepthRainRenderer {
         }
 
         float renderSeconds = UnifiedWindController.sharedMonotonicSeconds();
-        float turbulence = clamp(
-                state.windStrength * 0.62f + state.stormIntensity * 0.32f,
-                0f,
-                1f
-        );
+        float turbulence = PrecipitationDynamicsPolicy.turbulence(
+                state.windStrength, state.stormIntensity);
+        float fallScale = PrecipitationDynamicsPolicy.fallSpeedScale(
+                state.rainIntensity, state.drizzleIntensity, state.windStrength);
+        float leanScale = PrecipitationDynamicsPolicy.leanScale(
+                state.windStrength, state.stormIntensity);
 
         GLES20.glEnable(GLES20.GL_BLEND);
         GLES20.glBlendFunc(GLES20.GL_SRC_ALPHA, GLES20.GL_ONE_MINUS_SRC_ALPHA);
@@ -271,6 +278,8 @@ public final class HeroGlDepthRainRenderer {
         GLES20.glUniform1f(uWind, state.windStrength);
         GLES20.glUniform1f(uWindDir, state.windDirectionRadians);
         GLES20.glUniform1f(uTurbulence, turbulence);
+        GLES20.glUniform1f(uFallScale, fallScale);
+        GLES20.glUniform1f(uLeanScale, leanScale);
         GLES20.glUniform1f(uVisibility, state.visibilityFactor);
         GLES20.glUniform1f(uSceneLight, state.sceneLight);
         GLES20.glUniform1f(uDetail, detailScale);
