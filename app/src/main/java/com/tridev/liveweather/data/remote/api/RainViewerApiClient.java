@@ -21,6 +21,7 @@ public final class RainViewerApiClient {
                     Gson gson = new GsonBuilder().create();
                     Retrofit retrofit = new Retrofit.Builder()
                             .baseUrl(BASE_URL)
+                            .client(NetworkClientFactory.get())
                             .addConverterFactory(GsonConverterFactory.create(gson))
                             .build();
                     apiService = retrofit.create(RainViewerApiService.class);

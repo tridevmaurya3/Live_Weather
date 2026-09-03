@@ -18,6 +18,7 @@ public final class GeocodingApiClient {
                 if (apiService == null) {
                     Retrofit retrofit = new Retrofit.Builder()
                             .baseUrl(BASE_URL)
+                            .client(NetworkClientFactory.get())
                             .addConverterFactory(GsonConverterFactory.create())
                             .build();
                     apiService = retrofit.create(OpenMeteoGeocodingApiService.class);

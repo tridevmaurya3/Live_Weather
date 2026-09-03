@@ -100,6 +100,7 @@ dependencies {
     // Network + JSON foundation for the weather data layer.
     implementation(libs.retrofit)
     implementation(libs.retrofit.converter.gson)
+    implementation(libs.okhttp)
     implementation(libs.gson)
 
     // Foreground device location used to resolve weather coordinates.

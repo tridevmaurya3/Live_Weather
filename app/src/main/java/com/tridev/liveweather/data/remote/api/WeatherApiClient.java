@@ -23,6 +23,7 @@ public final class WeatherApiClient {
 
                     Retrofit retrofit = new Retrofit.Builder()
                             .baseUrl(BASE_URL)
+                            .client(NetworkClientFactory.get())
                             .addConverterFactory(GsonConverterFactory.create(gson))
                             .build();
 
