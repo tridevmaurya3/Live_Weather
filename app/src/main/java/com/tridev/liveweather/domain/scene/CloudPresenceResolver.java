@@ -14,6 +14,8 @@ import java.util.List;
 /**
  * Shared cloud-presence resolver. Stage 8 keeps total-cloud compatibility while
  * using provider low/mid/high layers whenever the active payload contains them.
+ * Stage 14 adds bounded near-now approach/exit depth without changing current
+ * precipitation, storm, lightning or weather-condition truth.
  */
 public final class CloudPresenceResolver {
 
@@ -63,6 +65,10 @@ public final class CloudPresenceResolver {
                 stormIntensity
         );
         double severeEnvelope = SevereWeatherVisualPolicy.cloudTransitionEnvelope(weather);
+        NearNowWeatherEvolutionPolicy.State evolution = NearNowWeatherEvolutionPolicy.resolve(weather);
+        double approachEnvelope = evolution.getApproachEnvelope();
+        double recentExitEnvelope = evolution.getRecentExitEnvelope();
+        double horizonVeil = evolution.getHorizonVeil();
 
         double verticalMass = Math.max(
                 layers.getLow(),
@@ -74,6 +80,9 @@ public final class CloudPresenceResolver {
                         + precipitation * 0.16d
                         + stormIntensity * 0.24d
                         + severeEnvelope * 0.08d
+                        + approachEnvelope * 0.045d
+                        + recentExitEnvelope * 0.025d
+                        + horizonVeil * 0.035d
                         + (1d - clamp01(visibilityFactor)) * 0.06d
         );
 
@@ -97,8 +106,29 @@ public final class CloudPresenceResolver {
                                 + stormIntensity * 0.12d
                 );
 
-        // The transition envelope affects cloud depth/darkness only. Current storm
-        // truth still exclusively owns stormIntensity and lightning scheduling.
+        /*
+         * Stage 14 only changes spatial cloud depth. Approaching non-severe weather appears first
+         * in the far/mid cloud field; recently departed precipitation may leave a small low-cloud
+         * tail. These cues never feed precipitation mode, storm ceiling or lightning scheduling.
+         */
+        farLayer = clamp01(
+                farLayer
+                        + approachEnvelope * 0.16d
+                        + horizonVeil * 0.10d
+        );
+        midLayer = clamp01(
+                midLayer
+                        + approachEnvelope * 0.08d
+                        + horizonVeil * 0.05d
+                        + recentExitEnvelope * 0.025d
+        );
+        nearLayer = clamp01(
+                nearLayer
+                        + recentExitEnvelope * 0.07d
+        );
+
+        // Stage 8 severe envelope remains the only forecast-adjacent input allowed to influence
+        // storm cloud ceiling. Current storm truth still exclusively owns stormIntensity.
         double stormCeiling = clamp01(
                 stormIntensity * 0.86d
                         + severeEnvelope * 0.38d
@@ -112,6 +142,9 @@ public final class CloudPresenceResolver {
                         - stormIntensity * 0.58d
                         - severeEnvelope * 0.18d
                         - precipitation * 0.20d
+                        - approachEnvelope * 0.045d
+                        - recentExitEnvelope * 0.025d
+                        - horizonVeil * 0.035d
                         - airHazeIntensity * 0.10d
                         - fogIntensity * 0.06d
                         - (1d - clamp01(visibilityFactor)) * 0.08d,
@@ -119,6 +152,7 @@ public final class CloudPresenceResolver {
                 1d
         );
 
+        // Mode stays current-truth based. Near-now cues can never declare precipitation/storm.
         CloudPresenceState.Mode mode;
         if (stormIntensity > 0.08d) {
             mode = CloudPresenceState.Mode.STORM;
