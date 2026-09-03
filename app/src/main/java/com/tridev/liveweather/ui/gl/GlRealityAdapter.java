@@ -9,6 +9,7 @@ import com.tridev.liveweather.domain.SkyRealityState;
 import com.tridev.liveweather.domain.scene.CloudPresenceState;
 import com.tridev.liveweather.domain.scene.DynamicRealityComposer;
 import com.tridev.liveweather.domain.scene.SceneState;
+import com.tridev.liveweather.domain.scene.SeasonalEnvironmentPolicy;
 import com.tridev.liveweather.domain.scene.ThermalEnvironmentPolicy;
 
 /**
@@ -67,7 +68,12 @@ public final class GlRealityAdapter {
 
         float observerLatitudeRadians = (float) Math.toRadians(clamp(latitude, -89.9d, 89.9d));
         float localSiderealRadians = (float) resolveLocalSiderealRadians(epochMillis, longitude);
-        float thermalBias = ThermalEnvironmentPolicy.resolve(weather.getCurrent());
+        float liveThermalBias = ThermalEnvironmentPolicy.resolve(weather.getCurrent());
+        float thermalBias = SeasonalEnvironmentPolicy.applyToThermal(
+                liveThermalBias,
+                latitude,
+                epochMillis
+        );
         float windDirectionRadians = (float) Math.toRadians(state.getWindDirectionDegrees());
 
         /*
