@@ -51,6 +51,12 @@ public final class SkyGradientProfile {
         float sunAltitude = (float) state.getSky().getSunAltitude();
         boolean daylight = sunAltitude > -4f;
 
+        float twilightWarmth = (float) AtmosphereLightPolicy.twilightWarmth(sunAltitude, cloud);
+        if (twilightWarmth > 0f) {
+            blend(mid, rgb(188, 105, 112), twilightWarmth * 0.20f);
+            blend(horizon, rgb(246, 157, 88), twilightWarmth * 0.38f);
+        }
+
         if (daylight) {
             if (cloud >= 0.24f) {
                 float amount = clamp01((cloud - 0.20f) / 0.55f) * 0.34f;
@@ -101,7 +107,8 @@ public final class SkyGradientProfile {
             }
         }
 
-        float horizonAtmosphere = clamp01(haze * 0.58f + fog * 0.82f);
+        float horizonAtmosphere = (float) AtmosphereLightPolicy.horizonDepth(
+                fog, haze, state.getVisibilityFactor());
         if (horizonAtmosphere > 0f) {
             float[] veil = daylight ? rgb(194, 199, 196) : rgb(76, 82, 88);
             blend(horizon, veil, horizonAtmosphere * 0.52f);
@@ -109,8 +116,9 @@ public final class SkyGradientProfile {
         }
 
         float sceneLight = clamp01((float) state.getSceneLight());
-        float minimumExposure = daylight ? 0.52f : 0.34f;
-        float exposure = Math.max(minimumExposure, 0.72f + sceneLight * 0.28f - storm * 0.18f);
+        float physicalExposure = (float) AtmosphereLightPolicy.daylightExposure(
+                sunAltitude, cloud, fog, haze, storm);
+        float exposure = clamp01(physicalExposure * (0.86f + sceneLight * 0.14f));
         scale(top, exposure);
         scale(mid, Math.min(1f, exposure + 0.07f));
         scale(horizon, Math.min(1f, exposure + 0.17f));

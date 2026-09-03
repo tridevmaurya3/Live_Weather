@@ -55,6 +55,7 @@ public final class GlRealityAdapter {
 
         double resolvedStarVisibility = clamp(
                 (sky.getStarVisibilityPercent() / 100d)
+                        * AtmosphereLightPolicy.starGate(sky.getSunAltitude())
                         * (1d - state.getAirHazeIntensity() * 0.45d),
                 0d,
                 1d
