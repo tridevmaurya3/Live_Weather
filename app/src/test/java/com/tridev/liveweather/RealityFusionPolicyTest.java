@@ -32,7 +32,7 @@ public final class RealityFusionPolicyTest {
         RealityFusionPolicy.RealityState state = RealityFusionPolicy.resolve(weather(1, 0.0,
                 "[0.0,0.0,0.2]", "[1,1,61]"));
         assertEquals(Integer.valueOf(1), state.getCondition().getWeatherCode());
-        assertEquals(Integer.valueOf(30), state.getNextPrecipitationMinutes());
+        assertEquals(Integer.valueOf(15), state.getNextPrecipitationMinutes());
     }
 
     @Test public void radarMetadataDoesNotClaimLocalRain() {
@@ -48,7 +48,7 @@ public final class RealityFusionPolicyTest {
     }
 
     private WeatherResponse weather(int code, double currentWet, String slots, String codes) {
-        String json = "{\"current\":{\"time\":\"2026-09-03T12:00\",\"is_day\":1,"
+        String json = "{\"current\":{\"time\":\"2026-09-03T12:15\",\"is_day\":1,"
                 + "\"weather_code\":" + code + ",\"precipitation\":" + currentWet + ","
                 + "\"rain\":" + currentWet + ",\"showers\":0,\"snowfall\":0},"
                 + "\"minutely_15\":{\"time\":[\"2026-09-03T12:00\",\"2026-09-03T12:15\","
