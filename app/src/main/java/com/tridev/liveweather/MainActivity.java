@@ -11,6 +11,8 @@ import android.content.pm.PackageManager;
 import android.location.Location;
 import android.os.Build;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
 import android.view.HapticFeedbackConstants;
 import android.view.View;
 import android.widget.TextView;
@@ -30,6 +32,7 @@ import androidx.lifecycle.ViewModelProvider;
 import com.google.android.material.bottomnavigation.BottomNavigationView;
 import com.tridev.liveweather.core.location.DeviceLocationManager;
 import com.tridev.liveweather.core.location.PlaceNameResolver;
+import com.tridev.liveweather.core.LiveDataFreshnessPolicy;
 import com.tridev.liveweather.data.local.AlertPreferences;
 import com.tridev.liveweather.data.local.WallpaperPreferences;
 import com.tridev.liveweather.domain.CityLocation;
@@ -93,6 +96,17 @@ public class MainActivity extends AppCompatActivity {
 
     private double latestLatitude = Double.NaN;
     private double latestLongitude = Double.NaN;
+    private final Handler liveRefreshHandler = new Handler(Looper.getMainLooper());
+    private final Runnable liveRefreshTicker = new Runnable() {
+        @Override
+        public void run() {
+            refreshForegroundWeatherIfDue();
+            liveRefreshHandler.postDelayed(
+                    this,
+                    LiveDataFreshnessPolicy.FOREGROUND_CHECK_MILLIS
+            );
+        }
+    };
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -130,6 +144,39 @@ public class MainActivity extends AppCompatActivity {
         WallpaperWeatherScheduler.schedule(this);
         WeatherAlertScheduler.schedule(this);
         handleLaunchIntent(getIntent());
+    }
+
+    @Override
+    protected void onStart() {
+        super.onStart();
+        liveRefreshHandler.removeCallbacks(liveRefreshTicker);
+        liveRefreshHandler.post(liveRefreshTicker);
+    }
+
+    @Override
+    protected void onStop() {
+        liveRefreshHandler.removeCallbacks(liveRefreshTicker);
+        super.onStop();
+    }
+
+    private void refreshForegroundWeatherIfDue() {
+        if (weatherViewModel == null || cityViewModel == null) return;
+        CityLocation selectedCity = cityViewModel.getSelectedCity();
+        if (selectedCity != null) {
+            weatherViewModel.refreshWeatherIfDue(
+                    selectedCity.getLatitude(),
+                    selectedCity.getLongitude(),
+                    System.currentTimeMillis()
+            );
+            return;
+        }
+        if (!Double.isNaN(latestLatitude) && !Double.isNaN(latestLongitude)) {
+            weatherViewModel.refreshWeatherIfDue(
+                    latestLatitude,
+                    latestLongitude,
+                    System.currentTimeMillis()
+            );
+        }
     }
 
     private void registerLocationPermissionLauncher() {

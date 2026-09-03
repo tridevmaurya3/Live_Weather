@@ -8,6 +8,7 @@ import androidx.lifecycle.LiveData;
 import androidx.lifecycle.MutableLiveData;
 
 import com.tridev.liveweather.core.DataReliabilityPolicy;
+import com.tridev.liveweather.core.LiveDataFreshnessPolicy;
 import com.tridev.liveweather.data.local.SavedCityStore;
 import com.tridev.liveweather.data.local.WeatherCache;
 import com.tridev.liveweather.data.remote.dto.WeatherResponse;
@@ -79,10 +80,45 @@ public final class WeatherViewModel extends AndroidViewModel {
     }
 
     public void refreshWeather(double latitude, double longitude, boolean force) {
+        refreshWeatherInternal(latitude, longitude, force, true);
+    }
+
+    /**
+     * Refreshes an unchanged foreground location only when its adaptive
+     * freshness window has elapsed. An existing request is allowed to finish
+     * instead of being cancelled and restarted by the minute ticker.
+     */
+    public boolean refreshWeatherIfDue(double latitude, double longitude, long now) {
+        WeatherUiState currentState = weatherState.getValue();
+        if (currentState != null && !isSameArea(currentState, latitude, longitude)) {
+            return false;
+        }
+        long interval = LiveDataFreshnessPolicy.refreshIntervalMillis(
+                currentState == null ? null : currentState.getWeather()
+        );
+        if (!LiveDataFreshnessPolicy.shouldRefresh(
+                currentState == null ? 0L : currentState.getUpdatedAt(),
+                now,
+                interval,
+                activeCall != null || (currentState != null && currentState.isLoading())
+        )) {
+            return false;
+        }
+        refreshWeatherInternal(latitude, longitude, true, false);
+        return true;
+    }
+
+    private void refreshWeatherInternal(
+            double latitude,
+            double longitude,
+            boolean force,
+            boolean replaceActiveRequest
+    ) {
         WeatherUiState currentState = weatherState.getValue();
         if (!force && canReuseLiveState(currentState, latitude, longitude)) return;
 
         if (activeCall != null) {
+            if (!replaceActiveRequest) return;
             activeCall.cancel();
             activeCall = null;
         }
