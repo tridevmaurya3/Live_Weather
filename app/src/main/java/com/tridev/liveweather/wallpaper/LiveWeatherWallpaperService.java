@@ -1,5 +1,6 @@
 package com.tridev.liveweather.wallpaper;
 
+import android.content.SharedPreferences;
 import android.os.Handler;
 import android.os.Looper;
 import android.service.wallpaper.WallpaperService;
@@ -9,19 +10,20 @@ import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
 import com.tridev.liveweather.core.performance.CinematicPerformanceGovernor;
+import com.tridev.liveweather.data.local.ActiveWeatherSnapshotStore;
 import com.tridev.liveweather.data.local.AirQualityCache;
 import com.tridev.liveweather.data.local.PerformancePreferences;
 import com.tridev.liveweather.data.local.WallpaperPreferences;
-import com.tridev.liveweather.data.local.WeatherCache;
 import com.tridev.liveweather.data.remote.dto.AirQualityResponse;
+import com.tridev.liveweather.domain.ActiveWeatherSnapshot;
 import com.tridev.liveweather.worker.WallpaperWeatherScheduler;
 
 /**
  * Android system Live Wallpaper backed by the shared Hero OpenGL weather engine.
  *
  * Rendering runs only while visible. Network refresh remains outside the frame
- * loop. Cache pushes are change-detected, and the cinematic governor keeps the
- * wallpaper battery-aware without changing the resolved weather scene.
+ * loop. Active snapshot pushes are change-detected, and the cinematic governor
+ * keeps the wallpaper battery-aware without changing the resolved weather scene.
  */
 public final class LiveWeatherWallpaperService extends WallpaperService {
 
@@ -34,7 +36,8 @@ public final class LiveWeatherWallpaperService extends WallpaperService {
 
         private final Handler handler=new Handler(Looper.getMainLooper());
         private final GlWallpaperRenderThread glRenderer=new GlWallpaperRenderThread();
-        private final WeatherCache weatherCache=new WeatherCache(LiveWeatherWallpaperService.this);
+        private final ActiveWeatherSnapshotStore activeSnapshotStore=
+                new ActiveWeatherSnapshotStore(LiveWeatherWallpaperService.this);
         private final AirQualityCache airQualityCache=new AirQualityCache(LiveWeatherWallpaperService.this);
         private final WallpaperPreferences preferences=new WallpaperPreferences(LiveWeatherWallpaperService.this);
         private final PerformancePreferences performancePreferences=new PerformancePreferences(LiveWeatherWallpaperService.this);
@@ -46,12 +49,28 @@ public final class LiveWeatherWallpaperService extends WallpaperService {
         private double appliedLatitude=Double.NaN;
         private double appliedLongitude=Double.NaN;
 
+        private final Runnable activeSnapshotReload=new Runnable(){
+            @Override public void run(){if(visible)reloadCache();}
+        };
+
+        private final SharedPreferences.OnSharedPreferenceChangeListener activeSnapshotListener=
+                new SharedPreferences.OnSharedPreferenceChangeListener(){
+                    @Override public void onSharedPreferenceChanged(
+                            SharedPreferences sharedPreferences,String key){
+                        if(!ActiveWeatherSnapshotStore.isChangeSignal(key))return;
+                        handler.removeCallbacks(activeSnapshotReload);
+                        handler.post(activeSnapshotReload);
+                    }
+                };
+
         private final Runnable cacheRefreshRunnable=new Runnable(){
             @Override public void run(){if(!visible)return;reloadCache();handler.postDelayed(this,CACHE_RELOAD_MILLIS);}
         };
 
         @Override public void onCreate(@NonNull SurfaceHolder surfaceHolder){
-            super.onCreate(surfaceHolder);setTouchEventsEnabled(false);reloadCache();WallpaperWeatherScheduler.schedule(LiveWeatherWallpaperService.this);
+            super.onCreate(surfaceHolder);setTouchEventsEnabled(false);
+            activeSnapshotStore.registerListener(activeSnapshotListener);
+            reloadCache();WallpaperWeatherScheduler.schedule(LiveWeatherWallpaperService.this);
         }
 
         @Override public void onVisibilityChanged(boolean value){
@@ -70,20 +89,21 @@ public final class LiveWeatherWallpaperService extends WallpaperService {
         }
 
         @Override public void onDestroy(){
-            visible=false;handler.removeCallbacksAndMessages(null);glRenderer.setVisible(false);glRenderer.release();super.onDestroy();
+            visible=false;activeSnapshotStore.unregisterListener(activeSnapshotListener);
+            handler.removeCallbacksAndMessages(null);glRenderer.setVisible(false);glRenderer.release();super.onDestroy();
         }
 
         private void reloadCache(){
             WallpaperPreferences.Options latestOptions=preferences.load();applyOptions(latestOptions);
 
-            WeatherCache.CachedWeather weather=weatherCache.load();
+            ActiveWeatherSnapshot weather=activeSnapshotStore.loadActive(System.currentTimeMillis());
             if(weather==null){
                 if(appliedWeatherSavedAt!=NO_CACHE_VERSION){glRenderer.clearWeatherData();resetAppliedWeatherIdentity();}
                 return;
             }
 
             AirQualityCache.CachedAirQuality air=airQualityCache.load(weather.getLatitude(),weather.getLongitude());
-            long weatherSavedAt=weather.getSavedAt();long airSavedAt=air==null?NO_CACHE_VERSION:air.getSavedAt();
+            long weatherSavedAt=weather.getFetchedAt();long airSavedAt=air==null?NO_CACHE_VERSION:air.getSavedAt();
             boolean locationChanged=!sameCoordinate(appliedLatitude,weather.getLatitude())||!sameCoordinate(appliedLongitude,weather.getLongitude());
             boolean weatherChanged=weatherSavedAt!=appliedWeatherSavedAt;boolean airChanged=airSavedAt!=appliedAirSavedAt;
             if(!locationChanged&&!weatherChanged&&!airChanged)return;

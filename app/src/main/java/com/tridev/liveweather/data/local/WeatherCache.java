@@ -93,6 +93,22 @@ public final class WeatherCache {
         return activeKey != null && activeKey.equals(locationKey(latitude, longitude));
     }
 
+    /**
+     * Moves only the active identity pointer. The target may intentionally have
+     * no cached payload yet; load() then returns null instead of leaking the
+     * previously active location while a new live request is in flight.
+     */
+    public void activateLocation(double latitude, double longitude) {
+        preferences.edit()
+                .putString(KEY_LAST_LOCATION, locationKey(latitude, longitude))
+                .apply();
+    }
+
+    /** Clears the active pointer without deleting any per-location snapshots. */
+    public void clearActiveLocation() {
+        preferences.edit().remove(KEY_LAST_LOCATION).apply();
+    }
+
     private void saveInternal(
             @NonNull WeatherResponse weather,
             double latitude,

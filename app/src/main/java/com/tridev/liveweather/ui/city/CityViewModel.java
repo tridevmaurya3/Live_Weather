@@ -8,11 +8,13 @@ import androidx.lifecycle.AndroidViewModel;
 import androidx.lifecycle.LiveData;
 import androidx.lifecycle.MutableLiveData;
 
+import com.tridev.liveweather.data.local.ActiveWeatherSnapshotStore;
 import com.tridev.liveweather.data.local.SavedCityStore;
 import com.tridev.liveweather.data.remote.dto.GeocodingResponse;
 import com.tridev.liveweather.domain.CityLocation;
 import com.tridev.liveweather.domain.CityUiState;
 import com.tridev.liveweather.repository.CitySearchRepository;
+import com.tridev.liveweather.widget.WeatherWidgetUpdater;
 
 import java.util.Collections;
 import java.util.List;
@@ -24,6 +26,7 @@ public final class CityViewModel extends AndroidViewModel {
     private final MutableLiveData<CityUiState> cityState = new MutableLiveData<>();
     private final CitySearchRepository citySearchRepository;
     private final SavedCityStore savedCityStore;
+    private final ActiveWeatherSnapshotStore activeSnapshotStore;
 
     private Call<GeocodingResponse> activeSearchCall;
 
@@ -31,6 +34,7 @@ public final class CityViewModel extends AndroidViewModel {
         super(application);
         citySearchRepository = new CitySearchRepository();
         savedCityStore = new SavedCityStore(application);
+        activeSnapshotStore = new ActiveWeatherSnapshotStore(application);
         publish(
                 false,
                 Collections.emptyList(),
@@ -118,11 +122,19 @@ public final class CityViewModel extends AndroidViewModel {
 
     public void selectCity(@NonNull CityLocation city) {
         savedCityStore.selectCity(city);
+        activeSnapshotStore.ensureActiveTarget(
+                city.getLatitude(),
+                city.getLongitude(),
+                city.getDisplayName()
+        );
+        WeatherWidgetUpdater.updateAll(getApplication());
         publishCurrent("Showing weather for " + city.getDisplayName() + ".");
     }
 
     public void useCurrentLocation() {
         savedCityStore.selectCity(null);
+        activeSnapshotStore.clearActiveTarget();
+        WeatherWidgetUpdater.updateAll(getApplication());
         publishCurrent("Using device current location.");
     }
 

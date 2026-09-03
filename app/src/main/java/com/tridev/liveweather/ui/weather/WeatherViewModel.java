@@ -3,18 +3,21 @@ package com.tridev.liveweather.ui.weather;
 import android.app.Application;
 
 import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
 import androidx.lifecycle.AndroidViewModel;
 import androidx.lifecycle.LiveData;
 import androidx.lifecycle.MutableLiveData;
 
 import com.tridev.liveweather.core.DataReliabilityPolicy;
 import com.tridev.liveweather.core.LiveDataFreshnessPolicy;
+import com.tridev.liveweather.data.local.ActiveWeatherSnapshotStore;
 import com.tridev.liveweather.data.local.SavedCityStore;
-import com.tridev.liveweather.data.local.WeatherCache;
 import com.tridev.liveweather.data.remote.dto.WeatherResponse;
+import com.tridev.liveweather.domain.ActiveWeatherSnapshot;
 import com.tridev.liveweather.domain.CityLocation;
 import com.tridev.liveweather.domain.WeatherUiState;
 import com.tridev.liveweather.repository.WeatherRepository;
+import com.tridev.liveweather.widget.WeatherWidgetUpdater;
 
 import retrofit2.Call;
 
@@ -25,31 +28,33 @@ public final class WeatherViewModel extends AndroidViewModel {
 
     private final MutableLiveData<WeatherUiState> weatherState = new MutableLiveData<>();
     private final WeatherRepository weatherRepository;
-    private final WeatherCache weatherCache;
+    private final ActiveWeatherSnapshotStore activeSnapshotStore;
+    private final SavedCityStore savedCityStore;
 
     private Call<WeatherResponse> activeCall;
 
     public WeatherViewModel(@NonNull Application application) {
         super(application);
         weatherRepository = new WeatherRepository();
-        weatherCache = new WeatherCache(application);
+        activeSnapshotStore = new ActiveWeatherSnapshotStore(application);
+        savedCityStore = new SavedCityStore(application);
 
-        CityLocation selectedCity = new SavedCityStore(application).getSelectedCity();
-        WeatherCache.CachedWeather cachedWeather;
+        CityLocation selectedCity = savedCityStore.getSelectedCity();
         if (selectedCity != null) {
-            cachedWeather = weatherCache.load(selectedCity.getLatitude(), selectedCity.getLongitude());
-        } else {
-            cachedWeather = weatherCache.load();
+            activeSnapshotStore.ensureActiveTarget(
+                    selectedCity.getLatitude(),
+                    selectedCity.getLongitude(),
+                    selectedCity.getDisplayName()
+            );
         }
 
-        if (cachedWeather != null) {
-            weatherState.setValue(fromCache(
-                    cachedWeather,
+        long now = System.currentTimeMillis();
+        ActiveWeatherSnapshot snapshot = activeSnapshotStore.loadActive(now);
+        if (snapshot != null) {
+            weatherState.setValue(fromSnapshot(
+                    snapshot,
                     false,
-                    DataReliabilityPolicy.weatherCacheMessage(
-                            cachedWeather.getSavedAt(),
-                            System.currentTimeMillis()
-                    )
+                    DataReliabilityPolicy.weatherCacheMessage(snapshot.getFetchedAt(), now)
             ));
         } else if (selectedCity != null) {
             weatherState.setValue(new WeatherUiState(
@@ -72,6 +77,8 @@ public final class WeatherViewModel extends AndroidViewModel {
                     Double.NaN
             ));
         }
+
+        WeatherWidgetUpdater.updateAll(application);
     }
 
     @NonNull
@@ -123,6 +130,13 @@ public final class WeatherViewModel extends AndroidViewModel {
             activeCall = null;
         }
 
+        ActiveWeatherSnapshotStore.RequestToken requestToken = activeSnapshotStore.beginRequest(
+                latitude,
+                longitude,
+                resolveLocationLabel(latitude, longitude)
+        );
+        WeatherWidgetUpdater.updateAll(getApplication());
+
         WeatherResponse existingWeather = null;
         long existingUpdatedAt = 0L;
         boolean existingFromCache = false;
@@ -132,10 +146,12 @@ public final class WeatherViewModel extends AndroidViewModel {
             existingUpdatedAt = currentState.getUpdatedAt();
             existingFromCache = currentState.isFromCache();
         } else {
-            WeatherCache.CachedWeather targetCache = weatherCache.load(latitude, longitude);
-            if (targetCache != null) {
-                existingWeather = targetCache.getWeather();
-                existingUpdatedAt = targetCache.getSavedAt();
+            ActiveWeatherSnapshot targetSnapshot = activeSnapshotStore.loadActive(
+                    System.currentTimeMillis()
+            );
+            if (targetSnapshot != null) {
+                existingWeather = targetSnapshot.getWeather();
+                existingUpdatedAt = targetSnapshot.getFetchedAt();
                 existingFromCache = true;
             }
         }
@@ -168,9 +184,17 @@ public final class WeatherViewModel extends AndroidViewModel {
                 new WeatherRepository.WeatherCallback() {
                     @Override
                     public void onSuccess(@NonNull WeatherResponse weatherResponse) {
-                        activeCall = null;
                         long now = System.currentTimeMillis();
-                        weatherCache.save(weatherResponse, latitude, longitude, now);
+                        if (!activeSnapshotStore.commitIfCurrent(
+                                requestToken,
+                                weatherResponse,
+                                now
+                        )) {
+                            return;
+                        }
+
+                        activeCall = null;
+                        WeatherWidgetUpdater.updateAll(getApplication());
                         weatherState.setValue(new WeatherUiState(
                                 false,
                                 weatherResponse,
@@ -184,6 +208,8 @@ public final class WeatherViewModel extends AndroidViewModel {
 
                     @Override
                     public void onError(@NonNull String message, Throwable throwable) {
+                        if (!activeSnapshotStore.isCurrent(requestToken)) return;
+
                         activeCall = null;
                         WeatherUiState latestState = weatherState.getValue();
                         boolean sameRequestedArea = isSameArea(latestState, latitude, longitude);
@@ -214,20 +240,34 @@ public final class WeatherViewModel extends AndroidViewModel {
         );
     }
 
-    private WeatherUiState fromCache(
-            @NonNull WeatherCache.CachedWeather cachedWeather,
+    private WeatherUiState fromSnapshot(
+            @NonNull ActiveWeatherSnapshot snapshot,
             boolean loading,
-            String message
+            @Nullable String message
     ) {
         return new WeatherUiState(
                 loading,
-                cachedWeather.getWeather(),
+                snapshot.getWeather(),
                 true,
                 message,
-                cachedWeather.getSavedAt(),
-                cachedWeather.getLatitude(),
-                cachedWeather.getLongitude()
+                snapshot.getFetchedAt(),
+                snapshot.getLatitude(),
+                snapshot.getLongitude()
         );
+    }
+
+    @NonNull
+    private String resolveLocationLabel(double latitude, double longitude) {
+        CityLocation selectedCity = savedCityStore.getSelectedCity();
+        if (selectedCity != null && DataReliabilityPolicy.sameLocation(
+                selectedCity.getLatitude(),
+                selectedCity.getLongitude(),
+                latitude,
+                longitude
+        )) {
+            return selectedCity.getDisplayName();
+        }
+        return "Current location";
     }
 
     private boolean canReuseLiveState(

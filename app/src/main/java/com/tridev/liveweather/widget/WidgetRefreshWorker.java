@@ -16,6 +16,7 @@ import androidx.work.Worker;
 import androidx.work.WorkerParameters;
 
 import com.tridev.liveweather.core.DataReliabilityPolicy;
+import com.tridev.liveweather.data.local.ActiveWeatherSnapshotStore;
 import com.tridev.liveweather.data.local.WeatherCache;
 import com.tridev.liveweather.data.remote.dto.WeatherResponse;
 import com.tridev.liveweather.repository.WeatherRepository;
@@ -85,6 +86,8 @@ public final class WidgetRefreshWorker extends Worker {
     private Result refreshSingle(@NonNull Context context, int appWidgetId) {
         WidgetPreferences.Config config = new WidgetPreferences(context).load(appWidgetId);
         WeatherCache cache = new WeatherCache(context);
+        ActiveWeatherSnapshotStore activeStore = new ActiveWeatherSnapshotStore(context);
+        ActiveWeatherSnapshotStore.RequestToken activeToken = null;
 
         double latitude;
         double longitude;
@@ -93,13 +96,13 @@ public final class WidgetRefreshWorker extends Worker {
             latitude = config.getLatitude();
             longitude = config.getLongitude();
         } else {
-            WeatherCache.CachedWeather active = cache.load();
-            if (active == null) {
+            activeToken = activeStore.captureRequest();
+            if (activeToken == null) {
                 WeatherWidgetUpdater.updateOne(context, appWidgetId);
                 return Result.success();
             }
-            latitude = active.getLatitude();
-            longitude = active.getLongitude();
+            latitude = activeToken.getLatitude();
+            longitude = activeToken.getLongitude();
         }
 
         try {
@@ -108,10 +111,11 @@ public final class WidgetRefreshWorker extends Worker {
             long now = System.currentTimeMillis();
             if (fixed) {
                 cache.saveSnapshot(weather, latitude, longitude, now);
-            } else {
-                // A follow-active widget must not move the app/wallpaper active
-                // pointer back if the user changed city while this request ran.
-                cache.saveIfStillActive(weather, latitude, longitude, now);
+            } else if (activeToken != null) {
+                // ACTIVE widgets share the exact app/wallpaper request generation.
+                // A late response, including an older response for the same city,
+                // can no longer replace a newer active snapshot.
+                activeStore.commitIfCurrent(activeToken, weather, now);
             }
             WeatherWidgetUpdater.updateOne(context, appWidgetId);
             return Result.success();
