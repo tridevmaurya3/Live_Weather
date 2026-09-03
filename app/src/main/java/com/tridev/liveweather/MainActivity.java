@@ -31,9 +31,11 @@ import androidx.lifecycle.ViewModelProvider;
 
 import com.google.android.material.bottomnavigation.BottomNavigationView;
 import com.tridev.liveweather.core.location.DeviceLocationManager;
+import com.tridev.liveweather.core.location.LocationContinuityPolicy;
 import com.tridev.liveweather.core.location.PlaceNameResolver;
 import com.tridev.liveweather.core.LiveDataFreshnessPolicy;
 import com.tridev.liveweather.data.local.AlertPreferences;
+import com.tridev.liveweather.data.local.LocationSnapshotStore;
 import com.tridev.liveweather.data.local.WallpaperPreferences;
 import com.tridev.liveweather.domain.CityLocation;
 import com.tridev.liveweather.domain.WeatherUiState;
@@ -93,9 +95,12 @@ public class MainActivity extends AppCompatActivity {
     private WallpaperPreferences wallpaperPreferences;
     private AlertPreferences alertPreferences;
     private AlertNotificationManager alertNotificationManager;
+    private LocationSnapshotStore locationSnapshotStore;
 
     private double latestLatitude = Double.NaN;
     private double latestLongitude = Double.NaN;
+    private long latestLocationCapturedAt;
+    private long lastForegroundLocationCheckAt;
     private final Handler liveRefreshHandler = new Handler(Looper.getMainLooper());
     private final Runnable liveRefreshTicker = new Runnable() {
         @Override
@@ -122,6 +127,7 @@ public class MainActivity extends AppCompatActivity {
         wallpaperPreferences = new WallpaperPreferences(this);
         alertPreferences = new AlertPreferences(this);
         alertNotificationManager = new AlertNotificationManager(this);
+        locationSnapshotStore = new LocationSnapshotStore(this);
 
         bindViews();
         weatherScreenRenderer = new WeatherScreenRenderer(this);
@@ -151,6 +157,7 @@ public class MainActivity extends AppCompatActivity {
         super.onStart();
         liveRefreshHandler.removeCallbacks(liveRefreshTicker);
         liveRefreshHandler.post(liveRefreshTicker);
+        recheckForegroundLocationIfDue();
     }
 
     @Override
@@ -177,6 +184,15 @@ public class MainActivity extends AppCompatActivity {
                     System.currentTimeMillis()
             );
         }
+    }
+
+    private void recheckForegroundLocationIfDue() {
+        if (cityViewModel == null || cityViewModel.getSelectedCity() != null
+                || deviceLocationManager == null || !deviceLocationManager.hasLocationPermission()) return;
+        long now = System.currentTimeMillis();
+        if (!LocationContinuityPolicy.shouldRecheck(lastForegroundLocationCheckAt, now)) return;
+        lastForegroundLocationCheckAt = now;
+        requestCurrentLocation(false, true);
     }
 
     private void registerLocationPermissionLauncher() {
@@ -527,6 +543,16 @@ public class MainActivity extends AppCompatActivity {
             activateCity(selectedCity, false, false);
             return;
         }
+        LocationSnapshotStore.Snapshot snapshot = locationSnapshotStore.load();
+        if (snapshot != null && LocationContinuityPolicy.isUsable(
+                snapshot.getLatitude(), snapshot.getLongitude(), snapshot.getAccuracyMeters())) {
+            latestLatitude = snapshot.getLatitude();
+            latestLongitude = snapshot.getLongitude();
+            latestLocationCapturedAt = snapshot.getCapturedAt();
+            phase6Renderer.setLocationAccuracy(
+                    snapshot.getAccuracyMeters(), deviceLocationManager.hasFineLocationPermission());
+            homeLocationValue.setText(WeatherFormatter.coordinates(latestLatitude, latestLongitude));
+        }
         if (deviceLocationManager.hasLocationPermission()) {
             requestCurrentLocation(false);
             return;
@@ -574,19 +600,41 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void requestCurrentLocation(boolean forceWeatherRefresh) {
-        if (cityViewModel.getSelectedCity() != null) return;
+        requestCurrentLocation(forceWeatherRefresh, false);
+    }
 
-        homeLocationValue.setText(R.string.home_location_requesting);
-        if (!hasWeatherData()) homeSyncStatus.setText(R.string.home_sync_location_requesting);
+    private void requestCurrentLocation(boolean forceWeatherRefresh, boolean silentRecheck) {
+        if (cityViewModel.getSelectedCity() != null) return;
+        lastForegroundLocationCheckAt = System.currentTimeMillis();
+
+        if (!silentRecheck) {
+            homeLocationValue.setText(R.string.home_location_requesting);
+            if (!hasWeatherData()) homeSyncStatus.setText(R.string.home_sync_location_requesting);
+        }
 
         deviceLocationManager.requestCurrentLocation(new DeviceLocationManager.LocationCallback() {
             @Override
             public void onLocation(Location location) {
-                latestLatitude = location.getLatitude();
-                latestLongitude = location.getLongitude();
-                double resolvedLatitude = latestLatitude;
-                double resolvedLongitude = latestLongitude;
+                long now = System.currentTimeMillis();
                 float accuracy = location.hasAccuracy() ? location.getAccuracy() : Float.NaN;
+                double candidateLatitude = location.getLatitude();
+                double candidateLongitude = location.getLongitude();
+                boolean activate = forceWeatherRefresh || LocationContinuityPolicy.shouldActivate(
+                        latestLatitude, latestLongitude, latestLocationCapturedAt,
+                        candidateLatitude, candidateLongitude, accuracy, now
+                );
+                if (!LocationContinuityPolicy.isUsable(candidateLatitude, candidateLongitude, accuracy)) {
+                    if (!silentRecheck) runOnUiThread(() -> renderLocationError(
+                            DeviceLocationManager.LocationError.LOCATION_UNAVAILABLE));
+                    return;
+                }
+                locationSnapshotStore.save(location, now);
+                if (!activate) return;
+                latestLatitude = candidateLatitude;
+                latestLongitude = candidateLongitude;
+                latestLocationCapturedAt = now;
+                double resolvedLatitude = candidateLatitude;
+                double resolvedLongitude = candidateLongitude;
                 boolean precise = deviceLocationManager.hasFineLocationPermission();
 
                 runOnUiThread(() -> {
@@ -623,7 +671,9 @@ public class MainActivity extends AppCompatActivity {
                     String message,
                     Throwable throwable
             ) {
-                runOnUiThread(() -> renderLocationError(error));
+                if (!silentRecheck || !hasWeatherData()) {
+                    runOnUiThread(() -> renderLocationError(error));
+                }
             }
         });
     }
