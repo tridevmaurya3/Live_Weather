@@ -4,6 +4,7 @@ import androidx.annotation.NonNull;
 
 import com.tridev.liveweather.data.remote.api.GeocodingApiClient;
 import com.tridev.liveweather.data.remote.api.OpenMeteoGeocodingApiService;
+import com.tridev.liveweather.data.remote.api.NetworkFailureMessage;
 import com.tridev.liveweather.data.remote.dto.GeocodingResponse;
 import com.tridev.liveweather.domain.CityLocation;
 
@@ -103,7 +104,7 @@ public final class CitySearchRepository {
                 if (call.isCanceled()) {
                     return;
                 }
-                callback.onError("Unable to search cities right now.");
+                callback.onError(NetworkFailureMessage.forService("City search", throwable));
             }
         });
 

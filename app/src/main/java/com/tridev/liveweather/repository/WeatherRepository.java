@@ -3,6 +3,7 @@ package com.tridev.liveweather.repository;
 import androidx.annotation.NonNull;
 
 import com.tridev.liveweather.data.remote.api.OpenMeteoApiService;
+import com.tridev.liveweather.data.remote.api.NetworkFailureMessage;
 import com.tridev.liveweather.data.remote.api.WeatherApiClient;
 import com.tridev.liveweather.data.remote.dto.WeatherResponse;
 
@@ -82,7 +83,7 @@ public class WeatherRepository {
                     return;
                 }
 
-                callback.onError("Unable to load weather data.", throwable);
+                callback.onError(NetworkFailureMessage.forService("Weather data", throwable), throwable);
             }
         });
 

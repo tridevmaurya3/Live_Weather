@@ -4,6 +4,7 @@ import androidx.annotation.NonNull;
 
 import com.tridev.liveweather.data.remote.api.AirQualityApiClient;
 import com.tridev.liveweather.data.remote.api.AirQualityApiService;
+import com.tridev.liveweather.data.remote.api.NetworkFailureMessage;
 import com.tridev.liveweather.data.remote.dto.AirQualityResponse;
 
 import java.io.IOException;
@@ -62,7 +63,10 @@ public final class AirQualityRepository {
                     @NonNull Throwable throwable
             ) {
                 if (!call.isCanceled()) {
-                    callback.onError("Unable to load air-quality data.", throwable);
+                    callback.onError(
+                            NetworkFailureMessage.forService("Air-quality data", throwable),
+                            throwable
+                    );
                 }
             }
         });

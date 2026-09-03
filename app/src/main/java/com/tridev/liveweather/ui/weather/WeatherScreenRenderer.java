@@ -684,7 +684,7 @@ public final class WeatherScreenRenderer {
             status = activity.getString(R.string.home_sync_weather_loading);
         } else if (state.hasWeather()) {
             String updated = WeatherFormatter.updatedTime(state.getUpdatedAt());
-            if (state.isFromCache() || state.getMessage() != null) {
+            if (state.isFromCache()) {
                 status = "Saved weather · updated " + updated + " · tap to refresh.";
             } else {
                 status = "Live · updated " + updated + " · tap to refresh.";

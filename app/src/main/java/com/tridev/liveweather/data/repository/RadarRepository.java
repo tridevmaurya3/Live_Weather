@@ -6,6 +6,7 @@ import androidx.annotation.Nullable;
 import com.tridev.liveweather.LiveWeatherApplication;
 import com.tridev.liveweather.data.local.RadarPersistentCache;
 import com.tridev.liveweather.data.remote.api.RadarFieldApiClient;
+import com.tridev.liveweather.data.remote.api.NetworkFailureMessage;
 import com.tridev.liveweather.data.remote.api.RainViewerApiClient;
 import com.tridev.liveweather.data.remote.dto.RadarFieldPointResponse;
 import com.tridev.liveweather.data.remote.dto.RainViewerResponse;
@@ -138,7 +139,10 @@ public final class RadarRepository {
                     callback.onSuccess(cachedRadar, DeliverySource.NETWORK_FALLBACK_CACHE, cachedRadarAt);
                     return;
                 }
-                callback.onError("Observed radar network unavailable", throwable);
+                callback.onError(
+                        NetworkFailureMessage.forService("Observed radar", throwable),
+                        throwable
+                );
             }
         });
     }
@@ -209,7 +213,10 @@ public final class RadarRepository {
                     callback.onSuccess(cachedField, DeliverySource.NETWORK_FALLBACK_CACHE, cachedFieldAt);
                     return;
                 }
-                callback.onError("Atmospheric model field network unavailable", throwable);
+                callback.onError(
+                        NetworkFailureMessage.forService("Atmospheric model field", throwable),
+                        throwable
+                );
             }
         });
     }
