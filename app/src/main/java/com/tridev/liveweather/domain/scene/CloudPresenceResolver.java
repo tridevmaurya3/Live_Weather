@@ -12,15 +12,8 @@ import java.time.format.DateTimeParseException;
 import java.util.List;
 
 /**
- * ODM-1B cloud presence resolver.
- *
- * This class decides how much cloud should be present before any renderer decides
- * what those clouds look like. It combines current cloud cover, the nearest
- * 15-minute neighbourhood, WMO condition semantics and active weather layers.
- *
- * Important: this is a visual consistency resolver, not a claim of camera-level
- * observation. It prevents a partly-cloudy state from becoming an empty sky and
- * prevents clear weather from receiving decorative fake cloud floors.
+ * Shared cloud-presence resolver. Stage 8 keeps total-cloud compatibility while
+ * using provider low/mid/high layers whenever the active payload contains them.
  */
 public final class CloudPresenceResolver {
 
@@ -43,9 +36,6 @@ public final class CloudPresenceResolver {
         int code = condition.getWeatherCode() == null ? 0 : condition.getWeatherCode();
 
         double amount = baseCloudAmount(weather, current);
-
-        // WMO cloud-state floors are semantic corrections, not decoration.
-        // Code 0 has deliberately no floor: genuinely clear data stays clear.
         if (code == 1) {
             amount = Math.max(amount, 0.14d);
         } else if (code == 2) {
@@ -58,9 +48,6 @@ public final class CloudPresenceResolver {
                 Math.max(rainIntensity, drizzleIntensity),
                 snowIntensity
         );
-
-        // Confirmed precipitation needs a believable cloud source even when one
-        // cloud-cover grid point temporarily under-reports the moving system.
         if (precipitation > 0d) {
             amount = Math.max(amount, 0.64d + precipitation * 0.28d);
         }
@@ -69,38 +56,65 @@ public final class CloudPresenceResolver {
         }
         amount = clamp01(amount);
 
+        CloudLayerProfile layers = CloudLayerProfile.resolve(
+                current,
+                amount,
+                precipitation,
+                stormIntensity
+        );
+        double severeEnvelope = SevereWeatherVisualPolicy.cloudTransitionEnvelope(weather);
+
+        double verticalMass = Math.max(
+                layers.getLow(),
+                Math.max(layers.getMid() * 0.92d, layers.getHigh() * 0.78d)
+        );
         double density = clamp01(
-                amount * 0.72d
-                        + precipitation * 0.18d
-                        + stormIntensity * 0.28d
-                        + (1d - clamp01(visibilityFactor)) * 0.08d
+                amount * 0.56d
+                        + verticalMass * 0.26d
+                        + precipitation * 0.16d
+                        + stormIntensity * 0.24d
+                        + severeEnvelope * 0.08d
+                        + (1d - clamp01(visibilityFactor)) * 0.06d
         );
 
-        double farLayer = amount < 0.05d
+        // Existing renderer depth contract: far=high, mid=mid-level, near=low-level.
+        double farLayer = amount < 0.04d
                 ? 0d
-                : clamp01((amount - 0.02d) / 0.78d * 0.74d + fogIntensity * 0.06d);
-        double midLayer = amount < 0.11d
-                ? 0d
-                : clamp01((amount - 0.09d) / 0.72d + precipitation * 0.08d);
-        double nearLayer = amount < 0.27d
+                : clamp01(layers.getHigh() * 0.92d + amount * 0.10d);
+        double midLayer = amount < 0.07d
                 ? 0d
                 : clamp01(
-                        (amount - 0.24d) / 0.76d
-                                + precipitation * 0.20d
-                                + stormIntensity * 0.22d
+                        layers.getMid() * 0.94d
+                                + amount * 0.08d
+                                + precipitation * 0.08d
                 );
+        double nearLayer = amount < 0.10d
+                ? 0d
+                : clamp01(
+                        layers.getLow() * 0.96d
+                                + amount * 0.05d
+                                + precipitation * 0.14d
+                                + stormIntensity * 0.12d
+                );
+
+        // The transition envelope affects cloud depth/darkness only. Current storm
+        // truth still exclusively owns stormIntensity and lightning scheduling.
         double stormCeiling = clamp01(
                 stormIntensity * 0.86d
-                        + Math.max(0d, amount - 0.72d) * 0.58d
-                        + precipitation * 0.18d
+                        + severeEnvelope * 0.38d
+                        + Math.max(0d, layers.getLow() - 0.68d) * 0.34d
+                        + Math.max(0d, layers.getMid() - 0.72d) * 0.24d
+                        + precipitation * 0.14d
         );
 
         double brightness = clamp(
                 1d
                         - stormIntensity * 0.58d
+                        - severeEnvelope * 0.18d
                         - precipitation * 0.20d
-                        - airHazeIntensity * 0.12d
-                        - (1d - clamp01(visibilityFactor)) * 0.10d,
+                        - airHazeIntensity * 0.10d
+                        - fogIntensity * 0.06d
+                        - (1d - clamp01(visibilityFactor)) * 0.08d,
                 0.18d,
                 1d
         );
@@ -177,8 +191,6 @@ public final class CloudPresenceResolver {
                     : nearestTimeIndex(times, current.getTime(), center);
         }
 
-        // Weighted 45-minute neighbourhood avoids one noisy grid slot dominating
-        // the visible sky while remaining responsive to a moving cloud field.
         double sum = 0d;
         double weightSum = 0d;
         for (int offset = -1; offset <= 1; offset++) {

@@ -11,9 +11,7 @@ import com.tridev.liveweather.domain.LiveConditionResolver;
 import com.tridev.liveweather.domain.SkyRealityEngine;
 import com.tridev.liveweather.domain.SkyRealityState;
 
-/**
- * Converts live weather + AQI haze + local astronomy into animation intensities.
- */
+/** Converts live weather + AQI haze + local astronomy into animation intensities. */
 public final class DynamicRealityComposer {
 
     private DynamicRealityComposer() {
@@ -65,13 +63,6 @@ public final class DynamicRealityComposer {
                 ? 0d
                 : current.getWindDirection10m();
 
-        /*
-         * Phase 20A high-gust motion contract:
-         * sustained wind owns the base drift; verified current gusts may add
-         * bounded turbulence but may never invent storm/rain state. The mapping
-         * deliberately reacts to both gust excess and gust-to-sustained ratio so
-         * a real squall is visually stronger without making normal wind frantic.
-         */
         double sustainedMotion = clamp(windSpeed / 58d, 0d, 1d);
         double gustExcess = Math.max(0d, windGust - windSpeed);
         double gustMotion = clamp(gustExcess / 34d, 0d, 1d);
@@ -93,19 +84,12 @@ public final class DynamicRealityComposer {
         boolean drizzleCode = code >= 51 && code <= 57;
         boolean rainCode = (code >= 61 && code <= 67) || (code >= 80 && code <= 82) || code >= 95;
         boolean snowCode = (code >= 71 && code <= 77) || code == 85 || code == 86;
-        boolean fogCode = code == 45 || code == 48;
         boolean stormCode = code >= 95;
 
         double drizzle = drizzleCode
                 ? clamp(0.25d + precipSignal * 0.45d, 0.18d, 0.72d)
                 : 0d;
 
-        /*
-         * Confidence-aware precipitation contract:
-         * raw model trace values do not independently start visual rain. The
-         * LiveConditionResolver must first resolve the current state to a rain,
-         * shower or thunderstorm code. Raw amounts then refine intensity only.
-         */
         double rain = rainCode
                 ? clamp(
                         0.24d + precipSignal * 0.62d + currentRain * 0.38d + currentShowers * 0.48d,
@@ -120,9 +104,15 @@ public final class DynamicRealityComposer {
         double snow = snowCode
                 ? clamp(0.28d + Math.max(currentSnow, precipSignal) * 0.30d, 0.20d, 1d)
                 : 0d;
-        double fog = fogCode
-                ? clamp(0.55d + (1d - visibilityFactor) * 0.45d, 0.45d, 1d)
-                : clamp((1d - visibilityFactor) * 0.78d, 0d, 0.85d);
+
+        AtmosphericObscurationPolicy.State obscuration = AtmosphericObscurationPolicy.resolve(
+                current,
+                code,
+                airHaze,
+                visibilityFactor
+        );
+        double fog = obscuration.getFogIntensity();
+
         double storm = stormCode
                 ? clamp(0.55d + rain * 0.45d, 0.55d, 1d)
                 : 0d;
@@ -155,14 +145,6 @@ public final class DynamicRealityComposer {
                 ? clamp(weatherTransparency * (0.72d + 0.28d * visibilityFactor), 0d, 1d)
                 : 0d;
 
-        /*
-         * FINAL MOON VISIBILITY CONTRACT
-         *
-         * The texture/shader owns lunar phase geometry. The composer must NOT
-         * multiply visibility by phase illumination again, otherwise a real thin
-         * crescent gets attenuated twice and disappears. Here we only model
-         * whether the lunar surface can be seen through atmosphere/daylight.
-         */
         double moonIllumination = clamp(sky.getMoonIlluminationPercent() / 100d, 0d, 1d);
         double moonVisibility = 0d;
 
