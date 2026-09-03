@@ -6,38 +6,17 @@ import java.util.List;
 
 public class WeatherResponse {
 
-    @SerializedName("latitude")
-    private Double latitude;
-
-    @SerializedName("longitude")
-    private Double longitude;
-
-    @SerializedName("generationtime_ms")
-    private Double generationTimeMs;
-
-    @SerializedName("utc_offset_seconds")
-    private Integer utcOffsetSeconds;
-
-    @SerializedName("timezone")
-    private String timezone;
-
-    @SerializedName("timezone_abbreviation")
-    private String timezoneAbbreviation;
-
-    @SerializedName("elevation")
-    private Double elevation;
-
-    @SerializedName("current")
-    private CurrentWeather current;
-
-    @SerializedName("minutely_15")
-    private Minutely15Weather minutely15;
-
-    @SerializedName("hourly")
-    private HourlyWeather hourly;
-
-    @SerializedName("daily")
-    private DailyWeather daily;
+    @SerializedName("latitude") private Double latitude;
+    @SerializedName("longitude") private Double longitude;
+    @SerializedName("generationtime_ms") private Double generationTimeMs;
+    @SerializedName("utc_offset_seconds") private Integer utcOffsetSeconds;
+    @SerializedName("timezone") private String timezone;
+    @SerializedName("timezone_abbreviation") private String timezoneAbbreviation;
+    @SerializedName("elevation") private Double elevation;
+    @SerializedName("current") private CurrentWeather current;
+    @SerializedName("minutely_15") private Minutely15Weather minutely15;
+    @SerializedName("hourly") private HourlyWeather hourly;
+    @SerializedName("daily") private DailyWeather daily;
 
     public Double getLatitude() { return latitude; }
     public Double getLongitude() { return longitude; }
@@ -52,7 +31,6 @@ public class WeatherResponse {
     public DailyWeather getDaily() { return daily; }
 
     public static class CurrentWeather {
-
         @SerializedName("time") private String time;
         @SerializedName("interval") private Integer interval;
         @SerializedName("temperature_2m") private Double temperature2m;
@@ -66,6 +44,10 @@ public class WeatherResponse {
         @SerializedName("snowfall") private Double snowfall;
         @SerializedName("snow_depth") private Double snowDepth;
         @SerializedName("soil_temperature_0cm") private Double soilTemperature0cm;
+        @SerializedName("shortwave_radiation") private Double shortwaveRadiation;
+        @SerializedName("direct_radiation") private Double directRadiation;
+        @SerializedName("diffuse_radiation") private Double diffuseRadiation;
+        @SerializedName("direct_normal_irradiance") private Double directNormalIrradiance;
         @SerializedName("weather_code") private Integer weatherCode;
         @SerializedName("cloud_cover") private Double cloudCover;
         @SerializedName("cloud_cover_low") private Double cloudCoverLow;
@@ -91,6 +73,10 @@ public class WeatherResponse {
         public Double getSnowfall() { return snowfall; }
         public Double getSnowDepth() { return snowDepth; }
         public Double getSoilTemperature0cm() { return soilTemperature0cm; }
+        public Double getShortwaveRadiation() { return shortwaveRadiation; }
+        public Double getDirectRadiation() { return directRadiation; }
+        public Double getDiffuseRadiation() { return diffuseRadiation; }
+        public Double getDirectNormalIrradiance() { return directNormalIrradiance; }
         public Integer getWeatherCode() { return weatherCode; }
         public Double getCloudCover() { return cloudCover; }
         public Double getCloudCoverLow() { return cloudCoverLow; }
@@ -105,7 +91,6 @@ public class WeatherResponse {
     }
 
     public static class Minutely15Weather {
-
         @SerializedName("time") private List<String> time;
         @SerializedName("precipitation") private List<Double> precipitation;
         @SerializedName("rain") private List<Double> rain;
@@ -126,7 +111,6 @@ public class WeatherResponse {
     }
 
     public static class HourlyWeather {
-
         @SerializedName("time") private List<String> time;
         @SerializedName("temperature_2m") private List<Double> temperature2m;
         @SerializedName("relative_humidity_2m") private List<Double> relativeHumidity2m;
@@ -140,6 +124,10 @@ public class WeatherResponse {
         @SerializedName("snowfall") private List<Double> snowfall;
         @SerializedName("snow_depth") private List<Double> snowDepth;
         @SerializedName("soil_temperature_0cm") private List<Double> soilTemperature0cm;
+        @SerializedName("shortwave_radiation") private List<Double> shortwaveRadiation;
+        @SerializedName("direct_radiation") private List<Double> directRadiation;
+        @SerializedName("diffuse_radiation") private List<Double> diffuseRadiation;
+        @SerializedName("direct_normal_irradiance") private List<Double> directNormalIrradiance;
         @SerializedName("weather_code") private List<Integer> weatherCode;
         @SerializedName("cloud_cover") private List<Double> cloudCover;
         @SerializedName("cloud_cover_low") private List<Double> cloudCoverLow;
@@ -164,6 +152,10 @@ public class WeatherResponse {
         public List<Double> getSnowfall() { return snowfall; }
         public List<Double> getSnowDepth() { return snowDepth; }
         public List<Double> getSoilTemperature0cm() { return soilTemperature0cm; }
+        public List<Double> getShortwaveRadiation() { return shortwaveRadiation; }
+        public List<Double> getDirectRadiation() { return directRadiation; }
+        public List<Double> getDiffuseRadiation() { return diffuseRadiation; }
+        public List<Double> getDirectNormalIrradiance() { return directNormalIrradiance; }
         public List<Integer> getWeatherCode() { return weatherCode; }
         public List<Double> getCloudCover() { return cloudCover; }
         public List<Double> getCloudCoverLow() { return cloudCoverLow; }
@@ -177,7 +169,6 @@ public class WeatherResponse {
     }
 
     public static class DailyWeather {
-
         @SerializedName("time") private List<String> time;
         @SerializedName("weather_code") private List<Integer> weatherCode;
         @SerializedName("temperature_2m_max") private List<Double> temperature2mMax;

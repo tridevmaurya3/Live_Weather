@@ -2,8 +2,8 @@ package com.tridev.liveweather.repository;
 
 import androidx.annotation.NonNull;
 
-import com.tridev.liveweather.data.remote.api.OpenMeteoApiService;
 import com.tridev.liveweather.data.remote.api.NetworkFailureMessage;
+import com.tridev.liveweather.data.remote.api.OpenMeteoApiService;
 import com.tridev.liveweather.data.remote.api.WeatherApiClient;
 import com.tridev.liveweather.data.remote.dto.WeatherResponse;
 
@@ -18,6 +18,7 @@ public class WeatherRepository {
     private static final String CURRENT_VARIABLES =
             "temperature_2m,relative_humidity_2m,apparent_temperature,dew_point_2m,is_day," +
                     "precipitation,rain,showers,snowfall,snow_depth,soil_temperature_0cm," +
+                    "shortwave_radiation,direct_radiation,diffuse_radiation,direct_normal_irradiance," +
                     "weather_code,cloud_cover,cloud_cover_low,cloud_cover_mid,cloud_cover_high," +
                     "visibility,pressure_msl,surface_pressure,wind_speed_10m,wind_direction_10m," +
                     "wind_gusts_10m";
@@ -28,7 +29,8 @@ public class WeatherRepository {
     private static final String HOURLY_VARIABLES =
             "temperature_2m,relative_humidity_2m,apparent_temperature,dew_point_2m,is_day," +
                     "precipitation_probability,precipitation,rain,showers,snowfall," +
-                    "snow_depth,soil_temperature_0cm,weather_code,cloud_cover," +
+                    "snow_depth,soil_temperature_0cm,shortwave_radiation,direct_radiation," +
+                    "diffuse_radiation,direct_normal_irradiance,weather_code,cloud_cover," +
                     "cloud_cover_low,cloud_cover_mid,cloud_cover_high,visibility,pressure_msl," +
                     "wind_speed_10m,wind_direction_10m,wind_gusts_10m";
 
@@ -72,7 +74,6 @@ public class WeatherRepository {
                     callback.onSuccess(response.body());
                     return;
                 }
-
                 callback.onError(buildHttpError(response), null);
             }
 
@@ -81,10 +82,7 @@ public class WeatherRepository {
                     @NonNull Call<WeatherResponse> call,
                     @NonNull Throwable throwable
             ) {
-                if (call.isCanceled()) {
-                    return;
-                }
-
+                if (call.isCanceled()) return;
                 callback.onError(NetworkFailureMessage.forService("Weather data", throwable), throwable);
             }
         });
@@ -92,10 +90,6 @@ public class WeatherRepository {
         return call;
     }
 
-    /**
-     * Synchronous network path intended for WorkManager background threads.
-     * Never call this method from the Android main thread.
-     */
     @NonNull
     public WeatherResponse loadWeatherBlocking(
             double latitude,
@@ -141,7 +135,6 @@ public class WeatherRepository {
 
     public interface WeatherCallback {
         void onSuccess(@NonNull WeatherResponse weatherResponse);
-
         void onError(@NonNull String message, Throwable throwable);
     }
 }

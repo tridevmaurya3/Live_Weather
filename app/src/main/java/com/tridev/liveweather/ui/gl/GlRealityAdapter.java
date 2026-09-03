@@ -15,12 +15,9 @@ import com.tridev.liveweather.domain.scene.ThermalEnvironmentPolicy;
 /**
  * Converts the existing shared reality engine into GPU uniforms.
  *
- * Sun/Moon positions, lunar phase and astronomical star visibility remain
- * authoritative outputs of the shared reality engines. The GPU adapter only
- * converts them to normalized/perceptual display uniforms. For the cinematic
- * reality pass it also supplies observer latitude and local sidereal angle so
- * the star renderer can rotate the celestial sphere instead of pinning stars to
- * screen coordinates.
+ * Sun/Moon positions, lunar phase and astronomical star visibility remain authoritative outputs
+ * of the shared reality engines. Stage 13 calibrates only renderer-facing Sun visibility and world
+ * exposure with observed/modelled solar irradiance; weather truth and celestial position stay intact.
  */
 public final class GlRealityAdapter {
 
@@ -80,16 +77,23 @@ public final class GlRealityAdapter {
         float surfaceTemperatureC = resolveSurfaceTemperatureC(current);
         float windDirectionRadians = (float) Math.toRadians(state.getWindDirectionDegrees());
 
+        SolarIrradianceRealityPolicy.State solar = SolarIrradianceRealityPolicy.resolve(
+                current,
+                sky.getSunAltitude()
+        );
+        float calibratedSunVisibility = clamp01((float) (
+                state.getSunVisibility() * solar.getDirectionalVisibilityFactor()
+        ));
+
         /*
-         * R11 world-light contract: weather truth stays unchanged. Only renderer-facing
-         * scene illumination receives bounded sun/cloud modulation so terrain, vegetation,
-         * water and wet-ground materials react to the same real sky. Broken-cloud variation
-         * is time-based and slow; full overcast and clear sky remain stable.
+         * R11 world-light contract remains intact. Stage 13 adds bounded solar calibration so
+         * bright/dark overcast and hazy sunlight respond to incoming radiation rather than cloud
+         * percentage alone. Missing solar observations are exactly neutral.
          */
         float worldSceneLight = clamp01((float) WorldLightingController.resolveSceneLight(
                 state.getSceneLight(),
                 sky.getSunAltitude(),
-                state.getSunVisibility(),
+                calibratedSunVisibility,
                 clouds.getCloudAmount(),
                 clouds.getDensity(),
                 clouds.getMidLayer(),
@@ -99,6 +103,10 @@ public final class GlRealityAdapter {
                 state.getStormIntensity(),
                 state.getFogIntensity(),
                 state.getAirHazeIntensity(),
+                solar.getGlobalLightFactor(),
+                solar.getDirectLightFactor(),
+                solar.getDiffuseFraction(),
+                solar.hasObservation(),
                 state.getWindStrength(),
                 windDirectionRadians,
                 epochMillis
@@ -116,7 +124,7 @@ public final class GlRealityAdapter {
                 skyProfile.horizonB,
                 sunX,
                 sunY,
-                clamp01((float) state.getSunVisibility()),
+                calibratedSunVisibility,
                 (float) sky.getSunAltitude(),
                 moonX,
                 moonY,
