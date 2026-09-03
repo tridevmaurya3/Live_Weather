@@ -14,6 +14,7 @@ import androidx.core.content.ContextCompat;
 
 import com.tridev.liveweather.R;
 import com.tridev.liveweather.data.remote.dto.WeatherResponse;
+import com.tridev.liveweather.domain.LiveConditionResolver;
 import com.tridev.liveweather.domain.SkyRealityEngine;
 import com.tridev.liveweather.domain.SkyRealityState;
 import com.tridev.liveweather.domain.WeatherUiState;
@@ -161,13 +162,14 @@ public final class WeatherScreenRenderer {
         forecastDailySummary.setText(ForecastIntelligence.tenDayOverview(response));
 
         if (current != null) {
-            String condition = WeatherFormatter.condition(current.getWeatherCode());
+            LiveConditionResolver.ResolvedCondition resolved = LiveConditionResolver.resolve(response);
+            String condition = resolved.getLabel();
             String symbol = WeatherFormatter.symbol(
-                    current.getWeatherCode(),
-                    current.getIsDay()
+                    resolved.getWeatherCode(),
+                    resolved.getIsDay()
             );
 
-            applyHeroMode(DashboardIntelligence.heroMode(current));
+            applyHeroMode(DashboardIntelligence.heroMode(response));
 
             homeTemperature.setText(WeatherFormatter.temperature(current.getTemperature2m()));
             homeCondition.setText(symbol + "  " + condition);
