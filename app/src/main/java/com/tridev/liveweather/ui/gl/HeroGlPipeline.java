@@ -34,6 +34,8 @@ public final class HeroGlPipeline {
     private final HeroGlSnowRenderer snowRenderer = new HeroGlSnowRenderer();
     private final HeroGlDiagnostics diagnostics = new HeroGlDiagnostics();
     private final GlSceneTransitionController transitionController = new GlSceneTransitionController();
+    private final SnowSurfaceController snowSurfaceController = new SnowSurfaceController();
+    private final GroundWetnessController meltWaterGroundController = new GroundWetnessController();
 
     /** Latest resolved current-weather truth. Diagnostics use this immediately. */
     @Nullable
@@ -51,6 +53,8 @@ public final class HeroGlPipeline {
 
     private boolean rendererViewsBound;
     private volatile float performanceDetailScale = 1f;
+    private long lastSnowSurfaceFrameNanos;
+    private float lastSnowSurfaceDeltaSeconds;
 
     private boolean sceneHealthy = true;
     private boolean starsHealthy = true;
@@ -121,6 +125,8 @@ public final class HeroGlPipeline {
             diagnostics.recordRendererFault("snow", "surface-create", error);
         }
 
+        lastSnowSurfaceFrameNanos = System.nanoTime();
+        lastSnowSurfaceDeltaSeconds = 0f;
         applyPerformanceDetail();
         updateAutoSceneryFromTruth(fullSnapshot);
         GlSceneSnapshot visual = transitionController.current();
@@ -259,7 +265,10 @@ public final class HeroGlPipeline {
         // No allocations here: the controller and renderer views are reused.
         if (transitionController.advance()) {
             GlSceneSnapshot visual = transitionController.current();
-            if (visual != null) applyVisualSnapshot(visual);
+            if (visual != null) {
+                advanceSnowSurface(visual);
+                applyVisualSnapshot(visual);
+            }
         }
 
         if (sceneHealthy) {
@@ -298,6 +307,11 @@ public final class HeroGlPipeline {
                 diagnostics.recordRendererFault("world", "draw", error);
             }
         }
+
+        // Melt water updates the same physical ground memory after this world frame. It becomes
+        // visible naturally on the next frame without masquerading as atmospheric precipitation.
+        applySnowMeltToGround();
+
         if (atmosphereHealthy) {
             try {
                 atmosphereRenderer.drawFrame();
@@ -354,6 +368,38 @@ public final class HeroGlPipeline {
     }
 
     /**
+     * Stage 12 advances only retained surface snow. Current snowfall truth remains untouched.
+     */
+    private void advanceSnowSurface(@NonNull GlSceneSnapshot visual) {
+        long nowNanos = System.nanoTime();
+        float deltaSeconds = lastSnowSurfaceFrameNanos <= 0L
+                ? 0f
+                : Math.max(0f, Math.min(
+                        0.25f,
+                        (nowNanos - lastSnowSurfaceFrameNanos) / 1_000_000_000f
+                ));
+        lastSnowSurfaceFrameNanos = nowNanos;
+        lastSnowSurfaceDeltaSeconds = deltaSeconds;
+
+        GlSceneSnapshot truth = fullSnapshot == null ? visual : fullSnapshot;
+        snowSurfaceController.advance(
+                truth.snowDepthMeters,
+                visual.snowIntensity,
+                truth.surfaceTemperatureC,
+                visual.rainIntensity,
+                visual.drizzleIntensity,
+                visual.sceneLight,
+                deltaSeconds
+        );
+    }
+
+    private void applySnowMeltToGround() {
+        float meltWater = snowSurfaceController.getMeltWaterIntensity();
+        if (meltWater <= 0.001f || lastSnowSurfaceDeltaSeconds <= 0f) return;
+        meltWaterGroundController.addMeltWater(meltWater, lastSnowSurfaceDeltaSeconds);
+    }
+
+    /**
      * S10 Auto Scene intelligence consumes only current resolved snapshot truth and updates
      * only the concrete scenery identity. It never alters snapshot/weather fields.
      */
@@ -403,6 +449,16 @@ public final class HeroGlPipeline {
                 state, options.isClouds(), options.isRain(), true,
                 options.isSnow(), options.isFog(), options.isStars()
         );
+
+        // World materials may retain observed ground snow after flakes stop. The dedicated
+        // snowfall renderer below still receives only current snowIntensity from state.
+        if (options.isSnow()) {
+            worldView.snowIntensity = Math.max(
+                    worldView.snowIntensity,
+                    snowSurfaceController.getCoverage()
+            );
+        }
+
         atmosphereView.copyVisualOptionsFrom(
                 state, options.isClouds(), true, true,
                 options.isSnow(), options.isFog(), options.isStars()

@@ -15,6 +15,10 @@ package com.tridev.liveweather.ui.gl;
  * network data or the wall clock. Multiple active renderers are time-gated with monotonic
  * {@link System#nanoTime()} so two surfaces cannot make the physical simulation run twice as
  * fast.</p>
+ *
+ * <p>Stage 12 adds a separate melt-water input. It can damp soil and low points after a real
+ * retained snowpack thaws, but deliberately does not increase rain exposure or atmospheric
+ * precipitation truth.</p>
  */
 public final class GroundWetnessController {
 
@@ -25,6 +29,7 @@ public final class GroundWetnessController {
     private static final Object SHARED_LOCK = new Object();
     private static final SharedState SHARED_STATE = new SharedState();
     private static long sharedLastAdvanceNanos;
+    private static long sharedLastMeltAdvanceNanos;
 
     private final boolean sharedMode;
 
@@ -81,6 +86,7 @@ public final class GroundWetnessController {
         synchronized (SHARED_LOCK) {
             SHARED_STATE.clear();
             sharedLastAdvanceNanos = 0L;
+            sharedLastMeltAdvanceNanos = 0L;
         }
     }
 
@@ -129,6 +135,23 @@ public final class GroundWetnessController {
         );
     }
 
+    /**
+     * Adds only retained-snow melt water to the physical ground reservoirs. This is intentionally
+     * separate from advance(): it never increments rainExposureSeconds and cannot create rain.
+     */
+    public void addMeltWater(float meltWaterIntensity, float deltaSeconds) {
+        if (sharedMode) {
+            synchronized (SHARED_LOCK) {
+                loadSharedState();
+                float sharedDelta = resolveSharedMeltDelta(deltaSeconds);
+                advanceMeltWaterInternal(meltWaterIntensity, sharedDelta);
+                saveSharedState();
+            }
+            return;
+        }
+        advanceMeltWaterInternal(meltWaterIntensity, deltaSeconds);
+    }
+
     private void advanceInternal(
             float rainIntensity,
             float drizzleIntensity,
@@ -165,6 +188,43 @@ public final class GroundWetnessController {
             );
         } else {
             advanceNaturalDrying(warm, wind, dt);
+        }
+
+        normalizeState();
+        updateVisiblePuddleCoverage();
+    }
+
+    private void advanceMeltWaterInternal(float meltWaterIntensity, float deltaSeconds) {
+        float dt = clamp(deltaSeconds, 0f, MAX_DELTA_SECONDS);
+        float melt = clamp01(meltWaterIntensity);
+        if (dt <= 0f || melt <= 0.001f) return;
+
+        // Melt first infiltrates the thawing ground. Only saturated soil produces meaningful runoff.
+        float targetSoil = clamp01(soilSaturation + 0.10f + melt * 0.42f);
+        soilSaturation = approach(
+                soilSaturation,
+                targetSoil,
+                (0.010f + melt * 0.034f) * dt
+        );
+
+        float runoff = melt * smoothstep(0.42f, 0.92f, soilSaturation);
+        surfaceWater = clamp01(surfaceWater + runoff * 0.0018f * dt);
+
+        float targetWetness = clamp01(
+                0.08f + soilSaturation * 0.76f + surfaceWater * 0.24f + melt * 0.10f
+        );
+        wetness = Math.max(
+                wetness,
+                approach(wetness, targetWetness, (0.012f + melt * 0.038f) * dt)
+        );
+
+        float basin = smoothstep(0.08f, 0.72f, surfaceWater)
+                * smoothstep(0.45f, 0.92f, soilSaturation);
+        if (basin > puddleDepth) {
+            puddleDepth = approach(puddleDepth, basin * 0.58f, (0.006f + melt * 0.022f) * dt);
+        }
+        if (basin > puddleSpread) {
+            puddleSpread = approach(puddleSpread, basin * 0.42f, (0.003f + melt * 0.012f) * dt);
         }
 
         normalizeState();
@@ -299,6 +359,7 @@ public final class GroundWetnessController {
                 resetInternal(wetness, puddleCoverage);
                 saveSharedState();
                 sharedLastAdvanceNanos = System.nanoTime();
+                sharedLastMeltAdvanceNanos = sharedLastAdvanceNanos;
             }
             return;
         }
@@ -406,6 +467,22 @@ public final class GroundWetnessController {
 
         // Very small inter-surface calls are valid: their sum still follows real monotonic time.
         // If a device reports no measurable elapsed time, avoid inventing extra simulation time.
+        return actualElapsed;
+    }
+
+    private float resolveSharedMeltDelta(float requestedDeltaSeconds) {
+        long nowNanos = System.nanoTime();
+        float requested = clamp(requestedDeltaSeconds, 0f, MAX_DELTA_SECONDS);
+        if (sharedLastMeltAdvanceNanos == 0L) {
+            sharedLastMeltAdvanceNanos = nowNanos;
+            return requested;
+        }
+        float actualElapsed = clamp(
+                (nowNanos - sharedLastMeltAdvanceNanos) / 1_000_000_000f,
+                0f,
+                MAX_DELTA_SECONDS
+        );
+        sharedLastMeltAdvanceNanos = nowNanos;
         return actualElapsed;
     }
 

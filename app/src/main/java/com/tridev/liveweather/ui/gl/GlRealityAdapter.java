@@ -66,17 +66,18 @@ public final class GlRealityAdapter {
                 ? 0f
                 : clamp01((float) Math.pow(resolvedStarVisibility, 0.38d));
 
+        WeatherResponse.CurrentWeather current = weather.getCurrent();
         float observerLatitudeRadians = (float) Math.toRadians(clamp(latitude, -89.9d, 89.9d));
         float localSiderealRadians = (float) resolveLocalSiderealRadians(epochMillis, longitude);
-        float liveThermalBias = ThermalEnvironmentPolicy.resolve(weather.getCurrent());
+        float liveThermalBias = ThermalEnvironmentPolicy.resolve(current);
         float thermalBias = SeasonalEnvironmentPolicy.applyToThermal(
                 liveThermalBias,
                 latitude,
                 epochMillis
         );
-        float environmentalMoisture = VegetationMaterialPolicy.resolveAtmosphericMoisture(
-                weather.getCurrent()
-        );
+        float environmentalMoisture = VegetationMaterialPolicy.resolveAtmosphericMoisture(current);
+        float snowDepthMeters = resolveSnowDepthMeters(current);
+        float surfaceTemperatureC = resolveSurfaceTemperatureC(current);
         float windDirectionRadians = (float) Math.toRadians(state.getWindDirectionDegrees());
 
         /*
@@ -144,9 +145,28 @@ public final class GlRealityAdapter {
                 worldSceneLight,
                 thermalBias,
                 environmentalMoisture,
+                snowDepthMeters,
+                surfaceTemperatureC,
                 clamp01((float) state.getVisibilityFactor()),
                 parallax
         );
+    }
+
+    private static float resolveSnowDepthMeters(@Nullable WeatherResponse.CurrentWeather current) {
+        if (current == null || current.getSnowDepth() == null) return -1f;
+        return Math.max(0f, current.getSnowDepth().floatValue());
+    }
+
+    /** Older cached payloads fall back to current air temperature instead of inventing a season. */
+    private static float resolveSurfaceTemperatureC(@Nullable WeatherResponse.CurrentWeather current) {
+        if (current == null) return 0f;
+        if (current.getSoilTemperature0cm() != null) {
+            return current.getSoilTemperature0cm().floatValue();
+        }
+        if (current.getTemperature2m() != null) {
+            return current.getTemperature2m().floatValue();
+        }
+        return 0f;
     }
 
     /** Greenwich mean sidereal time + observer longitude, normalized to 0..2π. */

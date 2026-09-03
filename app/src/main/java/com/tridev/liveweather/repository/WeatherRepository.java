@@ -17,9 +17,9 @@ public class WeatherRepository {
 
     private static final String CURRENT_VARIABLES =
             "temperature_2m,relative_humidity_2m,apparent_temperature,dew_point_2m,is_day," +
-                    "precipitation,rain,showers,snowfall,weather_code,cloud_cover," +
-                    "cloud_cover_low,cloud_cover_mid,cloud_cover_high,visibility," +
-                    "pressure_msl,surface_pressure,wind_speed_10m,wind_direction_10m," +
+                    "precipitation,rain,showers,snowfall,snow_depth,soil_temperature_0cm," +
+                    "weather_code,cloud_cover,cloud_cover_low,cloud_cover_mid,cloud_cover_high," +
+                    "visibility,pressure_msl,surface_pressure,wind_speed_10m,wind_direction_10m," +
                     "wind_gusts_10m";
 
     private static final String MINUTELY_15_VARIABLES =
@@ -28,8 +28,9 @@ public class WeatherRepository {
     private static final String HOURLY_VARIABLES =
             "temperature_2m,relative_humidity_2m,apparent_temperature,dew_point_2m,is_day," +
                     "precipitation_probability,precipitation,rain,showers,snowfall," +
-                    "weather_code,cloud_cover,cloud_cover_low,cloud_cover_mid,cloud_cover_high," +
-                    "visibility,pressure_msl,wind_speed_10m,wind_direction_10m,wind_gusts_10m";
+                    "snow_depth,soil_temperature_0cm,weather_code,cloud_cover," +
+                    "cloud_cover_low,cloud_cover_mid,cloud_cover_high,visibility,pressure_msl," +
+                    "wind_speed_10m,wind_direction_10m,wind_gusts_10m";
 
     private static final String DAILY_VARIABLES =
             "weather_code,temperature_2m_max,temperature_2m_min," +

@@ -70,6 +70,18 @@ public final class GlSceneSnapshot {
      */
     public float environmentalMoisture;
 
+    /**
+     * Stage 12 provider-observed snow depth on the ground in meters. A negative value means
+     * the field was unavailable in an older cached payload and must not be interpreted as zero.
+     */
+    public float snowDepthMeters;
+
+    /**
+     * Stage 12 land/water surface temperature in Celsius, with current 2 m air temperature as
+     * the compatibility fallback when the provider field is absent. This drives thaw only.
+     */
+    public float surfaceTemperatureC;
+
     public float visibilityFactor;
     public float parallax;
 
@@ -137,6 +149,73 @@ public final class GlSceneSnapshot {
                 windStrength, windDirectionRadians,
                 sceneLight, thermalBias,
                 0.50f,
+                -1f, 0f,
+                visibilityFactor, parallax
+        );
+    }
+
+    /** Stage 11 compatibility constructor retained unchanged for existing callers. */
+    public GlSceneSnapshot(
+            float topR,
+            float topG,
+            float topB,
+            float midR,
+            float midG,
+            float midB,
+            float horizonR,
+            float horizonG,
+            float horizonB,
+            float sunX,
+            float sunY,
+            float sunVisibility,
+            float sunAltitude,
+            float moonX,
+            float moonY,
+            float moonVisibility,
+            float moonIllumination,
+            float moonPhaseAngleRadians,
+            float moonAltitude,
+            float starVisibility,
+            float observerLatitudeRadians,
+            float localSiderealRadians,
+            float cloudCover,
+            float cloudDensity,
+            float cloudFarLayer,
+            float cloudMidLayer,
+            float cloudNearLayer,
+            float cloudStormCeiling,
+            float cloudBrightness,
+            float rainIntensity,
+            float drizzleIntensity,
+            float snowIntensity,
+            float fogIntensity,
+            float stormIntensity,
+            float airHazeIntensity,
+            float windStrength,
+            float windDirectionRadians,
+            float sceneLight,
+            float thermalBias,
+            float environmentalMoisture,
+            float visibilityFactor,
+            float parallax
+    ) {
+        this(
+                topR, topG, topB,
+                midR, midG, midB,
+                horizonR, horizonG, horizonB,
+                sunX, sunY, sunVisibility, sunAltitude,
+                moonX, moonY, moonVisibility, moonIllumination,
+                moonPhaseAngleRadians, moonAltitude,
+                starVisibility,
+                observerLatitudeRadians, localSiderealRadians,
+                cloudCover, cloudDensity,
+                cloudFarLayer, cloudMidLayer, cloudNearLayer,
+                cloudStormCeiling, cloudBrightness,
+                rainIntensity, drizzleIntensity, snowIntensity,
+                fogIntensity, stormIntensity, airHazeIntensity,
+                windStrength, windDirectionRadians,
+                sceneLight, thermalBias, environmentalMoisture,
+                -1f, 0f,
                 visibilityFactor, parallax
         );
     }
@@ -182,6 +261,8 @@ public final class GlSceneSnapshot {
             float sceneLight,
             float thermalBias,
             float environmentalMoisture,
+            float snowDepthMeters,
+            float surfaceTemperatureC,
             float visibilityFactor,
             float parallax
     ) {
@@ -225,6 +306,8 @@ public final class GlSceneSnapshot {
         this.sceneLight = sceneLight;
         this.thermalBias = thermalBias;
         this.environmentalMoisture = clamp01(environmentalMoisture);
+        this.snowDepthMeters = isFinite(snowDepthMeters) ? snowDepthMeters : -1f;
+        this.surfaceTemperatureC = isFinite(surfaceTemperatureC) ? surfaceTemperatureC : 0f;
         this.visibilityFactor = visibilityFactor;
         this.parallax = parallax;
     }
@@ -260,6 +343,8 @@ public final class GlSceneSnapshot {
                 source.sceneLight,
                 source.thermalBias,
                 source.environmentalMoisture,
+                source.snowDepthMeters,
+                source.surfaceTemperatureC,
                 source.visibilityFactor,
                 source.parallax
         );
@@ -306,6 +391,8 @@ public final class GlSceneSnapshot {
         sceneLight = source.sceneLight;
         thermalBias = source.thermalBias;
         environmentalMoisture = source.environmentalMoisture;
+        snowDepthMeters = source.snowDepthMeters;
+        surfaceTemperatureC = source.surfaceTemperatureC;
         visibilityFactor = source.visibilityFactor;
         parallax = source.parallax;
     }
@@ -366,6 +453,10 @@ public final class GlSceneSnapshot {
         GlSceneSnapshot copy = reusableCopyOf(this);
         copy.copyVisualOptionsFrom(this, clouds, rain, lightning, snow, fog, stars);
         return copy;
+    }
+
+    private static boolean isFinite(float value) {
+        return !Float.isNaN(value) && !Float.isInfinite(value);
     }
 
     private static float clamp01(float value) {

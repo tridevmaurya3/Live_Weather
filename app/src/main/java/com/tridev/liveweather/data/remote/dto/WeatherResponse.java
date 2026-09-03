@@ -64,6 +64,8 @@ public class WeatherResponse {
         @SerializedName("rain") private Double rain;
         @SerializedName("showers") private Double showers;
         @SerializedName("snowfall") private Double snowfall;
+        @SerializedName("snow_depth") private Double snowDepth;
+        @SerializedName("soil_temperature_0cm") private Double soilTemperature0cm;
         @SerializedName("weather_code") private Integer weatherCode;
         @SerializedName("cloud_cover") private Double cloudCover;
         @SerializedName("cloud_cover_low") private Double cloudCoverLow;
@@ -87,6 +89,8 @@ public class WeatherResponse {
         public Double getRain() { return rain; }
         public Double getShowers() { return showers; }
         public Double getSnowfall() { return snowfall; }
+        public Double getSnowDepth() { return snowDepth; }
+        public Double getSoilTemperature0cm() { return soilTemperature0cm; }
         public Integer getWeatherCode() { return weatherCode; }
         public Double getCloudCover() { return cloudCover; }
         public Double getCloudCoverLow() { return cloudCoverLow; }
@@ -134,6 +138,8 @@ public class WeatherResponse {
         @SerializedName("rain") private List<Double> rain;
         @SerializedName("showers") private List<Double> showers;
         @SerializedName("snowfall") private List<Double> snowfall;
+        @SerializedName("snow_depth") private List<Double> snowDepth;
+        @SerializedName("soil_temperature_0cm") private List<Double> soilTemperature0cm;
         @SerializedName("weather_code") private List<Integer> weatherCode;
         @SerializedName("cloud_cover") private List<Double> cloudCover;
         @SerializedName("cloud_cover_low") private List<Double> cloudCoverLow;
@@ -156,6 +162,8 @@ public class WeatherResponse {
         public List<Double> getRain() { return rain; }
         public List<Double> getShowers() { return showers; }
         public List<Double> getSnowfall() { return snowfall; }
+        public List<Double> getSnowDepth() { return snowDepth; }
+        public List<Double> getSoilTemperature0cm() { return soilTemperature0cm; }
         public List<Integer> getWeatherCode() { return weatherCode; }
         public List<Double> getCloudCover() { return cloudCover; }
         public List<Double> getCloudCoverLow() { return cloudCoverLow; }

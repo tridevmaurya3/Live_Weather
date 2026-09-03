@@ -108,6 +108,19 @@ public final class GroundWetnessControllerTest {
     }
 
     @Test
+    public void snowMeltCanWetGroundWithoutAtmosphericRainInput() {
+        GroundWetnessController controller = isolated();
+
+        for (int second = 0; second < 300; second++) {
+            controller.addMeltWater(0.75f, 1f);
+        }
+
+        assertTrue(controller.getSoilSaturation() > 0.30f);
+        assertTrue(controller.getWetness() > 0.20f);
+        assertTrue(controller.getSurfaceWater() >= 0f);
+    }
+
+    @Test
     public void recentRainDoesNotDisappearWhenRainStops() {
         GroundWetnessController controller = isolated();
 
@@ -179,6 +192,7 @@ public final class GroundWetnessControllerTest {
 
         for (int i = 0; i < 20; i++) {
             controller.advance(5f, 3f, 2f, 4f, 5f, 9f);
+            controller.addMeltWater(5f, 9f);
         }
 
         assertTrue(controller.getWetness() >= 0f && controller.getWetness() <= 1f);
