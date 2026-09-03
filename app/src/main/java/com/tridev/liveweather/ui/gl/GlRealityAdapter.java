@@ -9,6 +9,7 @@ import com.tridev.liveweather.domain.SkyRealityState;
 import com.tridev.liveweather.domain.scene.CloudPresenceState;
 import com.tridev.liveweather.domain.scene.DynamicRealityComposer;
 import com.tridev.liveweather.domain.scene.SceneState;
+import com.tridev.liveweather.domain.scene.ThermalEnvironmentPolicy;
 
 /**
  * Converts the existing shared reality engine into GPU uniforms.
@@ -66,7 +67,7 @@ public final class GlRealityAdapter {
 
         float observerLatitudeRadians = (float) Math.toRadians(clamp(latitude, -89.9d, 89.9d));
         float localSiderealRadians = (float) resolveLocalSiderealRadians(epochMillis, longitude);
-        float thermalBias = resolveThermalBias(weather.getCurrent());
+        float thermalBias = ThermalEnvironmentPolicy.resolve(weather.getCurrent());
         float windDirectionRadians = (float) Math.toRadians(state.getWindDirectionDegrees());
 
         /*
@@ -146,18 +147,6 @@ public final class GlRealityAdapter {
         double localDegrees = normalizeDegrees(gmstDegrees + longitudeDegrees);
         double radians = Math.toRadians(localDegrees) % TWO_PI;
         return radians < 0d ? radians + TWO_PI : radians;
-    }
-
-    private static float resolveThermalBias(@Nullable WeatherResponse.CurrentWeather current) {
-        if (current == null) return 0f;
-        Double apparent = current.getApparentTemperature();
-        Double measured = current.getTemperature2m();
-        if (apparent == null && measured == null) return 0f;
-        double celsius = apparent != null ? apparent : measured;
-
-        double warm = clamp((celsius - 27d) / 18d, 0d, 1d);
-        double cold = clamp((16d - celsius) / 18d, 0d, 1d);
-        return (float) clamp(warm - cold, -1d, 1d);
     }
 
     private static float celestialX(double azimuth, float parallaxOffset) {

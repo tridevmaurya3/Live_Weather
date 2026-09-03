@@ -86,6 +86,22 @@ public class AutoSceneryPolicyTest {
     }
 
     @Test
+    public void dryHazeDoesNotMasqueradeAsFog() {
+        SceneryMode result = AutoSceneryPolicy.resolveForCurrentTruth(
+                12, 229, 1,
+                0.22f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.82f
+        );
+
+        assertTrue(
+                result == SceneryMode.OPEN_SKY
+                        || result == SceneryMode.URBAN_BUILDINGS
+                        || result == SceneryMode.NATURAL_HILLS
+        );
+        assertNotEquals(SceneryMode.RIVER_LAKE, result);
+        assertNotEquals(SceneryMode.VILLAGE, result);
+    }
+
+    @Test
     public void clearCurrentTruthFallsBackToDayPartPolicy() {
         SceneryMode expected = AutoSceneryPolicy.resolve(12, 229, 3);
         SceneryMode actual = AutoSceneryPolicy.resolveForCurrentTruth(

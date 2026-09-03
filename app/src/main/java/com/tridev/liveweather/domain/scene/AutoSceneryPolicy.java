@@ -11,6 +11,10 @@ import java.util.Calendar;
  * background scenery identity. It never creates, suppresses or reinterprets weather.
  * Resolution happens outside the OpenGL frame hot path, so there is no per-frame
  * clock, disk or network work.
+ *
+ * Stage 9 keeps meteorological fog and pollution/dust haze separate all the way
+ * through Auto scenery selection. Haze may choose a lower-contrast exposed scene,
+ * but it can no longer masquerade as fog and force fog-specific scenery.
  */
 public final class AutoSceneryPolicy {
 
@@ -65,6 +69,12 @@ public final class AutoSceneryPolicy {
             SceneryMode.NATURAL_HILLS,
             SceneryMode.RIVER_LAKE,
             SceneryMode.VILLAGE
+    };
+
+    private static final SceneryMode[] HAZE_POOL = {
+            SceneryMode.OPEN_SKY,
+            SceneryMode.URBAN_BUILDINGS,
+            SceneryMode.NATURAL_HILLS
     };
 
     private static final SceneryMode[] CLOUDY_POOL = {
@@ -140,7 +150,8 @@ public final class AutoSceneryPolicy {
         float storm = clamp01(stormIntensity);
         float snow = clamp01(snowIntensity);
         float rain = Math.max(clamp01(rainIntensity), clamp01(drizzleIntensity) * 0.72f);
-        float fog = Math.max(clamp01(fogIntensity), clamp01(hazeIntensity) * 0.52f);
+        float fog = clamp01(fogIntensity);
+        float haze = clamp01(hazeIntensity);
         float cloud = clamp01(cloudCover);
 
         if (storm >= 0.20f) {
@@ -154,6 +165,9 @@ public final class AutoSceneryPolicy {
         }
         if (rain >= 0.10f) {
             return choose(RAIN_POOL, day, boundedVariant, 23);
+        }
+        if (haze >= 0.42f) {
+            return choose(HAZE_POOL, day, boundedVariant, 27);
         }
         if (cloud >= 0.76f) {
             return choose(CLOUDY_POOL, day, boundedVariant, 29);
