@@ -62,6 +62,9 @@ public final class HeroGlAnalyticWorldRenderer {
             "uniform float uDetail;",
             "uniform float uGroundWetness;",
             "uniform float uPuddleCoverage;",
+            "uniform float uVegetationVitality;",
+            "uniform float uVegetationDryStress;",
+            "uniform float uVegetationColdStress;",
             "uniform float uSceneryFrom;",
             "uniform float uSceneryTo;",
             "uniform float uSceneryMix;",
@@ -70,6 +73,15 @@ public final class HeroGlAnalyticWorldRenderer {
             "const float TAU=6.28318530718;",
             "float modeAt(float scene,float id){return 1.0-step(0.45,abs(scene-id));}",
             "float mode(float id){return mix(modeAt(uSceneryFrom,id),modeAt(uSceneryTo,id),uSceneryMix);}",
+            "vec3 vegetationMaterial(vec3 base,float vitality,float dryStress,float coldStress){",
+            " float luma=dot(base,vec3(0.299,0.587,0.114));",
+            " vec3 dryTone=vec3(luma*1.10,luma*0.92,luma*0.48);",
+            " vec3 coldTone=vec3(luma)*vec3(0.90,0.96,1.04);",
+            " base=mix(base,dryTone,clamp(dryStress,0.0,1.0)*0.46);",
+            " base=mix(base,coldTone,clamp(coldStress,0.0,1.0)*0.30);",
+            " float lush=max(0.0,clamp(vitality,0.0,1.0)-0.70);",
+            " return mix(base,base*vec3(0.94,1.07,0.96),lush*0.22);",
+            "}",
             "void main(){",
             " vec2 p=vec2(vUv.x,1.0-vUv.y);",
             " float aspect=uResolution.x/max(1.0,uResolution.y);",
@@ -108,6 +120,9 @@ public final class HeroGlAnalyticWorldRenderer {
             " float puddleTruth=clamp(uPuddleCoverage,0.0,1.0);",
             " float snowTruth=clamp(uSnow,0.0,1.0);",
             " float fogTruth=clamp(max(uFog,uHaze*0.45),0.0,1.0);",
+            " float vegetationVitality=clamp(uVegetationVitality,0.0,1.0);",
+            " float vegetationDryStress=clamp(uVegetationDryStress,0.0,1.0);",
+            " float vegetationColdStress=clamp(uVegetationColdStress,0.0,1.0);",
             " float windAxis=sin(uWindDir)+cos(uWindDir)*0.35;",
             " float windSign=windAxis<0.0?-1.0:1.0;",
             " float windPulse=sin(uTime*(0.24+uWind*0.40)+xNear*3.4+vPhase)*uWind*windSign;",
@@ -144,6 +159,7 @@ public final class HeroGlAnalyticWorldRenderer {
             " forestC=mix(forestC,vec3(0.075,0.080,0.052),golden*0.070);",
             " forestC=mix(forestC,vec3(0.018,0.034,0.052),moonMaterial*0.080);",
             " forestC=mix(forestC,forestC*vec3(0.72,0.84,0.78),wetTruth*0.15);",
+            " forestC=vegetationMaterial(forestC,vegetationVitality,vegetationDryStress,vegetationColdStress);",
             " vec3 color=vec3(0.0);float alpha=0.0;",
             " float a=farM*(0.42-haze*0.22);color=mix(color,farC,a);alpha=max(alpha,a);",
             " a=midM*(0.58-haze*0.18);color=mix(color,midC,a);alpha=max(alpha,a);",
@@ -224,6 +240,7 @@ public final class HeroGlAnalyticWorldRenderer {
             " vec3 hedgeC=mix(vec3(0.018,0.038,0.024),vec3(0.075,0.115,0.060),light);",
             " hedgeC=mix(hedgeC,vec3(0.12,0.105,0.055),golden*0.08);",
             " hedgeC=mix(hedgeC,hedgeC*vec3(0.68,0.82,0.74),wetTruth*0.18);",
+            " hedgeC=vegetationMaterial(hedgeC,vegetationVitality,vegetationDryStress,vegetationColdStress);",
             " hedgeC=mix(hedgeC,snowTone,snowTruth*0.08);",
             " color=mix(color,hedgeC,hedge*0.24);alpha=max(alpha,hedge*0.10);",
             " float windowEnd=0.41+0.14*mUrban+vNorm*0.035;",
@@ -245,6 +262,7 @@ public final class HeroGlAnalyticWorldRenderer {
             " fieldBase=mix(fieldBase,vec3(0.18,0.13,0.045),golden*0.10);",
             " fieldBase=mix(fieldBase,vec3(0.025,0.052,0.050),deepNight*0.10+moonMaterial*0.05);",
             " fieldBase=mix(fieldBase,fieldBase*vec3(0.62,0.78,0.66),wetTruth*0.28);",
+            " fieldBase=vegetationMaterial(fieldBase,vegetationVitality,vegetationDryStress,vegetationColdStress);",
             " fieldBase=mix(fieldBase,snowTone,snowTruth*0.08);",
             " color=mix(color,fieldBase,farmGround*(0.22+light*0.12)*(1.0-uFog*0.52));alpha=max(alpha,farmGround*0.28);",
             " float farmFreq=(8.0+variant*1.25)*mix(0.88,1.0,detail);",
@@ -255,6 +273,7 @@ public final class HeroGlAnalyticWorldRenderer {
             " farmC=mix(farmC,vec3(0.30,0.21,0.070),golden*0.12*(0.60+0.40*solarSide));",
             " farmC=mix(farmC,vec3(0.030,0.065,0.070),moonMaterial*0.08);",
             " farmC=mix(farmC,farmC*vec3(0.64,0.80,0.68),wetTruth*0.22);",
+            " farmC=vegetationMaterial(farmC,vegetationVitality,vegetationDryStress,vegetationColdStress);",
             " farmC=mix(farmC,snowTone,snowTruth*0.10);",
             " color=mix(color,farmC,rowMask*(0.34+vNorm*0.04));alpha=max(alpha,rowMask*0.25);",
             " color+=vec3(0.10,0.12,0.045)*fineRows*farmGround*(0.026+vNorm*0.006)*(1.0-uFog*0.60)*microContrast;",
@@ -263,6 +282,7 @@ public final class HeroGlAnalyticWorldRenderer {
             " float cropHeads=cropHeadBand*smoothstep(0.76,0.95,cropHeadNoise);",
             " vec3 cropHeadC=mix(vec3(0.10,0.15,0.050),vec3(0.24,0.22,0.075),light);",
             " cropHeadC=mix(cropHeadC,vec3(0.34,0.24,0.085),golden*0.14);",
+            " cropHeadC=vegetationMaterial(cropHeadC,vegetationVitality,vegetationDryStress,vegetationColdStress);",
             " cropHeadC=mix(cropHeadC,snowTone,snowTruth*0.18);",
             " color+=cropHeadC*cropHeads*0.050;",
             " float riverShift=vNorm*0.006*sin(vPhase*1.3);",
@@ -271,6 +291,7 @@ public final class HeroGlAnalyticWorldRenderer {
             " bankC=mix(bankC,vec3(0.105,0.095,0.060),vNorm*0.10);",
             " bankC=mix(bankC,vec3(0.14,0.105,0.050),golden*0.09);",
             " bankC=mix(bankC,bankC*vec3(0.64,0.78,0.70),wetTruth*0.20);",
+            " bankC=vegetationMaterial(bankC,vegetationVitality,vegetationDryStress,vegetationColdStress);",
             " bankC=mix(bankC,snowTone,snowTruth*0.14);",
             " color=mix(color,bankC,bank*(0.45-haze*0.16));alpha=max(alpha,bank*0.40);",
             " float water=mRiver*smoothstep(0.885+riverShift,0.945,p.y);",
@@ -297,6 +318,7 @@ public final class HeroGlAnalyticWorldRenderer {
             " vec3 reedC=mix(vec3(0.020,0.052,0.030),vec3(0.105,0.145,0.065),light);",
             " reedC=mix(reedC,vec3(0.16,0.13,0.055),golden*0.10);",
             " reedC=mix(reedC,reedC*vec3(0.68,0.82,0.74),wetTruth*0.18);",
+            " reedC=vegetationMaterial(reedC,vegetationVitality,vegetationDryStress,vegetationColdStress);",
             " reedC=mix(reedC,snowTone,snowTruth*0.10);",
             " color=mix(color,reedC,reeds*0.24);alpha=max(alpha,reeds*0.08);",
             " float meadow=mFlowers*smoothstep(0.850-vNorm*0.005,0.935,p.y);",
@@ -306,6 +328,7 @@ public final class HeroGlAnalyticWorldRenderer {
             " meadowC=mix(meadowC,vec3(0.14,0.13,0.055),golden*0.09);",
             " meadowC=mix(meadowC,vec3(0.028,0.062,0.078),moonMaterial*0.08);",
             " meadowC=mix(meadowC,meadowC*vec3(0.64,0.82,0.70),wetTruth*0.24);",
+            " meadowC=vegetationMaterial(meadowC,vegetationVitality,vegetationDryStress,vegetationColdStress);",
             " meadowC=mix(meadowC,snowTone,snowTruth*0.09);",
             " color=mix(color,meadowC,meadow*(0.42+leafTexture*0.16*microContrast)*(1.0-uFog*0.42));alpha=max(alpha,meadow*0.46);",
             " float grassFine=0.5+0.5*sin(xNear*((137.0+variant*5.0)*freqScale)+p.y*(73.0*freqScale)+sway*0.25+windPulse*0.22+vPhase*0.5);",
@@ -313,6 +336,7 @@ public final class HeroGlAnalyticWorldRenderer {
             " vec3 grassC=mix(vec3(0.020,0.060,0.030),vec3(0.075,0.14,0.060),light);",
             " grassC=mix(grassC,vec3(0.13,0.11,0.050),golden*0.09);",
             " grassC=mix(grassC,grassC*vec3(0.66,0.82,0.70),wetTruth*0.20);",
+            " grassC=vegetationMaterial(grassC,vegetationVitality,vegetationDryStress,vegetationColdStress);",
             " grassC=mix(grassC,snowTone,snowTruth*0.08);",
             " color+=grassC*grassDetail*0.038;",
             " float flowerSignalA=0.5+0.5*sin(xNear*((113.0+variant*4.0)*freqScale)+p.y*mix(72.0,112.0,detail)+sway*0.16+vPhase);",
@@ -320,6 +344,7 @@ public final class HeroGlAnalyticWorldRenderer {
             " float flowerA=smoothstep(0.89,0.97,flowerSignalA);",
             " float flowerB=smoothstep(0.91,0.98,flowerSignalB);",
             " float flowerDots=meadow*max(flowerA,flowerB)*(1.0-uFog*0.72)*(0.34+light*0.44)*(0.55+0.45*detailMid);",
+            " flowerDots*=mix(0.34,1.0,vegetationVitality)*(1.0-vegetationDryStress*0.55)*(1.0-vegetationColdStress*0.62)*(1.0-snowTruth*0.70);",
             " vec3 flowerPaletteA=mix(vec3(0.92,0.50,0.64),vec3(0.70,0.58,0.95),vNorm);",
             " vec3 flowerPaletteB=mix(vec3(0.96,0.78,0.34),vec3(0.96,0.66,0.40),vNorm);",
             " vec3 flowerC=mix(flowerPaletteA,flowerPaletteB,flowerB);",
@@ -369,6 +394,7 @@ public final class HeroGlAnalyticWorldRenderer {
 
     private final FloatBuffer quad;
     private final GroundWetnessController groundWetnessController = new GroundWetnessController();
+    private final VegetationMaterialPolicy.Sample vegetationSample = new VegetationMaterialPolicy.Sample();
 
     private int program;
     private int aPos;
@@ -395,6 +421,9 @@ public final class HeroGlAnalyticWorldRenderer {
     private int uDetail;
     private int uGroundWetness;
     private int uPuddleCoverage;
+    private int uVegetationVitality;
+    private int uVegetationDryStress;
+    private int uVegetationColdStress;
     private int uSceneryFrom;
     private int uSceneryTo;
     private int uSceneryMix;
@@ -458,6 +487,9 @@ public final class HeroGlAnalyticWorldRenderer {
         uDetail = u("uDetail");
         uGroundWetness = u("uGroundWetness");
         uPuddleCoverage = u("uPuddleCoverage");
+        uVegetationVitality = u("uVegetationVitality");
+        uVegetationDryStress = u("uVegetationDryStress");
+        uVegetationColdStress = u("uVegetationColdStress");
         uSceneryFrom = u("uSceneryFrom");
         uSceneryTo = u("uSceneryTo");
         uSceneryMix = u("uSceneryMix");
@@ -499,6 +531,16 @@ public final class HeroGlAnalyticWorldRenderer {
                 scene.windStrength,
                 wetnessDeltaSeconds
         );
+        VegetationMaterialPolicy.resolveInto(
+                vegetationSample,
+                scene.environmentalMoisture,
+                groundWetnessController.getSoilSaturation(),
+                groundWetnessController.getWetness(),
+                scene.rainIntensity,
+                scene.drizzleIntensity,
+                scene.snowIntensity,
+                scene.thermalBias
+        );
         updateSceneryTransition(nowNanos);
 
         GLES20.glEnable(GLES20.GL_BLEND);
@@ -527,6 +569,9 @@ public final class HeroGlAnalyticWorldRenderer {
         GLES20.glUniform1f(uDetail, detailScale);
         GLES20.glUniform1f(uGroundWetness, groundWetnessController.getWetness());
         GLES20.glUniform1f(uPuddleCoverage, groundWetnessController.getPuddleCoverage());
+        GLES20.glUniform1f(uVegetationVitality, vegetationSample.vitality);
+        GLES20.glUniform1f(uVegetationDryStress, vegetationSample.dryStress);
+        GLES20.glUniform1f(uVegetationColdStress, vegetationSample.coldStress);
         GLES20.glUniform1f(uSceneryFrom, sceneryFrom.getShaderId());
         GLES20.glUniform1f(uSceneryTo, sceneryTo.getShaderId());
         GLES20.glUniform1f(uSceneryMix, sceneryMix);

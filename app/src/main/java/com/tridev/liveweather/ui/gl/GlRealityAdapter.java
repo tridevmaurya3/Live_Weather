@@ -74,6 +74,9 @@ public final class GlRealityAdapter {
                 latitude,
                 epochMillis
         );
+        float environmentalMoisture = VegetationMaterialPolicy.resolveAtmosphericMoisture(
+                weather.getCurrent()
+        );
         float windDirectionRadians = (float) Math.toRadians(state.getWindDirectionDegrees());
 
         /*
@@ -140,6 +143,7 @@ public final class GlRealityAdapter {
                 windDirectionRadians,
                 worldSceneLight,
                 thermalBias,
+                environmentalMoisture,
                 clamp01((float) state.getVisibilityFactor()),
                 parallax
         );

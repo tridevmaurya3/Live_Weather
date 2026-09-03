@@ -164,6 +164,13 @@ final class GlSceneTransitionController {
             );
             from.sceneLight = approach(from.sceneLight, to.sceneLight, dt, 2.2f, 2.6f);
             from.thermalBias = approach(from.thermalBias, to.thermalBias, dt, 4.8f, 4.8f);
+            from.environmentalMoisture = approach(
+                    from.environmentalMoisture,
+                    to.environmentalMoisture,
+                    dt,
+                    3.8f,
+                    4.8f
+            );
             from.visibilityFactor = approach(from.visibilityFactor, to.visibilityFactor, dt, 2.0f, 3.2f);
             from.parallax = approach(from.parallax, to.parallax, dt, 0.10f, 0.10f);
 
@@ -262,6 +269,7 @@ final class GlSceneTransitionController {
                 && near(a.airHazeIntensity, b.airHazeIntensity, 0.002f)
                 && near(a.sceneLight, b.sceneLight, 0.002f)
                 && near(a.thermalBias, b.thermalBias, 0.002f)
+                && near(a.environmentalMoisture, b.environmentalMoisture, 0.002f)
                 && near(a.visibilityFactor, b.visibilityFactor, 0.002f)
                 && near(a.parallax, b.parallax, 0.001f);
     }

@@ -64,9 +64,19 @@ public final class GlSceneSnapshot {
      */
     public float thermalBias;
 
+    /**
+     * Stage 11 normalized atmospheric moisture context, 0..1. It is derived from current
+     * humidity/dew-point observations and is used only by environmental world materials.
+     */
+    public float environmentalMoisture;
+
     public float visibilityFactor;
     public float parallax;
 
+    /**
+     * Compatibility constructor retained for older callers/tests. Missing Stage 11 atmospheric
+     * moisture stays neutral rather than pretending the world is dry or saturated.
+     */
     public GlSceneSnapshot(
             float topR,
             float topG,
@@ -110,6 +120,71 @@ public final class GlSceneSnapshot {
             float visibilityFactor,
             float parallax
     ) {
+        this(
+                topR, topG, topB,
+                midR, midG, midB,
+                horizonR, horizonG, horizonB,
+                sunX, sunY, sunVisibility, sunAltitude,
+                moonX, moonY, moonVisibility, moonIllumination,
+                moonPhaseAngleRadians, moonAltitude,
+                starVisibility,
+                observerLatitudeRadians, localSiderealRadians,
+                cloudCover, cloudDensity,
+                cloudFarLayer, cloudMidLayer, cloudNearLayer,
+                cloudStormCeiling, cloudBrightness,
+                rainIntensity, drizzleIntensity, snowIntensity,
+                fogIntensity, stormIntensity, airHazeIntensity,
+                windStrength, windDirectionRadians,
+                sceneLight, thermalBias,
+                0.50f,
+                visibilityFactor, parallax
+        );
+    }
+
+    public GlSceneSnapshot(
+            float topR,
+            float topG,
+            float topB,
+            float midR,
+            float midG,
+            float midB,
+            float horizonR,
+            float horizonG,
+            float horizonB,
+            float sunX,
+            float sunY,
+            float sunVisibility,
+            float sunAltitude,
+            float moonX,
+            float moonY,
+            float moonVisibility,
+            float moonIllumination,
+            float moonPhaseAngleRadians,
+            float moonAltitude,
+            float starVisibility,
+            float observerLatitudeRadians,
+            float localSiderealRadians,
+            float cloudCover,
+            float cloudDensity,
+            float cloudFarLayer,
+            float cloudMidLayer,
+            float cloudNearLayer,
+            float cloudStormCeiling,
+            float cloudBrightness,
+            float rainIntensity,
+            float drizzleIntensity,
+            float snowIntensity,
+            float fogIntensity,
+            float stormIntensity,
+            float airHazeIntensity,
+            float windStrength,
+            float windDirectionRadians,
+            float sceneLight,
+            float thermalBias,
+            float environmentalMoisture,
+            float visibilityFactor,
+            float parallax
+    ) {
         this.topR = topR;
         this.topG = topG;
         this.topB = topB;
@@ -149,6 +224,7 @@ public final class GlSceneSnapshot {
         this.windDirectionRadians = windDirectionRadians;
         this.sceneLight = sceneLight;
         this.thermalBias = thermalBias;
+        this.environmentalMoisture = clamp01(environmentalMoisture);
         this.visibilityFactor = visibilityFactor;
         this.parallax = parallax;
     }
@@ -183,6 +259,7 @@ public final class GlSceneSnapshot {
                 source.windDirectionRadians,
                 source.sceneLight,
                 source.thermalBias,
+                source.environmentalMoisture,
                 source.visibilityFactor,
                 source.parallax
         );
@@ -228,6 +305,7 @@ public final class GlSceneSnapshot {
         windDirectionRadians = source.windDirectionRadians;
         sceneLight = source.sceneLight;
         thermalBias = source.thermalBias;
+        environmentalMoisture = source.environmentalMoisture;
         visibilityFactor = source.visibilityFactor;
         parallax = source.parallax;
     }
@@ -288,5 +366,9 @@ public final class GlSceneSnapshot {
         GlSceneSnapshot copy = reusableCopyOf(this);
         copy.copyVisualOptionsFrom(this, clouds, rain, lightning, snow, fog, stars);
         return copy;
+    }
+
+    private static float clamp01(float value) {
+        return Math.max(0f, Math.min(1f, value));
     }
 }
