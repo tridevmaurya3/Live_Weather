@@ -23,8 +23,8 @@ import java.nio.FloatBuffer;
  * resolved weather truth or the frozen cloud layer.
  * Stage 15 applies the already-smoothed measured visibility as distance-dependent
  * atmospheric transmission inside this existing pass; no extra framebuffer or draw call.
- * Celestial-occlusion Stage 4 preserves atmospheric terrain transmission while making the
- * physical mountain silhouette opaque to the direct Sun disc and its immediate halo.
+ * Celestial-occlusion Stages 4-5 preserve atmospheric terrain transmission while making the
+ * physical mountain silhouette opaque to direct Sun/Moon discs and their immediate halos.
  */
 public final class HeroGlAnalyticWorldRenderer {
 
@@ -404,12 +404,19 @@ public final class HeroGlAnalyticWorldRenderer {
             " color=mix(color,color*vec3(1.045,0.965,0.900),twilightAmbient*materialMask*0.050);",
             " color=mix(color,color*vec3(0.900,0.965,1.075),(blueHour*0.035+deepNight*0.040)*materialMask);",
             " float terrainOcclusion=clamp(max(farM,max(midM,nearM)),0.0,1.0)*(1.0-openW);",
+            " float celestialTerrainMask=smoothstep(0.08,0.58,terrainOcclusion);",
             " vec2 sunDelta=(p-uSunPos)*vec2(aspect,1.0);",
             " float sunDistance=length(sunDelta);",
             " float sunDiscBlock=1.0-smoothstep(0.033,0.052,sunDistance);",
             " float sunHaloBlock=(1.0-smoothstep(0.050,0.125,sunDistance))*0.72;",
             " float sunTerrainBlock=max(sunDiscBlock,sunHaloBlock)*clamp(uSunVis,0.0,1.0);",
-            " alpha=max(alpha,terrainOcclusion*sunTerrainBlock);",
+            " alpha=max(alpha,celestialTerrainMask*sunTerrainBlock);",
+            " vec2 moonDelta=(p-uMoonPos)*vec2(aspect,1.0);",
+            " float moonDistance=length(moonDelta);",
+            " float moonDiscBlock=1.0-smoothstep(0.031,0.047,moonDistance);",
+            " float moonHaloBlock=(1.0-smoothstep(0.045,0.105,moonDistance))*0.62;",
+            " float moonTerrainBlock=max(moonDiscBlock,moonHaloBlock)*clamp(uMoonVis,0.0,1.0);",
+            " alpha=max(alpha,celestialTerrainMask*moonTerrainBlock);",
             " gl_FragColor=vec4(clamp(color,0.0,1.0),clamp(alpha,0.0,0.98));",
             "}");
 
