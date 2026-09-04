@@ -93,7 +93,7 @@ public final class HeroGlAnalyticWorldRenderer {
             "void main(){",
             " vec2 p=vec2(vUv.x,1.0-vUv.y);vec2 screenP=p;",
             " p=vec2(0.5+(p.x-0.5)*0.5,1.0+(p.y-1.0)*0.5);",
-            " float aspect=uResolution.x/max(1.0,uResolution.y);"
+            " float aspect=uResolution.x/max(1.0,uResolution.y);",
             " float baseX=(p.x-0.5)*(aspect/0.45)+0.5;",
             " float par=uParallax-0.5;",
             " float detail=clamp(uDetail,0.5,1.0);",
