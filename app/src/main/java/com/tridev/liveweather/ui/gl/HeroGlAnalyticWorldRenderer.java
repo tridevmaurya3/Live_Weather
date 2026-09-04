@@ -23,6 +23,8 @@ import java.nio.FloatBuffer;
  * resolved weather truth or the frozen cloud layer.
  * Stage 15 applies the already-smoothed measured visibility as distance-dependent
  * atmospheric transmission inside this existing pass; no extra framebuffer or draw call.
+ * Celestial-occlusion Stage 4 preserves atmospheric terrain transmission while making the
+ * physical mountain silhouette opaque to the direct Sun disc and its immediate halo.
  */
 public final class HeroGlAnalyticWorldRenderer {
 
@@ -401,7 +403,14 @@ public final class HeroGlAnalyticWorldRenderer {
             " float materialMask=clamp(alpha,0.0,1.0)*(1.0-openW*0.76);",
             " color=mix(color,color*vec3(1.045,0.965,0.900),twilightAmbient*materialMask*0.050);",
             " color=mix(color,color*vec3(0.900,0.965,1.075),(blueHour*0.035+deepNight*0.040)*materialMask);",
-            " gl_FragColor=vec4(clamp(color,0.0,1.0),clamp(alpha,0.0,0.94));",
+            " float terrainOcclusion=clamp(max(farM,max(midM,nearM)),0.0,1.0)*(1.0-openW);",
+            " vec2 sunDelta=(p-uSunPos)*vec2(aspect,1.0);",
+            " float sunDistance=length(sunDelta);",
+            " float sunDiscBlock=1.0-smoothstep(0.033,0.052,sunDistance);",
+            " float sunHaloBlock=(1.0-smoothstep(0.050,0.125,sunDistance))*0.72;",
+            " float sunTerrainBlock=max(sunDiscBlock,sunHaloBlock)*clamp(uSunVis,0.0,1.0);",
+            " alpha=max(alpha,terrainOcclusion*sunTerrainBlock);",
+            " gl_FragColor=vec4(clamp(color,0.0,1.0),clamp(alpha,0.0,0.98));",
             "}");
 
     private final FloatBuffer quad;
