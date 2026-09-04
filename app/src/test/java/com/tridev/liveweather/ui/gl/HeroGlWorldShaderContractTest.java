@@ -61,7 +61,7 @@ public final class HeroGlWorldShaderContractTest {
         assertTrue(source.contains("float sunDiscBlock=1.0-smoothstep(0.066,0.104,sunDistance)"));
         assertTrue(source.contains("float sunTerrainBlock=max(sunDiscBlock,sunHaloBlock)"));
         assertTrue(source.contains("alpha=max(alpha,celestialTerrainMask*sunTerrainBlock)"));
-        assertTrue(source.contains("float moonDiscBlock=1.0-smoothstep(0.031,0.047,moonDistance)"));
+        assertTrue(source.contains("float moonDiscBlock=1.0-smoothstep(0.062,0.094,moonDistance)"));
         assertTrue(source.contains("float moonTerrainBlock=max(moonDiscBlock,moonHaloBlock)"));
         assertTrue(source.contains("alpha=max(alpha,celestialTerrainMask*moonTerrainBlock)"));
     }
