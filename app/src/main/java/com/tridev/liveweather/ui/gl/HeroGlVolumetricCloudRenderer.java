@@ -48,6 +48,7 @@ public final class HeroGlVolumetricCloudRenderer {
             "uniform float uParallax;",
             "uniform float uSceneLight;",
             "uniform float uBrightness;",
+            "uniform float uDetail;",
             "uniform vec2 uSunPos;",
             "uniform float uSunVis;",
             "uniform float uSunAltitude;",
@@ -148,14 +149,15 @@ public final class HeroGlVolumetricCloudRenderer {
             "  float f0=wrappedMass(p,c0,farScale,1.7,0.0,evolution*0.62);",
             "  float f1=wrappedMass(p,c1,midScale,4.1,tower*0.16,evolution*0.88);",
             "  float f2=wrappedMass(p,c2,nearScale,7.3,tower,evolution*1.13);",
-            "  float f3=wrappedMass(p,c3,mix(0.18,0.34,overcast+rainFamily),10.9,tower*0.08,evolution*0.79);",
+            "  float f3=-2.0;",
+            "  if(uDetail>0.66){f3=wrappedMass(p,c3,mix(0.18,0.34,overcast+rainFamily),10.9,tower*0.08,evolution*0.79);}",
             "  float fairOpacity=(0.16+0.13*fair)*(0.30+0.70*farTruth);",
             "  float midOpacity=(0.18+cover*0.30)*(0.22+0.78*midTruth);",
             "  float nearOpacity=(0.15+cover*0.38)*(0.18+0.82*nearTruth);",
             "  composite(color,alpha,f0,p,c0,fairOpacity*smoothstep(0.025,0.24,cover));",
             "  composite(color,alpha,f1,p,c1,midOpacity*smoothstep(0.13,0.52,cover));",
             "  composite(color,alpha,f2,p,c2,nearOpacity*smoothstep(0.36,0.78,cover)*mix(0.72,1.0,density));",
-            "  composite(color,alpha,f3,p,c3,(0.12+0.32*broken+0.38*overcast+0.42*rainFamily)*(0.25+0.75*midTruth));",
+            "  if(uDetail>0.66){composite(color,alpha,f3,p,c3,(0.12+0.32*broken+0.38*overcast+0.42*rainFamily)*(0.25+0.75*midTruth));}",
             "  gl_FragColor=vec4(clamp(color,0.0,1.0),clamp(alpha,0.0,0.88));",
             "}");
 
@@ -177,6 +179,7 @@ public final class HeroGlVolumetricCloudRenderer {
     private int uParallax;
     private int uSceneLight;
     private int uBrightness;
+    private int uDetail;
     private int uSunPos;
     private int uSunVis;
     private int uSunAltitude;
@@ -185,6 +188,7 @@ public final class HeroGlVolumetricCloudRenderer {
     private int width = 1;
     private int height = 1;
     private long startNanos;
+    private volatile float detailScale = 1f;
     @Nullable private volatile GlSceneSnapshot snapshot;
 
     public HeroGlVolumetricCloudRenderer() {
@@ -195,6 +199,10 @@ public final class HeroGlVolumetricCloudRenderer {
 
     public void setSnapshot(@Nullable GlSceneSnapshot value) {
         snapshot = value;
+    }
+
+    public void setDetailScale(float value) {
+        detailScale = Math.max(0.5f, Math.min(1f, value));
     }
 
     public void onSurfaceCreated() {
@@ -215,6 +223,7 @@ public final class HeroGlVolumetricCloudRenderer {
         uParallax = uniform("uParallax");
         uSceneLight = uniform("uSceneLight");
         uBrightness = uniform("uBrightness");
+        uDetail = uniform("uDetail");
         uSunPos = uniform("uSunPos");
         uSunVis = uniform("uSunVis");
         uSunAltitude = uniform("uSunAltitude");
@@ -250,6 +259,7 @@ public final class HeroGlVolumetricCloudRenderer {
         GLES20.glUniform1f(uParallax, scene.parallax);
         GLES20.glUniform1f(uSceneLight, scene.sceneLight);
         GLES20.glUniform1f(uBrightness, scene.cloudBrightness);
+        GLES20.glUniform1f(uDetail, detailScale);
         GLES20.glUniform2f(uSunPos, scene.sunX, scene.sunY);
         GLES20.glUniform1f(uSunVis, scene.sunVisibility);
         GLES20.glUniform1f(uSunAltitude, scene.sunAltitude);

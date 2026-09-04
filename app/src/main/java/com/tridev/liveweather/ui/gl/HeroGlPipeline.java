@@ -23,13 +23,9 @@ import com.tridev.liveweather.domain.scene.SceneryVariantRuntimeState;
  * The OpenGL draw hot path never reads preferences, the clock or network data.
  */
 public final class HeroGlPipeline {
-    // Temporary clean-sky fallback. Keep weather cloud data intact while the
-    // cloud renderer is rebuilt from scratch.
-    private static final boolean CLOUD_RENDERING_ENABLED = false;
-
     private final HeroGlSkyCelestialRenderer sceneRenderer = new HeroGlSkyCelestialRenderer();
     private final HeroGlFixedStarRenderer starRenderer = new HeroGlFixedStarRenderer();
-    private final HeroGlTextureCloudRenderer cloudRenderer = new HeroGlTextureCloudRenderer();
+    private final HeroGlVolumetricCloudRenderer cloudRenderer = new HeroGlVolumetricCloudRenderer();
     private final HeroGlAnalyticWorldRenderer worldRenderer = new HeroGlAnalyticWorldRenderer();
     private final HeroGlAtmosphereOverlayRenderer atmosphereRenderer = new HeroGlAtmosphereOverlayRenderer();
     private final HeroGlPortableStormRenderer stormRenderer = new HeroGlPortableStormRenderer();
@@ -92,9 +88,7 @@ public final class HeroGlPipeline {
             diagnostics.recordRendererFault("stars", "surface-create", error);
         }
         try {
-            if (CLOUD_RENDERING_ENABLED) {
-                cloudRenderer.onSurfaceCreated();
-            }
+            cloudRenderer.onSurfaceCreated();
         } catch (RuntimeException error) {
             cloudsHealthy = false;
             diagnostics.recordRendererFault("clouds", "surface-create", error);
@@ -163,9 +157,7 @@ public final class HeroGlPipeline {
         }
         if (cloudsHealthy) {
             try {
-                if (CLOUD_RENDERING_ENABLED) {
-                    cloudRenderer.onSurfaceChanged(width, height);
-                }
+                cloudRenderer.onSurfaceChanged(width, height);
             } catch (RuntimeException error) {
                 cloudsHealthy = false;
                 diagnostics.recordRendererFault("clouds", "surface-change", error);
@@ -298,7 +290,7 @@ public final class HeroGlPipeline {
                 diagnostics.recordRendererFault("stars", "draw", error);
             }
         }
-        if (CLOUD_RENDERING_ENABLED && cloudsHealthy) {
+        if (cloudsHealthy) {
             try {
                 cloudRenderer.drawFrame();
             } catch (RuntimeException error) {
