@@ -23,6 +23,9 @@ import com.tridev.liveweather.domain.scene.SceneryVariantRuntimeState;
  * The OpenGL draw hot path never reads preferences, the clock or network data.
  */
 public final class HeroGlPipeline {
+    // Temporary clean-sky fallback. Keep weather cloud data intact while the
+    // cloud renderer is rebuilt from scratch.
+    private static final boolean CLOUD_RENDERING_ENABLED = false;
 
     private final HeroGlSkyCelestialRenderer sceneRenderer = new HeroGlSkyCelestialRenderer();
     private final HeroGlFixedStarRenderer starRenderer = new HeroGlFixedStarRenderer();
@@ -89,7 +92,9 @@ public final class HeroGlPipeline {
             diagnostics.recordRendererFault("stars", "surface-create", error);
         }
         try {
-            cloudRenderer.onSurfaceCreated();
+            if (CLOUD_RENDERING_ENABLED) {
+                cloudRenderer.onSurfaceCreated();
+            }
         } catch (RuntimeException error) {
             cloudsHealthy = false;
             diagnostics.recordRendererFault("clouds", "surface-create", error);
@@ -158,7 +163,9 @@ public final class HeroGlPipeline {
         }
         if (cloudsHealthy) {
             try {
-                cloudRenderer.onSurfaceChanged(width, height);
+                if (CLOUD_RENDERING_ENABLED) {
+                    cloudRenderer.onSurfaceChanged(width, height);
+                }
             } catch (RuntimeException error) {
                 cloudsHealthy = false;
                 diagnostics.recordRendererFault("clouds", "surface-change", error);
@@ -291,7 +298,7 @@ public final class HeroGlPipeline {
                 diagnostics.recordRendererFault("stars", "draw", error);
             }
         }
-        if (cloudsHealthy) {
+        if (CLOUD_RENDERING_ENABLED && cloudsHealthy) {
             try {
                 cloudRenderer.drawFrame();
             } catch (RuntimeException error) {
