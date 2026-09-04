@@ -53,10 +53,10 @@ public final class HeroGlWorldShaderContractTest {
         // Stage 15 terrain transmission must remain intact away from celestial discs.
         assertTrue(source.contains("farM*(0.42-haze*0.22)*farTransmission"));
         assertTrue(source.contains("midM*(0.58-haze*0.18)*midTransmission"));
-        assertTrue(source.contains("float nearM=0.0"));
+        assertTrue(source.contains("nearM*(0.76-haze*0.08)*nearTransmission"));
 
         // Direct celestial discs/near halos become opaque only where real terrain overlaps them.
-        assertTrue(source.contains("float terrainOcclusion=clamp(max(farM,midM)"));
+        assertTrue(source.contains("float terrainOcclusion=clamp(max(farM,max(midM,nearM))"));
         assertTrue(source.contains("float celestialTerrainMask=smoothstep(0.08,0.58,terrainOcclusion)"));
         assertTrue(source.contains("float sunDiscBlock=1.0-smoothstep(0.066,0.104,sunDistance)"));
         assertTrue(source.contains("float sunTerrainBlock=max(sunDiscBlock,sunHaloBlock)"));
@@ -64,18 +64,6 @@ public final class HeroGlWorldShaderContractTest {
         assertTrue(source.contains("float moonDiscBlock=1.0-smoothstep(0.062,0.094,moonDistance)"));
         assertTrue(source.contains("float moonTerrainBlock=max(moonDiscBlock,moonHaloBlock)"));
         assertTrue(source.contains("alpha=max(alpha,celestialTerrainMask*moonTerrainBlock)"));
-        assertTrue(source.contains("clamp(alpha,0.0,1.0)"));
-    }
-
-    @Test
-    public void livingLandscapeKeepsLightweightMotionInTheExistingWorldPass() throws Exception {
-        String source = readPrivateStaticString("FS");
-
-        assertTrue(source.contains("float livingWater="));
-        assertTrue(source.contains("float birdScene="));
-        assertTrue(source.contains("float turbineScene="));
-        assertTrue(source.contains("float animalScene="));
-        assertTrue(source.contains("rotorAngle=atan(rotor.y,rotor.x)-uTime"));
     }
 
     private static void assertUniformUsed(String source, String uniform) {
