@@ -48,6 +48,11 @@ public final class HeroGlVolumetricCloudRenderer {
             "uniform float uParallax;",
             "uniform float uSceneLight;",
             "uniform float uBrightness;",
+            "uniform vec2 uSunPos;",
+            "uniform float uSunVis;",
+            "uniform float uSunAltitude;",
+            "uniform vec2 uMoonPos;",
+            "uniform float uMoonVis;",
             "float hash21(vec2 p){",
             "  p=fract(p*vec2(123.34,456.21));p+=dot(p,p+45.32);return fract(p.x*p.y);",
             "}",
@@ -88,9 +93,24 @@ public final class HeroGlVolumetricCloudRenderer {
             "  float crown=smoothstep(-0.28,0.52,(p.y-center.y));",
             "  float rim=smoothstep(-0.02,0.15,field)-smoothstep(0.15,0.38,field);",
             "  float light=clamp(uSceneLight,0.08,1.0);",
-            "  vec3 shadow=vec3(0.34,0.39,0.47)*mix(0.55,1.0,light);",
+            "  float weather=clamp(uRain*0.40+uStorm*0.78+uStormCeiling*0.18,0.0,1.0);",
+            "  float aspect=uResolution.x/max(1.0,uResolution.y);",
+            "  vec2 sunPos=uSunPos;sunPos.x=(sunPos.x-0.5)*aspect+0.5;",
+            "  vec2 moonPos=uMoonPos;moonPos.x=(moonPos.x-0.5)*aspect+0.5;",
+            "  float sunSide=sign(sunPos.x-center.x+0.0001);",
+            "  float sideLight=clamp(0.50+(p.x-center.x)*sunSide*2.1,0.0,1.0);",
+            "  float directional=clamp(crown*0.62+sideLight*0.38,0.0,1.0);",
+            "  float twilight=clamp(1.0-abs(uSunAltitude)/15.0,0.0,1.0)*uSunVis;",
+            "  float underside=(1.0-crown)*(0.16+weather*0.52);",
+            "  vec3 shadow=mix(vec3(0.38,0.43,0.50),vec3(0.20,0.24,0.31),weather)*mix(0.52,1.0,light);",
             "  vec3 white=vec3(0.91,0.94,0.98)*mix(0.62,1.08,light)*uBrightness;",
-            "  vec3 cloud=mix(shadow,white,0.30+0.58*crown)+rim*0.08*light;",
+            "  vec3 cloud=mix(shadow,white,0.22+directional*0.70-underside*0.22);",
+            "  vec3 warm=vec3(1.12,0.78,0.48);vec3 moon=vec3(0.68,0.79,1.05);",
+            "  cloud=mix(cloud,cloud*warm,twilight*directional*(1.0-weather)*0.28);",
+            "  cloud=mix(cloud,cloud*moon,uMoonVis*(1.0-light)*directional*0.18);",
+            "  float sunNear=1.0-smoothstep(0.12,0.58,distance(p,sunPos));",
+            "  float moonNear=1.0-smoothstep(0.10,0.46,distance(p,moonPos));",
+            "  cloud+=rim*(warm*sunNear*uSunVis*0.16+moon*moonNear*uMoonVis*(1.0-light)*0.08);",
             "  rgb=mix(rgb,cloud,a);alpha=1.0-(1.0-alpha)*(1.0-a);",
             "}",
             "void main(){",
@@ -157,6 +177,11 @@ public final class HeroGlVolumetricCloudRenderer {
     private int uParallax;
     private int uSceneLight;
     private int uBrightness;
+    private int uSunPos;
+    private int uSunVis;
+    private int uSunAltitude;
+    private int uMoonPos;
+    private int uMoonVis;
     private int width = 1;
     private int height = 1;
     private long startNanos;
@@ -190,6 +215,11 @@ public final class HeroGlVolumetricCloudRenderer {
         uParallax = uniform("uParallax");
         uSceneLight = uniform("uSceneLight");
         uBrightness = uniform("uBrightness");
+        uSunPos = uniform("uSunPos");
+        uSunVis = uniform("uSunVis");
+        uSunAltitude = uniform("uSunAltitude");
+        uMoonPos = uniform("uMoonPos");
+        uMoonVis = uniform("uMoonVis");
         startNanos = System.nanoTime();
     }
 
@@ -220,6 +250,11 @@ public final class HeroGlVolumetricCloudRenderer {
         GLES20.glUniform1f(uParallax, scene.parallax);
         GLES20.glUniform1f(uSceneLight, scene.sceneLight);
         GLES20.glUniform1f(uBrightness, scene.cloudBrightness);
+        GLES20.glUniform2f(uSunPos, scene.sunX, scene.sunY);
+        GLES20.glUniform1f(uSunVis, scene.sunVisibility);
+        GLES20.glUniform1f(uSunAltitude, scene.sunAltitude);
+        GLES20.glUniform2f(uMoonPos, scene.moonX, scene.moonY);
+        GLES20.glUniform1f(uMoonVis, scene.moonVisibility);
         quad.position(0);
         GLES20.glEnableVertexAttribArray(aPosition);
         GLES20.glVertexAttribPointer(aPosition, 2, GLES20.GL_FLOAT, false, 0, quad);
