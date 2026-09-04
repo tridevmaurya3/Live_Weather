@@ -18,9 +18,10 @@ import java.nio.FloatBuffer;
 /**
  * Photoreal cloud-atlas renderer shared by the app Hero and Live Wallpaper.
  *
- * Cloud-reality repair Stage 1 keeps provider-resolved far/mid/near cloud truth authoritative
- * while reconstructing the atlas presentation as compact overlapping atmospheric masses instead
- * of stretched strip-like sprites. Weather state, cover and density are never synthesized here.
+ * Cloud-reality repair Stages 1-2 keep provider-resolved far/mid/near cloud truth authoritative,
+ * rebuild the atlas presentation as compact atmospheric masses and move those masses with one-way
+ * wind advection. Slow internal UV evolution adds life without moving cloud centers back and forth
+ * like a pendulum. Weather state, cover and density are never synthesized here.
  */
 public final class HeroGlTextureCloudRenderer {
 
@@ -76,6 +77,9 @@ public final class HeroGlTextureCloudRenderer {
             "  vec2 q=vec2(dx/size.x+0.5,(p.y-center.y)/size.y+0.5);",
             "  float inside=step(0.0,q.x)*step(q.x,1.0)*step(0.0,q.y)*step(q.y,1.0);",
             "  if(mirrorX>0.5){q.x=1.0-q.x;}",
+            "  float evolution=uTime*(0.020+uWind*0.014)+cell*0.73;",
+            "  vec2 warp=vec2(sin(q.y*6.2+evolution),cos(q.x*5.4-evolution*0.83))*0.0065*(0.55+0.45*uWind);",
+            "  q+=warp;",
             "  vec4 s=atlasSample(clamp(q,0.0,1.0),cell);",
             "  float edgeX=smoothstep(0.0,0.145,q.x)*smoothstep(0.0,0.145,1.0-q.x);",
             "  float edgeY=smoothstep(0.0,0.120,q.y)*smoothstep(0.0,0.120,1.0-q.y);",
@@ -95,12 +99,9 @@ public final class HeroGlTextureCloudRenderer {
             "  float farLayer=clamp(uFarLayer,0.0,1.0);float midLayer=clamp(uMidLayer,0.0,1.0);float nearLayer=clamp(uNearLayer,0.0,1.0);",
             "  float ceilingTruth=clamp(uStormCeiling,0.0,1.0);float mass=clamp(cover*0.67+density*0.43,0.0,1.0);",
             "  float gust=smoothstep(0.54,0.94,uWind);float gustPulse=0.5+0.5*sin(uTime*(0.64+uWind*0.74)+uWindDir*1.7);",
-            "  float gustMod=1.0+gust*(0.06+0.095*gustPulse);float speed=0.0128*(0.58+uWind*1.55)*gustMod;",
+            "  float gustMod=1.0+gust*(0.05+0.070*gustPulse);float speed=0.0128*(0.58+uWind*1.55)*gustMod;",
             "  float projectedWind=sin(uWindDir)+cos(uWindDir)*0.38;float direction=projectedWind<0.0?-1.0:1.0;",
-            "  float cross=sin(uTime*(0.31+uWind*0.26)+uWindDir*2.1)*0.008*gust;",
-            "  float lift=cos(uTime*(0.26+uWind*0.20)+uWindDir)*0.0060*gust;",
-            "  float breatheA=sin(uTime*0.062+0.7)*0.0075;float breatheB=sin(uTime*0.043+2.2)*0.0060;",
-            "  float drift=direction*uTime*speed*(0.74+0.26*abs(projectedWind))+(uParallax-0.5)*0.055+cross;",
+            "  float drift=direction*uTime*speed*(0.74+0.26*abs(projectedWind))+(uParallax-0.5)*0.055;",
             "  float cell=uStorm>0.08?2.0:(uRain>0.06?1.0:(cover>0.78?0.0:(cover>0.52?7.0:(cover>0.25?6.0:5.0))));",
             "  float farCell=cover>0.68?0.0:(cover>0.32?7.0:4.0);float altCell=mod(cell+3.0,8.0);float farAlt=mod(farCell+5.0,8.0);",
             "  float weatherShade=clamp(uStorm*0.72+uRain*0.17+(1.0-uBrightness)*0.18+density*0.055,0.0,1.0);",
@@ -115,15 +116,15 @@ public final class HeroGlTextureCloudRenderer {
             "  float nearOpacity=(0.128+mass*0.425)*smoothstep(0.28,0.72,cover)*(0.08+0.92*nearTruth);",
             "  float farDrift=drift*0.44;float midDrift=drift*0.80;float nearDrift=drift*1.15;",
             "  vec3 color=vec3(0.0);float alpha=0.0;",
-            "  over(color,alpha,spriteWrapped(p,vec2(fract(0.16+farDrift),0.205+lift*0.16+breatheB),vec2(0.52,0.215),farCell,farOpacity,0.0),tint*1.10);",
-            "  if(detail>0.66){over(color,alpha,spriteWrapped(p,vec2(fract(0.66+farDrift*1.08),0.275-lift*0.14-breatheA),vec2(0.47,0.200),farAlt,farOpacity*0.78,1.0),tint*1.055);}",
-            "  over(color,alpha,spriteWrapped(p,vec2(fract(0.25+midDrift),0.360+lift*0.35+breatheA),vec2(0.58,0.305),cell,midOpacity,0.0),tint);",
-            "  if(detail>0.60){over(color,alpha,spriteWrapped(p,vec2(fract(0.78+midDrift*1.07),0.438-lift*0.29-breatheB),vec2(0.53,0.275),altCell,midOpacity*0.78,1.0),tint*0.97);}",
-            "  over(color,alpha,spriteWrapped(p,vec2(fract(0.48+nearDrift),0.520+lift*0.50+breatheB),vec2(0.60,0.350),cell,nearOpacity,1.0),tint*0.91);",
-            "  if(detail>0.82&&nearTruth>0.34){over(color,alpha,spriteWrapped(p,vec2(fract(0.01+nearDrift*0.94),0.458-lift*0.23+breatheA),vec2(0.49,0.260),altCell,nearOpacity*0.40,0.0),tint*0.94);}",
+            "  over(color,alpha,spriteWrapped(p,vec2(fract(0.16+farDrift),0.205),vec2(0.52,0.215),farCell,farOpacity,0.0),tint*1.10);",
+            "  if(detail>0.66){over(color,alpha,spriteWrapped(p,vec2(fract(0.66+farDrift*1.08),0.275),vec2(0.47,0.200),farAlt,farOpacity*0.78,1.0),tint*1.055);}",
+            "  over(color,alpha,spriteWrapped(p,vec2(fract(0.25+midDrift),0.360),vec2(0.58,0.305),cell,midOpacity,0.0),tint);",
+            "  if(detail>0.60){over(color,alpha,spriteWrapped(p,vec2(fract(0.78+midDrift*1.07),0.438),vec2(0.53,0.275),altCell,midOpacity*0.78,1.0),tint*0.97);}",
+            "  over(color,alpha,spriteWrapped(p,vec2(fract(0.48+nearDrift),0.520),vec2(0.60,0.350),cell,nearOpacity,1.0),tint*0.91);",
+            "  if(detail>0.82&&nearTruth>0.34){over(color,alpha,spriteWrapped(p,vec2(fract(0.01+nearDrift*0.94),0.458),vec2(0.49,0.260),altCell,nearOpacity*0.40,0.0),tint*0.94);}",
             "  if(detail>0.88&&cover<0.46&&farTruth>0.12){",
             "    float wispOpacity=(0.045+0.090*farTruth)*(1.0-smoothstep(0.34,0.52,cover));",
-            "    over(color,alpha,spriteWrapped(p,vec2(fract(0.43+farDrift*1.26),0.315+breatheA*0.55),vec2(0.38,0.125),4.0,wispOpacity,1.0),vec3(1.08)*tint);",
+            "    over(color,alpha,spriteWrapped(p,vec2(fract(0.43+farDrift*1.26),0.315),vec2(0.38,0.125),4.0,wispOpacity,1.0),vec3(1.08)*tint);",
             "  }",
             "  float overcast=smoothstep(0.69,0.93,mass);float ceilingStrength=max(overcast,ceilingTruth*0.94);",
             "  float xWave=0.5+0.5*sin(p.x*7.2+uTime*0.023*(1.0+gust*0.30));",
