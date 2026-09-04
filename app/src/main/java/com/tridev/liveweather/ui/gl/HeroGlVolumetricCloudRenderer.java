@@ -45,6 +45,7 @@ public final class HeroGlVolumetricCloudRenderer {
             "uniform float uStorm;",
             "uniform float uWind;",
             "uniform float uWindDir;",
+            "uniform float uParallax;",
             "uniform float uSceneLight;",
             "uniform float uBrightness;",
             "float hash21(vec2 p){",
@@ -63,22 +64,24 @@ public final class HeroGlVolumetricCloudRenderer {
             "float ellipse(vec2 p,vec2 center,vec2 radius){",
             "  vec2 q=(p-center)/radius;return 1.0-dot(q,q);",
             "}",
-            "float compactMass(vec2 p,vec2 center,float scale,float seed,float tower){",
+            "float compactMass(vec2 p,vec2 center,float scale,float seed,float tower,float evolution){",
             "  vec2 q=(p-center)/scale;",
-            "  float body=ellipse(q,vec2(0.00,-0.05),vec2(0.82,0.36));",
-            "  body=max(body,ellipse(q,vec2(-0.48,0.04),vec2(0.46,0.40)));",
-            "  body=max(body,ellipse(q,vec2(-0.10,0.22),vec2(0.52,0.55)));",
-            "  body=max(body,ellipse(q,vec2(0.34,0.17),vec2(0.45,0.48)));",
-            "  body=max(body,ellipse(q,vec2(0.60,0.00),vec2(0.33,0.31)));",
+            "  float morphA=sin(evolution+seed*1.37);float morphB=cos(evolution*0.83+seed*0.91);",
+            "  float body=ellipse(q,vec2(0.00,-0.05),vec2(0.82+morphA*0.025,0.36+morphB*0.018));",
+            "  body=max(body,ellipse(q,vec2(-0.48+morphB*0.018,0.04),vec2(0.46,0.40+morphA*0.020)));",
+            "  body=max(body,ellipse(q,vec2(-0.10,0.22+morphA*0.018),vec2(0.52+morphB*0.018,0.55)));",
+            "  body=max(body,ellipse(q,vec2(0.34+morphA*0.015,0.17),vec2(0.45,0.48+morphB*0.018)));",
+            "  body=max(body,ellipse(q,vec2(0.60,0.00+morphB*0.014),vec2(0.33+morphA*0.016,0.31)));",
             "  body=max(body,mix(-2.0,ellipse(q,vec2(-0.04,0.62),vec2(0.43,0.50)),tower));",
             "  body=max(body,mix(-2.0,ellipse(q,vec2(0.16,1.00),vec2(0.38,0.48)),tower));",
-            "  float detail=fbm(q*3.2+vec2(seed,seed*1.71));",
-            "  float micro=fbm(q*7.1+vec2(seed*2.3,-seed));",
+            "  vec2 evolveShift=vec2(evolution*0.13,-evolution*0.071);",
+            "  float detail=fbm(q*3.2+vec2(seed,seed*1.71)+evolveShift);",
+            "  float micro=fbm(q*7.1+vec2(seed*2.3,-seed)+evolveShift*1.7);",
             "  return body+(detail-0.50)*0.34+(micro-0.50)*0.09;",
             "}",
-            "float wrappedMass(vec2 p,vec2 center,float scale,float seed,float tower){",
+            "float wrappedMass(vec2 p,vec2 center,float scale,float seed,float tower,float evolution){",
             "  float dx=p.x-center.x;dx-=floor(dx+0.5);",
-            "  return compactMass(vec2(center.x+dx,p.y),center,scale,seed,tower);",
+            "  return compactMass(vec2(center.x+dx,p.y),center,scale,seed,tower,evolution);",
             "}",
             "void composite(inout vec3 rgb,inout float alpha,float field,vec2 p,vec2 center,float opacity){",
             "  float soft=0.085;float a=smoothstep(-soft,soft,field)*opacity;",
@@ -97,6 +100,8 @@ public final class HeroGlVolumetricCloudRenderer {
             "  float projected=sin(uWindDir)+cos(uWindDir)*0.38;",
             "  float direction=projected<0.0?-1.0:1.0;",
             "  float travel=direction*uTime*(0.006+uWind*0.018);",
+            "  float evolution=uTime*(0.0032+uWind*0.0018);",
+            "  float parallaxShift=uParallax-0.5;",
             "  float cover=clamp(uCloud,0.0,1.0),density=clamp(uDensity,0.0,1.0);",
             "  float rain=clamp(uRain,0.0,1.0),storm=clamp(uStorm,0.0,1.0);",
             "  float fair=1.0-smoothstep(0.20,0.42,cover);",
@@ -110,17 +115,20 @@ public final class HeroGlVolumetricCloudRenderer {
             "  float midTruth=smoothstep(0.03,0.72,uMidLayer);",
             "  float nearTruth=smoothstep(0.05,0.78,uNearLayer);",
             "  vec3 color=vec3(0.0);float alpha=0.0;",
-            "  vec2 c0=vec2(fract(0.18+travel*0.44),mix(0.20,0.27,broken));",
-            "  vec2 c1=vec2(fract(0.64+travel*0.78),mix(0.34,0.41,rainFamily));",
-            "  vec2 c2=vec2(fract(0.34+travel*1.18),mix(0.50,0.43,stormFamily));",
-            "  vec2 c3=vec2(fract(0.84+travel*0.70),0.30);",
+            "  float farTravel=travel*0.34+parallaxShift*0.014;",
+            "  float midTravel=travel*0.72+parallaxShift*0.036;",
+            "  float nearTravel=travel*1.18+parallaxShift*0.072;",
+            "  vec2 c0=vec2(fract(0.18+farTravel),mix(0.20,0.27,broken));",
+            "  vec2 c1=vec2(fract(0.64+midTravel),mix(0.34,0.41,rainFamily));",
+            "  vec2 c2=vec2(fract(0.34+nearTravel),mix(0.50,0.43,stormFamily));",
+            "  vec2 c3=vec2(fract(0.84+midTravel*0.93),0.30);",
             "  float farScale=mix(0.14,0.25,scattered+broken*0.72);",
             "  float midScale=mix(0.22,0.38,broken+overcast*0.80+rainFamily*0.72);",
             "  float nearScale=mix(0.26,0.43,overcast+rainFamily*0.82+stormFamily);",
-            "  float f0=wrappedMass(p,c0,farScale,1.7,0.0);",
-            "  float f1=wrappedMass(p,c1,midScale,4.1,tower*0.16);",
-            "  float f2=wrappedMass(p,c2,nearScale,7.3,tower);",
-            "  float f3=wrappedMass(p,c3,mix(0.18,0.34,overcast+rainFamily),10.9,tower*0.08);",
+            "  float f0=wrappedMass(p,c0,farScale,1.7,0.0,evolution*0.62);",
+            "  float f1=wrappedMass(p,c1,midScale,4.1,tower*0.16,evolution*0.88);",
+            "  float f2=wrappedMass(p,c2,nearScale,7.3,tower,evolution*1.13);",
+            "  float f3=wrappedMass(p,c3,mix(0.18,0.34,overcast+rainFamily),10.9,tower*0.08,evolution*0.79);",
             "  float fairOpacity=(0.16+0.13*fair)*(0.30+0.70*farTruth);",
             "  float midOpacity=(0.18+cover*0.30)*(0.22+0.78*midTruth);",
             "  float nearOpacity=(0.15+cover*0.38)*(0.18+0.82*nearTruth);",
@@ -146,6 +154,7 @@ public final class HeroGlVolumetricCloudRenderer {
     private int uStorm;
     private int uWind;
     private int uWindDir;
+    private int uParallax;
     private int uSceneLight;
     private int uBrightness;
     private int width = 1;
@@ -178,6 +187,7 @@ public final class HeroGlVolumetricCloudRenderer {
         uStorm = uniform("uStorm");
         uWind = uniform("uWind");
         uWindDir = uniform("uWindDir");
+        uParallax = uniform("uParallax");
         uSceneLight = uniform("uSceneLight");
         uBrightness = uniform("uBrightness");
         startNanos = System.nanoTime();
@@ -207,6 +217,7 @@ public final class HeroGlVolumetricCloudRenderer {
         GLES20.glUniform1f(uStorm, scene.stormIntensity);
         GLES20.glUniform1f(uWind, scene.windStrength);
         GLES20.glUniform1f(uWindDir, scene.windDirectionRadians);
+        GLES20.glUniform1f(uParallax, scene.parallax);
         GLES20.glUniform1f(uSceneLight, scene.sceneLight);
         GLES20.glUniform1f(uBrightness, scene.cloudBrightness);
         quad.position(0);
