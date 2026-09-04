@@ -23,9 +23,10 @@ import com.tridev.liveweather.domain.scene.SceneryVariantRuntimeState;
  * The OpenGL draw hot path never reads preferences, the clock or network data.
  */
 public final class HeroGlPipeline {
+
     private final HeroGlSkyCelestialRenderer sceneRenderer = new HeroGlSkyCelestialRenderer();
     private final HeroGlFixedStarRenderer starRenderer = new HeroGlFixedStarRenderer();
-    private final HeroGlVolumetricCloudRenderer cloudRenderer = new HeroGlVolumetricCloudRenderer();
+    private final HeroGlTextureCloudRenderer cloudRenderer = new HeroGlTextureCloudRenderer();
     private final HeroGlAnalyticWorldRenderer worldRenderer = new HeroGlAnalyticWorldRenderer();
     private final HeroGlAtmosphereOverlayRenderer atmosphereRenderer = new HeroGlAtmosphereOverlayRenderer();
     private final HeroGlPortableStormRenderer stormRenderer = new HeroGlPortableStormRenderer();

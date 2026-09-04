@@ -8,86 +8,44 @@ import java.lang.reflect.Field;
 
 import org.junit.Test;
 
-/** Release-lock contracts for the atlas-free volumetric cloud rebuild. */
+/** Regression contract for the post-roadmap cloud-shape and motion repair. */
 public final class HeroGlCloudMotionContractTest {
 
     @Test
-    public void sharedPipelineUsesOnlyTheNewVolumetricRenderer() throws Exception {
-        Field field = HeroGlPipeline.class.getDeclaredField("cloudRenderer");
-        assertEquals(HeroGlVolumetricCloudRenderer.class, field.getType());
-    }
-
-    @Test
-    public void cloudBodiesAreProceduralCompactMassesWithoutAtlasSampling() throws Exception {
+    public void cloudCentersUseContinuousWindAdvectionWithoutPendulumOffsets() throws Exception {
         String source = fragmentShader();
-        assertTrue(source.contains("float compactMass("));
-        assertTrue(source.contains("float ellipse("));
-        assertTrue(source.contains("float fbm("));
-        assertTrue(count(source, "body=max(body,ellipse") >= 4);
-        assertFalse(source.contains("sampler2D"));
-        assertFalse(source.contains("texture2D"));
-        assertFalse(source.contains("atlasSample"));
-        assertFalse(source.contains("spriteWrapped"));
-    }
 
-    @Test
-    public void weatherTruthSelectsAllRequiredCloudFamilies() throws Exception {
-        String source = fragmentShader();
-        assertTrue(source.contains("float fair="));
-        assertTrue(source.contains("float scattered="));
-        assertTrue(source.contains("float broken="));
-        assertTrue(source.contains("float overcast="));
-        assertTrue(source.contains("float rainFamily="));
-        assertTrue(source.contains("float stormFamily="));
-        assertTrue(source.contains("uFarLayer"));
-        assertTrue(source.contains("uMidLayer"));
-        assertTrue(source.contains("uNearLayer"));
-    }
+        assertTrue(source.contains("float advection=direction*uTime*speed"));
+        assertTrue(source.contains("float farDrift=advection*0.32"));
+        assertTrue(source.contains("float midDrift=advection*0.72"));
+        assertTrue(source.contains("float nearDrift=advection*1.18"));
 
-    @Test
-    public void centersUseOrderedOneWayWindTravelWithoutPendulumMotion() throws Exception {
-        String source = fragmentShader();
-        assertTrue(source.contains("float travel=direction*uTime"));
-        assertTrue(source.contains("float farTravel=travel*0.34"));
-        assertTrue(source.contains("float midTravel=travel*0.72"));
-        assertTrue(source.contains("float nearTravel=travel*1.18"));
         assertFalse(source.contains("float cross="));
         assertFalse(source.contains("float lift="));
         assertFalse(source.contains("breatheA"));
         assertFalse(source.contains("breatheB"));
-        assertFalse(source.contains("vec2 c0=vec2(sin"));
-        assertFalse(source.contains("vec2 c1=vec2(sin"));
-        assertFalse(source.contains("vec2 c2=vec2(sin"));
     }
 
     @Test
-    public void evolutionChangesInternalDensityInsteadOfCloudCenterDirection() throws Exception {
+    public void cloudLifeComesFromInternalEvolutionNotCenterReversal() throws Exception {
         String source = fragmentShader();
-        assertTrue(source.contains("float evolution=uTime*"));
-        assertTrue(source.contains("float morphA=sin(evolution"));
-        assertTrue(source.contains("vec2 evolveShift="));
-        assertTrue(source.contains("+evolveShift"));
+
+        assertTrue(source.contains("float evolution=uTime*(0.020+uWind*0.014)+cell*0.73"));
+        assertTrue(source.contains("vec2 warp=vec2(sin(q.y*6.2+evolution)"));
+        assertTrue(source.contains("float sheetFlow=direction*uTime*(0.004+uWind*0.006)"));
     }
 
     @Test
-    public void lightingRespondsToSunMoonTwilightAndSevereWeather() throws Exception {
+    public void repairedCloudMassesStayCompactInsteadOfOldWideStrips() throws Exception {
         String source = fragmentShader();
-        assertTrue(source.contains("uSunPos"));
-        assertTrue(source.contains("uSunAltitude"));
-        assertTrue(source.contains("uMoonPos"));
-        assertTrue(source.contains("float directional="));
-        assertTrue(source.contains("float twilight="));
-        assertTrue(source.contains("float underside="));
-        assertTrue(source.contains("float weather=clamp(uRain"));
-    }
 
-    @Test
-    public void adaptiveDetailPreservesPrimaryMassesAndDropsOnlySecondaryMass() throws Exception {
-        String source = fragmentShader();
-        assertTrue(source.contains("if(uDetail>0.66){f3="));
-        assertTrue(source.contains("float f0=wrappedMass"));
-        assertTrue(source.contains("float f1=wrappedMass"));
-        assertTrue(source.contains("float f2=wrappedMass"));
+        assertTrue(source.contains("vec2(0.52,0.215)"));
+        assertTrue(source.contains("vec2(0.58,0.305)"));
+        assertTrue(source.contains("vec2(0.60,0.350)"));
+        assertTrue(source.contains("float breakup=0.91+0.09*sin"));
+
+        assertFalse(source.contains("vec2(0.82,0.315)"));
+        assertFalse(source.contains("vec2(0.88,0.365)"));
     }
 
     @Test
@@ -99,7 +57,7 @@ public final class HeroGlCloudMotionContractTest {
     }
 
     private static String fragmentShader() throws Exception {
-        Field field = HeroGlVolumetricCloudRenderer.class.getDeclaredField("FS");
+        Field field = HeroGlTextureCloudRenderer.class.getDeclaredField("FS");
         field.setAccessible(true);
         return (String) field.get(null);
     }
@@ -108,16 +66,6 @@ public final class HeroGlCloudMotionContractTest {
         int count = 0;
         for (int i = 0; i < value.length(); i++) {
             if (value.charAt(i) == target) count++;
-        }
-        return count;
-    }
-
-    private static int count(String value, String target) {
-        int count = 0;
-        int offset = 0;
-        while ((offset = value.indexOf(target, offset)) >= 0) {
-            count++;
-            offset += target.length();
         }
         return count;
     }
