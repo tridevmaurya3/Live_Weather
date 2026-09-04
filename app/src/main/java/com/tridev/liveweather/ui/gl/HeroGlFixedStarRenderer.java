@@ -81,7 +81,7 @@ public final class HeroGlFixedStarRenderer {
             "  float twinkleAmp=(0.012+nearHorizon*0.050)*(1.0-aStar.z*0.32);",
             "  float scint=1.0+sin(uTime*(0.55+fract(abs(phase))*0.52)+phase)*twinkleAmp;",
             "  vAlpha=clamp(aStar.z*uStarVis*horizonFade*scint,0.0,1.0);",
-            "  gl_PointSize=clamp(aStar.w*uPixelScale*(0.96+0.04*scint),1.0,4.8);",
+            "  gl_PointSize=clamp(aStar.w*uPixelScale*2.0*(0.96+0.04*scint),2.0,9.6);",
             "  vColorMix=clamp(aColorMix,0.0,1.0);vBrightness=aStar.z;",
             "}"
     );

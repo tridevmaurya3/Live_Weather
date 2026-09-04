@@ -23,7 +23,6 @@ import com.tridev.liveweather.domain.scene.SceneryVariantRuntimeState;
  * The OpenGL draw hot path never reads preferences, the clock or network data.
  */
 public final class HeroGlPipeline {
-    private static final float SCENE_VIEWPORT_SCALE = 1.5f;
 
     private final HeroGlSkyCelestialRenderer sceneRenderer = new HeroGlSkyCelestialRenderer();
     private final HeroGlFixedStarRenderer starRenderer = new HeroGlFixedStarRenderer();
@@ -205,14 +204,6 @@ public final class HeroGlPipeline {
                 diagnostics.recordRendererFault("snow", "surface-change", error);
             }
         }
-
-        // Apply one shared camera crop after every renderer has received the real surface size.
-        // Rendering inputs stay unchanged; the complete environment is framed 50% larger.
-        int scaledWidth = Math.max(1, Math.round(width * SCENE_VIEWPORT_SCALE));
-        int scaledHeight = Math.max(1, Math.round(height * SCENE_VIEWPORT_SCALE));
-        int viewportX = (width - scaledWidth) / 2;
-        int viewportY = (height - scaledHeight) / 2;
-        GLES20.glViewport(viewportX, viewportY, scaledWidth, scaledHeight);
     }
 
     public void setSnapshot(@Nullable GlSceneSnapshot snapshot) {

@@ -58,7 +58,7 @@ public final class HeroGlWorldShaderContractTest {
         // Direct celestial discs/near halos become opaque only where real terrain overlaps them.
         assertTrue(source.contains("float terrainOcclusion=clamp(max(farM,max(midM,nearM))"));
         assertTrue(source.contains("float celestialTerrainMask=smoothstep(0.08,0.58,terrainOcclusion)"));
-        assertTrue(source.contains("float sunDiscBlock=1.0-smoothstep(0.033,0.052,sunDistance)"));
+        assertTrue(source.contains("float sunDiscBlock=1.0-smoothstep(0.066,0.104,sunDistance)"));
         assertTrue(source.contains("float sunTerrainBlock=max(sunDiscBlock,sunHaloBlock)"));
         assertTrue(source.contains("alpha=max(alpha,celestialTerrainMask*sunTerrainBlock)"));
         assertTrue(source.contains("float moonDiscBlock=1.0-smoothstep(0.031,0.047,moonDistance)"));

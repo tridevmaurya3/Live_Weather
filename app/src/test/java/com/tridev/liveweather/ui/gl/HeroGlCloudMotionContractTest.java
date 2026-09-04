@@ -39,9 +39,9 @@ public final class HeroGlCloudMotionContractTest {
     public void repairedCloudMassesStayCompactInsteadOfOldWideStrips() throws Exception {
         String source = fragmentShader();
 
-        assertTrue(source.contains("vec2(0.52,0.215)"));
-        assertTrue(source.contains("vec2(0.58,0.305)"));
-        assertTrue(source.contains("vec2(0.60,0.350)"));
+        assertTrue(source.contains("vec2(1.56,0.645)"));
+        assertTrue(source.contains("vec2(1.74,0.915)"));
+        assertTrue(source.contains("vec2(1.80,1.050)"));
         assertTrue(source.contains("float breakup=0.91+0.09*sin"));
 
         assertFalse(source.contains("vec2(0.82,0.315)"));
