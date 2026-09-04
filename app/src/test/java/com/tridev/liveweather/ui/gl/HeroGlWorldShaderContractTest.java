@@ -46,6 +46,26 @@ public final class HeroGlWorldShaderContractTest {
         assertTrue(fragment.contains("clamp(uMicroVisibility,0.34,1.0)"));
     }
 
+    @Test
+    public void mountainSilhouetteBlocksDirectSunAndMoonWithoutBreakingAtmosphericDepth() throws Exception {
+        String source = readPrivateStaticString("FS");
+
+        // Stage 15 terrain transmission must remain intact away from celestial discs.
+        assertTrue(source.contains("farM*(0.42-haze*0.22)*farTransmission"));
+        assertTrue(source.contains("midM*(0.58-haze*0.18)*midTransmission"));
+        assertTrue(source.contains("nearM*(0.76-haze*0.08)*nearTransmission"));
+
+        // Direct celestial discs/near halos become opaque only where real terrain overlaps them.
+        assertTrue(source.contains("float terrainOcclusion=clamp(max(farM,max(midM,nearM))"));
+        assertTrue(source.contains("float celestialTerrainMask=smoothstep(0.08,0.58,terrainOcclusion)"));
+        assertTrue(source.contains("float sunDiscBlock=1.0-smoothstep(0.033,0.052,sunDistance)"));
+        assertTrue(source.contains("float sunTerrainBlock=max(sunDiscBlock,sunHaloBlock)"));
+        assertTrue(source.contains("alpha=max(alpha,celestialTerrainMask*sunTerrainBlock)"));
+        assertTrue(source.contains("float moonDiscBlock=1.0-smoothstep(0.031,0.047,moonDistance)"));
+        assertTrue(source.contains("float moonTerrainBlock=max(moonDiscBlock,moonHaloBlock)"));
+        assertTrue(source.contains("alpha=max(alpha,celestialTerrainMask*moonTerrainBlock)"));
+    }
+
     private static void assertUniformUsed(String source, String uniform) {
         assertTrue(source.contains("uniform float " + uniform + ";"));
         assertTrue(count(source, uniform) >= 2);
