@@ -18,10 +18,9 @@ import java.nio.FloatBuffer;
 /**
  * Photoreal cloud-atlas renderer shared by the app Hero and Live Wallpaper.
  *
- * Reality fine-tuning keeps resolved weather truth authoritative while reducing
- * the flat dark cut-out look seen in real-device rainy-wallpaper footage. Cloud
- * layers retain far/mid/near truth, but use softer edges, lower overlap opacity,
- * smaller near masses and more readable low-wind drift.
+ * Cloud-reality repair Stage 1 keeps provider-resolved far/mid/near cloud truth authoritative
+ * while reconstructing the atlas presentation as compact overlapping atmospheric masses instead
+ * of stretched strip-like sprites. Weather state, cover and density are never synthesized here.
  */
 public final class HeroGlTextureCloudRenderer {
 
@@ -78,10 +77,11 @@ public final class HeroGlTextureCloudRenderer {
             "  float inside=step(0.0,q.x)*step(q.x,1.0)*step(0.0,q.y)*step(q.y,1.0);",
             "  if(mirrorX>0.5){q.x=1.0-q.x;}",
             "  vec4 s=atlasSample(clamp(q,0.0,1.0),cell);",
-            "  float edgeX=smoothstep(0.0,0.118,q.x)*smoothstep(0.0,0.118,1.0-q.x);",
-            "  float edgeY=smoothstep(0.0,0.090,q.y)*smoothstep(0.0,0.090,1.0-q.y);",
-            "  float crown=0.94+0.06*sin((q.x*5.2+q.y*2.9+cell)*3.14159);",
-            "  s.a*=inside*opacity*edgeX*edgeY*crown;return s;",
+            "  float edgeX=smoothstep(0.0,0.145,q.x)*smoothstep(0.0,0.145,1.0-q.x);",
+            "  float edgeY=smoothstep(0.0,0.120,q.y)*smoothstep(0.0,0.120,1.0-q.y);",
+            "  float crown=0.93+0.07*sin((q.x*5.7+q.y*3.1+cell)*3.14159);",
+            "  float breakup=0.91+0.09*sin(q.x*10.6+sin(q.y*7.3+cell*0.83)*1.35+cell);",
+            "  s.a*=inside*opacity*edgeX*edgeY*crown*breakup;return s;",
             "}",
             "void over(inout vec3 color,inout float alpha,vec4 s,vec3 tint){",
             "  float a=clamp(s.a,0.0,0.80);",
@@ -110,20 +110,20 @@ public final class HeroGlTextureCloudRenderer {
             "  tint*=mix(vec3(1.0),warmTint,twilight*0.15*(1.0-weatherShade));",
             "  tint*=mix(vec3(1.0),moonTint,uMoonVis*(1.0-uSceneLight)*0.08);",
             "  float farTruth=smoothstep(0.015,0.62,farLayer);float midTruth=smoothstep(0.03,0.72,midLayer);float nearTruth=smoothstep(0.05,0.78,nearLayer);",
-            "  float farOpacity=(0.080+mass*0.225)*smoothstep(0.035,0.25,cover)*(0.16+0.84*farTruth);",
-            "  float midOpacity=(0.130+mass*0.365)*smoothstep(0.12,0.48,cover)*(0.12+0.88*midTruth);",
-            "  float nearOpacity=(0.115+mass*0.405)*smoothstep(0.28,0.72,cover)*(0.08+0.92*nearTruth);",
+            "  float farOpacity=(0.088+mass*0.235)*smoothstep(0.035,0.25,cover)*(0.16+0.84*farTruth);",
+            "  float midOpacity=(0.142+mass*0.382)*smoothstep(0.12,0.48,cover)*(0.12+0.88*midTruth);",
+            "  float nearOpacity=(0.128+mass*0.425)*smoothstep(0.28,0.72,cover)*(0.08+0.92*nearTruth);",
             "  float farDrift=drift*0.44;float midDrift=drift*0.80;float nearDrift=drift*1.15;",
             "  vec3 color=vec3(0.0);float alpha=0.0;",
-            "  over(color,alpha,spriteWrapped(p,vec2(fract(0.18+farDrift),0.195+lift*0.16+breatheB),vec2(0.72,0.220),farCell,farOpacity,0.0),tint*1.10);",
-            "  if(detail>0.66){over(color,alpha,spriteWrapped(p,vec2(fract(0.71+farDrift*1.08),0.270-lift*0.14-breatheA),vec2(0.64,0.205),farAlt,farOpacity*0.72,1.0),tint*1.055);}",
-            "  over(color,alpha,spriteWrapped(p,vec2(fract(0.29+midDrift),0.355+lift*0.35+breatheA),vec2(0.82,0.315),cell,midOpacity,0.0),tint);",
-            "  if(detail>0.60){over(color,alpha,spriteWrapped(p,vec2(fract(0.82+midDrift*1.07),0.432-lift*0.29-breatheB),vec2(0.74,0.285),altCell,midOpacity*0.72,1.0),tint*0.97);}",
-            "  over(color,alpha,spriteWrapped(p,vec2(fract(0.51+nearDrift),0.515+lift*0.50+breatheB),vec2(0.88,0.365),cell,nearOpacity,1.0),tint*0.91);",
-            "  if(detail>0.82&&nearTruth>0.34){over(color,alpha,spriteWrapped(p,vec2(fract(0.04+nearDrift*0.94),0.455-lift*0.23+breatheA),vec2(0.66,0.270),altCell,nearOpacity*0.34,0.0),tint*0.94);}",
+            "  over(color,alpha,spriteWrapped(p,vec2(fract(0.16+farDrift),0.205+lift*0.16+breatheB),vec2(0.52,0.215),farCell,farOpacity,0.0),tint*1.10);",
+            "  if(detail>0.66){over(color,alpha,spriteWrapped(p,vec2(fract(0.66+farDrift*1.08),0.275-lift*0.14-breatheA),vec2(0.47,0.200),farAlt,farOpacity*0.78,1.0),tint*1.055);}",
+            "  over(color,alpha,spriteWrapped(p,vec2(fract(0.25+midDrift),0.360+lift*0.35+breatheA),vec2(0.58,0.305),cell,midOpacity,0.0),tint);",
+            "  if(detail>0.60){over(color,alpha,spriteWrapped(p,vec2(fract(0.78+midDrift*1.07),0.438-lift*0.29-breatheB),vec2(0.53,0.275),altCell,midOpacity*0.78,1.0),tint*0.97);}",
+            "  over(color,alpha,spriteWrapped(p,vec2(fract(0.48+nearDrift),0.520+lift*0.50+breatheB),vec2(0.60,0.350),cell,nearOpacity,1.0),tint*0.91);",
+            "  if(detail>0.82&&nearTruth>0.34){over(color,alpha,spriteWrapped(p,vec2(fract(0.01+nearDrift*0.94),0.458-lift*0.23+breatheA),vec2(0.49,0.260),altCell,nearOpacity*0.40,0.0),tint*0.94);}",
             "  if(detail>0.88&&cover<0.46&&farTruth>0.12){",
             "    float wispOpacity=(0.045+0.090*farTruth)*(1.0-smoothstep(0.34,0.52,cover));",
-            "    over(color,alpha,spriteWrapped(p,vec2(fract(0.46+farDrift*1.26),0.315+breatheA*0.55),vec2(0.52,0.135),4.0,wispOpacity,1.0),vec3(1.08)*tint);",
+            "    over(color,alpha,spriteWrapped(p,vec2(fract(0.43+farDrift*1.26),0.315+breatheA*0.55),vec2(0.38,0.125),4.0,wispOpacity,1.0),vec3(1.08)*tint);",
             "  }",
             "  float overcast=smoothstep(0.69,0.93,mass);float ceilingStrength=max(overcast,ceilingTruth*0.94);",
             "  float xWave=0.5+0.5*sin(p.x*7.2+uTime*0.023*(1.0+gust*0.30));",
